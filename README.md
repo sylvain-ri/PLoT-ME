@@ -6,9 +6,9 @@ Sylvain Riondet, NUS/SoC, GIS/Biopolis, Singapore
 
 
 ### Contact
-Author: Sylvain Riondet, PhD student in the National University of Singapore, School of Computing
+Author: Sylvain Riondet, PhD student at the National University of Singapore, School of Computing
 Email: sylvain@u.nus.edu
 Lab: Genome Institute of Singapore
-Supervisors: Martin Henz & Niranjan Nagarajan
+Supervisors: Niranjan Nagarajan & Martin Henz
 Date started: 2019-02-21
 
