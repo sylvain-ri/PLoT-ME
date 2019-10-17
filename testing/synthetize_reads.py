@@ -5,8 +5,12 @@
 # Started on 2019-06-18
 #
 # ######################################################################################################################
+# Scrap 
 # Synthesise reads from genomes .fna files.
 #
+
+# what is inside, example:
+# b'>NC_002162.1 Ureaplasma parvum serovar 3 str. ATCC 700970, complete genome\nATGGCTAATAATTATCAAACTTTATATGATTCAGCAATAAAAAGGATTCCATACGATCTTATTTCTGATCAAGCTTATGC\nAATTCTACAAAATGCTAAAACTCATAAAGTTTGCGATGGTGTTT'
 
 
 import argparse
@@ -15,42 +19,57 @@ import os
 from os.path import getsize, join as path_join
 import pandas as pd
 import subprocess
-
 from tqdm import tqdm
 
-path_genomes   = "/home/sjriondet/Data/ncbi-2019-complete/refseq"
-path_out_reads = "/home/sjriondet/Data/synthetic_reads"
+
+path_genomes   = "/home/ubuntu/Data/NCBI/20190704/refseq"
+path_cache     = "/home/ubuntu/Data/NCBI"
+path_out_reads = "/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genomes"
 
 
-def preprocess_genomes(folder):
+def preprocess_genomes(folder, gzip=True, update_summary=False):
     """ Read through all genomes files to have a summary of the available data """
     cache_file_name = "_genomes.pd"
     # meta_file_name = ""
-    cache_file_path = path_join(folder, cache_file_name)
+    cache_file_path = path_join(path_cache, cache_file_name)
+    fna_extensions = (".fna", ".fa", ".fastq", )
+    if gzip: fna_extensions = (ext + gz for ext in fna_extensions for gz in (".gz", ".gzip"))
 
-    if os.path.isfile(cache_file_path):
+    if os.path.isfile(cache_file_path) and update_summary is False:
         return pd.read_pickle(cache_file_path)
+    
     else:
         # todo create the summary file
+        summary_genomes = []
+        
         number_genomes = sum([len(files) for _, _, files in os.walk(path_genomes)])
         for dir_path, dir_names, files in tqdm(os.walk(path_genomes), total=number_genomes):
             for file in files:
-                if file.endswith((".fna", ".fa", ".fastq", )):
+                    
+                if file.endswith(fna_extensions):
                     file_path = path_join(dir_path, file)
                     file_size = getsize(file_path)
-                    with gzip.open(file_path, 'rb') as f:
-                        content = f.read().decode("utf-8")
-                        content.count("\n")
-                        # what is inside, example:
-                        # b'>NC_002162.1 Ureaplasma parvum serovar 3 str. ATCC 700970, complete genome\nATGGCTAATAATTATCAAACTTTATATGATTCAGCAATAAAAAGGATTCCATACGATCTTATTTCTGATCAAGCTTATGC\nAATTCTACAAAATGCTAAAACTCATAAAGTTTGCGATGGTGTTT'
-
-        df = pd.DataFrame()
+                    
+                    if gzip:
+                        with gzip.open(file_path, 'rb') as f:
+                            content = f.read().decode("utf-8")
+                    else:
+                        with open(file_path, 'rb') as f:
+                            content = f.read()
+                    summary_genomes.append(scrap_genomes(content))
+                        
+                        
+        df = pd.DataFrame(summary_genomes, columns=["taxon", "file_path", "", "", "", ])
         df.to_pickle(cache_file_path)
         return df
 
+def scrap_genomes(content):
+    
+    return ["something"]
+    
 
 def reads_from_genomes(number_reads):
-    """ Create synthetic reads from intact genomee """
+    """ Create synthetic reads from intact genome """
     # todo: add a counter (like want x reads)
 
     number_genomes = sum([len(files) for _, _, files in os.walk(path_genomes)])
@@ -78,3 +97,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
+    
+    
+    
+    
+    
+    
