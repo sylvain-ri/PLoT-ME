@@ -26,6 +26,8 @@ path_genomes   = "/home/ubuntu/Data/NCBI/20190704/refseq"
 path_cache     = "/home/ubuntu/Data/NCBI"
 path_out_reads = "/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genomes"
 
+meta_data = {"taxon", "file_path", "", "", "", }  # todo: add info for each field
+
 
 def preprocess_genomes(folder, gzip=True, update_summary=False):
     """ Read through all genomes files to have a summary of the available data """
