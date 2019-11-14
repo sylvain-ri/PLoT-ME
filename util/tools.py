@@ -11,6 +11,43 @@ import os
 import re
 import traceback
 import pandas as pd
+from ete3 import NCBITaxa
+
+
+ncbi = NCBITaxa()
+
+
+# To get the taxo ids at various ranks
+# From: https://stackoverflow.com/a/36517712/4767645
+def get_desired_ranks(taxid, desired_ranks):
+    """
+    Returns a Dict with the rank name and associated taxo id, for a given species / taxo id.
+    :param taxid:
+    :param desired_ranks:
+    :return:
+    """
+    lineage = ncbi.get_lineage(taxid)
+    lineage2ranks = ncbi.get_rank(lineage)
+    ranks2lineage = dict((rank, taxid) for (taxid, rank) in lineage2ranks.items())
+    return {f'{rank}_id': ranks2lineage.get(rank, '<not present>') for rank in desired_ranks}
+
+
+# From: https://stackoverflow.com/a/36517712/4767645
+def taxa_id_to_csv(taxids, desired_ranks, path):
+    """
+    Write the taxonomy ids, at the selected ranks, to a csv file
+    :param taxids: list of integers of a selected species
+    :param desired_ranks: list of ranks such as ['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
+    :param path: path for the output .csv file
+    :return:
+    """
+    import csv
+    with open(path, 'w') as csvfile:
+        fieldnames = ['{}_id'.format(rank) for rank in desired_ranks]
+        writer = csv.DictWriter(csvfile, delimiter='\t', fieldnames=fieldnames)
+        writer.writeheader()
+        for taxid in taxids:
+            writer.writerow(get_desired_ranks(taxid, desired_ranks))
 
 
 def read_fna(file_path):
