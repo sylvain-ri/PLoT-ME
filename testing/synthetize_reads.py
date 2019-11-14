@@ -20,7 +20,12 @@ from os.path import getsize, join as path_join
 import pandas as pd
 import subprocess
 from tqdm import tqdm
+from CONSTANTS import paths
 
+
+# todo: check what in the NCBI database, count length and the line number of each genome, each chromosome, save it.
+#  save the path, taxo id, lineage at various ranks
+#  to be able to filter, select species at some rank, with some length of genome, ...
 
 path_genomes   = "/home/ubuntu/Data/NCBI/20190704/refseq"
 path_cache     = "/home/ubuntu/Data/NCBI"
@@ -29,13 +34,13 @@ path_out_reads = "/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genome
 meta_data = {"taxon", "file_path", "", "", "", }  # todo: add info for each field
 
 
-def preprocess_genomes(folder, gzip=True, update_summary=False):
+def preprocess_genomes(folder, is_zip=True, update_summary=False):
     """ Read through all genomes files to have a summary of the available data """
     cache_file_name = "_genomes.pd"
     # meta_file_name = ""
     cache_file_path = path_join(path_cache, cache_file_name)
     fna_extensions = (".fna", ".fa", ".fastq", )
-    if gzip: fna_extensions = (ext + gz for ext in fna_extensions for gz in (".gz", ".gzip"))
+    if is_zip: fna_extensions = (ext + gz for ext in fna_extensions for gz in (".gz", ".gzip"))
 
     if os.path.isfile(cache_file_path) and update_summary is False:
         return pd.read_pickle(cache_file_path)
@@ -52,7 +57,7 @@ def preprocess_genomes(folder, gzip=True, update_summary=False):
                     file_path = path_join(dir_path, file)
                     file_size = getsize(file_path)
                     
-                    if gzip:
+                    if is_zip:
                         with gzip.open(file_path, 'rb') as f:
                             content = f.read().decode("utf-8")
                     else:
@@ -75,7 +80,7 @@ def reads_from_genomes(number_reads):
     # todo: add a counter (like want x reads)
 
     number_genomes = sum([len(files) for _, _, files in os.walk(path_genomes)])
-    reads
+
 
 
     # todo: add a counter (like want x reads)
