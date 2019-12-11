@@ -20,7 +20,7 @@ from os.path import getsize, join as path_join
 import pandas as pd
 import subprocess
 from tqdm import tqdm
-from CONSTANTS import paths
+from .CONSTANTS import paths
 
 
 # todo: check what in the NCBI database, count length and the line number of each genome, each chromosome, save it.
