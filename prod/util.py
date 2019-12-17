@@ -15,7 +15,9 @@ from datetime import date
 import os
 import os.path as osp
 import logging
+import traceback
 
+import ete3.ncbi_taxonomy
 
 # import sys
 # print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
@@ -29,16 +31,22 @@ util_logger.debug('write messages')
 # Paths
 class ProjectPaths:
     def __init__(self):
+        self.data = "/home/ubuntu/Data"
         self.LOGS = f"/home/ubuntu/logs/{date.today()}.log"
+
+        self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
+        self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
+        self.RefSeq_4mer_freq = f"{self.RefSeq_kmer_freq}/4mer"
+
         self.classifiers = ('kraken2', )
-        self.DB = "/home/ubuntu/database/kraken2"
-        self.KRAKEN2_DB = {
-            "2015-10bins"  : f"{self.DB}/2015-10bins",
-            "2015-standard": f"{self.DB}/2015-standard",
+        self.classifier_DB = "/home/ubuntu/database/kraken2"
+        self.kraken2_DB = {
+            "2015-10bins"  : f"{self.classifier_DB}/2015-10bins",
+            "2015-standard": f"{self.classifier_DB}/2015-standard",
         }
-        self.FOLDER_REPORTS = "/home/ubuntu/Data/Reports"
+        self.folder_reports = f"{self.data}/Reports"
         
-        self.models = "/home/ubuntu/Data/kmer_freq/4mer/V4"
+        self.models = f"{self.data}/kmer_freq/4mer/V4"
         self.lda_model = f"{self.models}/LDA/lda_model_20_int.pd"
         self.kmeans_model = f"{self.models}/clustering/10_kmeans_2019-05-09_04-08.pkl"
 
@@ -59,6 +67,7 @@ def is_valid_directory(x):
             raise NotADirectoryError(f'The path is not a folder : {x}')
         return x
 
+
 def is_valid_file(x):
     if osp.isfile(x):
         return x
@@ -66,20 +75,27 @@ def is_valid_file(x):
         util_logger.error('file does not exist ' + x)
         raise FileNotFoundError(f'The path is not a file : {x}')
 
+
 def folder_today(path):
     s_today = f"{date.today()}"
     final_path = osp.join(path, s_today)
     if not osp.isdir(final_path):
         os.makedirs(final_path)
     return final_path
-        
+
+
+def div_z(n, d):
+    return n / d if d else 0
+
 
 # #############################################################################
 # Methods for nucleotides manipulations
 nucleotides = "ACGT"
 
+
 def kmers_dic(n, choice=nucleotides):
     return {a:0 for a in combinaisons(choice, n)}
+
 
 def combinaisons(combi, n, instances=nucleotides):
     if n == 1:
@@ -87,7 +103,8 @@ def combinaisons(combi, n, instances=nucleotides):
     else:
         return [f"{a}{n}" for a in combinaisons(combi, n-1) for n in instances]
 
-def window(seq, window_size=4):
+
+def seq_to_window(seq, window_size=4):
     """ Return a sliding window from a string """
     for i in range(len(seq) - window_size + 1):
         yield seq[i:i+window_size]
@@ -104,7 +121,7 @@ def seq_count_kmer(seq, kmer_count, k=4, ignore_N=True):
     kmer_count[wrong_base] = 0
     
     try:
-        for kmer in window(str(seq), k):
+        for kmer in seq_to_window(str(seq), k):
             try:
                 kmer_count[kmer] += 1
             except:
@@ -118,8 +135,37 @@ def seq_count_kmer(seq, kmer_count, k=4, ignore_N=True):
         print(traceback.format_exc())
         return kmer_count
 
-# #############################################################################
 
+# #############################################################################
+# Related to taxonomy
+
+ncbi = ete3.ncbi_taxonomy.NCBITaxa()
+
+
+def get_desired_ranks(taxid, desired_ranks, tolist=False):
+    """ Get all taxonomy ids of desired ranks
+        From stackoverflow
+        https://stackoverflow.com/questions/36503042/how-to-get-taxonomic-specific-ids-for-kingdom-phylum-class-order-family-gen
+    """
+    try:
+        lineage = ncbi.get_lineage(taxid)
+        lineage2ranks = ncbi.get_rank(lineage)
+        ranks2lineage = dict((rank, taxid) for (taxid, rank) in lineage2ranks.items())
+        if tolist: return [ranks2lineage.get(rank, 0) for rank in desired_ranks]
+        else:      return {f'{rank}_id': ranks2lineage.get(rank, 0) for rank in desired_ranks}
+    except:
+        print(f"retrieval of the lineage of {taxid} failed")
+        if tolist: return [0 for rank in desired_ranks]
+        else:      return {f'{rank}_id': 0 for rank in desired_ranks}
+
+
+def get_list_rank(taxids, desired_rank="species"):
+    """ Get the taxonomy id at the species level, from a list of id below species level """
+    res = []
+    for taxid in taxids:
+        name = get_desired_ranks(taxid, [desired_rank], tolist=True)[0]
+        res.append(name)
+    return res
 
 
 # #############################################################################
