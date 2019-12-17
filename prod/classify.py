@@ -121,7 +121,7 @@ class CustomRead(SeqRecord.SeqRecord):
 class FastQClassification:
     """ For a fastq file, bin reads, classify them, and compare results """
     
-    def __init__(self, path_original_fastq, db_choice, folder_report, bin_nb=10, classifier="kraken2", 
+    def __init__(self, path_original_fastq, db_choice, folder_report, bin_nb=10, classifier="kraken2",
                  cores=multiprocessing.cpu_count(), dry_run=True, verbose=False):
         self.logger = logging.getLogger('classify.FastQClassification')
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
@@ -165,7 +165,7 @@ class FastQClassification:
         self.logger.info('start to classify reads with kraken2 standard DB')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
-            "--db", f"{PATHS.KRAKEN2_DB[self.db_choice]}", 
+            "--db", f"{PATHS.kraken2_DB[self.db_choice]}",
             self.path_original_fastq, 
             "--output", f"{self.path_out}.full.kraken2.out",
             "--report", f"{self.path_out}.full.kraken2.report",
@@ -179,7 +179,7 @@ class FastQClassification:
         self.logger.info('start to classify reads with kraken2 10 bins DB')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
-            "--db", f"{PATHS.KRAKEN2_DB[self.db_choice]}/{i}", 
+            "--db", f"{PATHS.kraken2_DB[self.db_choice]}/{i}",
             file, 
             "--output", f"{self.path_out}.bin-{i}.kraken2.out",
             "--report", f"{self.path_out}.bin-{i}.kraken2.report",
@@ -221,12 +221,12 @@ def classify_reads(path_fastq, path_report, classifier, db):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
-        'Provided a fastq file with reads, bins the reads into defined bins ' \
-        'and launch a classifier loading one bin at the time.')
+                                     'Provided a fastq file with reads, bins the reads into defined bins '
+                                     'and launch a classifier loading one bin at the time.')
     parser.add_argument('-i', '--input_fastq',   help='Input file in fastq format', type=is_valid_file, 
                                                  default=path_fastq_comm)
-    parser.add_argument('-o', '--output_folder', help='Folder for output reports' , type=is_valid_directory, 
-                                                 default=folder_today(PATHS.FOLDER_REPORTS))
+    parser.add_argument('-o', '--output_folder', help='Folder for output reports', type=is_valid_directory,
+                        default=folder_today(PATHS.folder_reports))
     parser.add_argument('-c', '--classifier',    help='choose kraken2 or centrifuge', 
                                                  choices=PATHS.classifiers, default=PATHS.classifiers[0])
     parser.add_argument('-d', '--database',      default='standard', help='which reference to use', choices=('standard', 'mini', ))
