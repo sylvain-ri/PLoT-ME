@@ -12,7 +12,6 @@
 # 
 
 import argparse
-from datetime import datetime as dt
 import logging
 import multiprocessing
 import numpy as np
@@ -23,13 +22,15 @@ import pickle
 import random
 import subprocess
 import traceback
+
+# todo: add timing record
 from time import time
 
 from Bio import SeqIO, SeqRecord
 import matplotlib.pyplot as plt
 from tqdm import tqdm_notebook as tqdm
 
-from util import *
+from prod.util import *
 
 
 # Import paths and constants for the whole project
@@ -90,7 +91,7 @@ class CustomRead(SeqRecord.SeqRecord):
     
     def count_kmer(self, ignore_N=True):
         """ common method """
-        seq_count_kmer(self.seq, self.kmer_count, self.k, ignore_N=True)
+        seq_count_kmer(self.seq, self.kmer_count, self.k, ignore_N=ignore_N)
     
     def lda_reduce(self):
         self.logger.info('reducing dimension of kmer frequency to lda representation')
@@ -108,7 +109,8 @@ class CustomRead(SeqRecord.SeqRecord):
         assert self.FASTQ_PATH is not None, AttributeError("Path of the fastq file must first be defined")
         with open(self.path_out, "a") as f:
             SeqIO.write(self, f, "fasta")
-        
+
+    @classmethod
     def set_fastq_path(path_fastq):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
         CustomRead.FASTQ_PATH = path_fastq
@@ -141,8 +143,7 @@ class FastQClassification:
         self.dry_run       = dry_run
         self.verbose       = verbose
         self.cmd           = None
-    
-                
+
     def find_binned_files(self):
         for i in range(self.bin_nb):
             path_bin_i = f"{self.folder}/{self.file_name}.bin-{i}.fastq"
@@ -191,7 +192,6 @@ class FastQClassification:
     def kraken2_report_merging(self):
         self.logger.info('Merging kraken2 reports')
         NotImplementedError
-        
     
     def __repr__(self):
         return f"Fastq file located at <{self.path_original_fastq}>, ready to be classified with " \
@@ -201,6 +201,7 @@ class FastQClassification:
 # #############################################################################
 # Defaults and main method
 path_fastq_comm = "/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq"
+
 
 def classify_reads(path_fastq, path_report, classifier, db):
     """ Should load a file, do all the processing """
