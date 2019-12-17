@@ -111,10 +111,10 @@ class CustomRead(SeqRecord.SeqRecord):
             SeqIO.write(self, f, "fasta")
 
     @classmethod
-    def set_fastq_path(path_fastq):
+    def set_fastq_path(cls, path_fastq):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
-        CustomRead.FASTQ_PATH = path_fastq
-        CustomRead.BASE_PATH  = osp.splitext(path_fastq)[0]
+        cls.FASTQ_PATH = path_fastq
+        cls.BASE_PATH  = osp.splitext(path_fastq)[0]
 
 
 # #############################################################################
