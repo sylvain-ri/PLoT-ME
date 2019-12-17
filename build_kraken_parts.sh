@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 cores=2
 for cluster in {0..9}
 do
