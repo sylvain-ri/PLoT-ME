@@ -17,9 +17,9 @@ import os.path as osp
 import logging
 
 
-import sys
-print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
-print(sys.argv[0])
+# import sys
+# print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
+# print(sys.argv[0])
 
 util_logger = logging.getLogger('classify.util')
 util_logger.debug('write messages')
@@ -66,6 +66,13 @@ def is_valid_file(x):
         util_logger.error('file does not exist ' + x)
         raise FileNotFoundError(f'The path is not a file : {x}')
 
+def folder_today(path):
+    s_today = f"{date.today()}"
+    final_path = osp.join(path, s_today)
+    if not osp.isdir(final_path):
+        os.makedirs(final_path)
+    return final_path
+        
 
 # #############################################################################
 # Methods for nucleotides manipulations
@@ -80,10 +87,36 @@ def combinaisons(combi, n, instances=nucleotides):
     else:
         return [f"{a}{n}" for a in combinaisons(combi, n-1) for n in instances]
 
-def window(fseq, window_size=4):
-    for i in range(len(fseq) - window_size + 1):
-        yield fseq[i:i+window_size]
+def window(seq, window_size=4):
+    """ Return a sliding window from a string """
+    for i in range(len(seq) - window_size + 1):
+        yield seq[i:i+window_size]
 
+
+def seq_count_kmer(seq, kmer_count, k=4, ignore_N=True):
+    """ Count all kmers, ignore kmers with N or other undecided nucleotides 
+        seq: string nucleotide input
+        kmer_count: dict with all combinations of nucleotides, initialized with zeros (kmer_template["AAAA"] = 0, kmer_count["AAAC"] = 0...)
+        the new string hashing behaviour, BiopythonWarning: Using str(seq) to use the new behaviour
+    """
+    util_logger.info('counting kmers')
+    wrong_base = "N"*k
+    kmer_count[wrong_base] = 0
+    
+    try:
+        for kmer in window(str(seq), k):
+            try:
+                kmer_count[kmer] += 1
+            except:
+                kmer_count[wrong_base] += 1
+                
+        if ignore_N:
+            kmer_count.pop(wrong_base)
+        return kmer_count
+    except Exception as e:
+        print("type error: " + str(e))
+        print(traceback.format_exc())
+        return kmer_count
 
 # #############################################################################
 
