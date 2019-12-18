@@ -14,27 +14,16 @@
 import argparse
 import logging
 import multiprocessing
-import numpy as np
 import os
 import os.path as osp
-import pandas as pd
-import pickle
-import random
 import subprocess
-import traceback
 
 # todo: add timing record
-from time import time
-
-from Bio import SeqIO, SeqRecord
-import matplotlib.pyplot as plt
 from tqdm import tqdm_notebook as tqdm
 
-from prod.util import *
-
-
 # Import paths and constants for the whole project
-PATHS = ProjectPaths()
+from prod.util import PATHS
+
 
 # #############################################################################
 # https://docs.python.org/3/howto/logging-cookbook.html
@@ -61,60 +50,6 @@ if False:
     pd.options.display.float_format = '{:,.2f}'.format
     
 
-# #############################################################################
-class CustomRead(SeqRecord.SeqRecord):
-    """ Customized Read Sequence. """
-    KMER4 = kmers_dic(4)
-    FASTQ_PATH = None
-    BASE_PATH  = None
-    
-    # Load the models to be able to apply them on each read
-    LDA = pickle.load(open(PATHS.lda_model, 'rb'))
-    KMEANS = pickle.load(open(PATHS.kmeans_model, 'rb'))
-    
-    def __init__(self, obj, k=4):
-        self.logger = logging.getLogger('classify.CustomRead')
-        self.logger.debug('Creating new instance')
-        # wrap the object
-        self._wrapped_obj = obj
-        # Additional attributes
-        self.k          = k
-        self.bin        = None
-        self.kmer_count = self.KMER4.copy()
-        self.lda_feat   = []
-        self.path_out   = None
-    
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return getattr(self, attr)
-        return getattr(self._wrapped_obj, attr)
-    
-    def count_kmer(self, ignore_N=True):
-        """ common method """
-        seq_count_kmer(self.seq, self.kmer_count, self.k, ignore_N=ignore_N)
-    
-    def lda_reduce(self):
-        self.logger.info('reducing dimension of kmer frequency to lda representation')
-        self.lda_feat   = self.LDA.transform(np.fromiter(
-                          self.kmer_count.values(),dtype=int).reshape(-1, 256))  # Put into 2D one row
-        
-    def find_bin(self):
-        self.logger.info('finding bins for each read')
-        self.bin        = self.KMEANS.predict(self.lda_feat)[0]
-        self.description= self.description + f", bin_id={self.bin}"
-        self.path_out   = f"{self.BASE_PATH}.bin-{self.bin}.fastq"
-        return self.bin
-    
-    def to_fastq(self):
-        assert self.FASTQ_PATH is not None, AttributeError("Path of the fastq file must first be defined")
-        with open(self.path_out, "a") as f:
-            SeqIO.write(self, f, "fasta")
-
-    @classmethod
-    def set_fastq_path(cls, path_fastq):
-        assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
-        cls.FASTQ_PATH = path_fastq
-        cls.BASE_PATH  = osp.splitext(path_fastq)[0]
 
 
 # #############################################################################
