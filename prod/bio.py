@@ -10,14 +10,18 @@
 #
 # common resources for biology related functions and Classes
 #
+import logging
+import numpy as np
+import os.path as osp
 import pickle
 import traceback
-import ete3.ncbi_taxonomy
 
 # todo: check if this logger works
-from Bio import SeqRecord
+from Bio import SeqRecord, SeqIO
+import ete3.ncbi_taxonomy
+from tqdm import tqdm
 
-from prod.util import util_logger
+from prod.util import PATHS, util_logger
 
 
 # #############################################################################
@@ -101,7 +105,7 @@ def get_list_rank(taxids, desired_rank="species"):
 
 # #############################################################################
 class CustomRead(SeqRecord.SeqRecord):
-    """ Customized Read Sequence. """
+    """ Customized Read Sequence. Wrapping SeqIO.Record """
     KMER4 = kmers_dic(4)
     FASTQ_PATH = None
     BASE_PATH = None
@@ -118,7 +122,7 @@ class CustomRead(SeqRecord.SeqRecord):
         # Additional attributes
         self.k = k
         self.bin = None
-        self.kmer_count = self.KMER4.copy()
+        self._kmer_count = None
         self.lda_feat = []
         self.path_out = None
 
@@ -127,9 +131,12 @@ class CustomRead(SeqRecord.SeqRecord):
             return getattr(self, attr)
         return getattr(self._wrapped_obj, attr)
 
-    def count_kmer(self, ignore_N=True):
+    @property
+    def kmer_count(self, ignore_N=True):
         """ common method """
-        seq_count_kmer(self.seq, self.kmer_count, self.k, ignore_N=ignore_N)
+        if self._kmer_count is None:
+            self._kmer_count = seq_count_kmer(self.seq, self.KMER4.copy(), self.k, ignore_N=ignore_N)
+        return self._kmer_count
 
     def lda_reduce(self):
         self.logger.info('reducing dimension of kmer frequency to lda representation')
@@ -139,7 +146,7 @@ class CustomRead(SeqRecord.SeqRecord):
     def find_bin(self):
         self.logger.info('finding bins for each read')
         self.bin = self.KMEANS.predict(self.lda_feat)[0]
-        self.description = self.description + f", bin_id={self.bin}"
+        self.description = f"{self.description}, bin_id={self.bin}"
         self.path_out = f"{self.BASE_PATH}.bin-{self.bin}.fastq"
         return self.bin
 
@@ -158,7 +165,7 @@ class CustomRead(SeqRecord.SeqRecord):
     def bin_reads(cls, fastq_file):
         """ Bin all reads from provide file """
         counter = 0
-        cls.set_fastq_path(path_fastq_comm)
+        cls.set_fastq_path(fastq_file)
 
         for record in tqdm(SeqIO.parse(fastq_file, "fasta")):
             custom_read = CustomRead(record)
@@ -168,3 +175,38 @@ class CustomRead(SeqRecord.SeqRecord):
             custom_read.to_fastq()
             counter += 1
         print(counter)
+
+    @staticmethod
+    def split_genome(record=SeqRecord.SeqRecord, window=10000):
+        """ Split a genome/plasmid into multiple windows, to count the k-mer
+            or to create the .fna files for kraken2-build
+        """
+        can_be = ["plasmid", "chloroplaste", "scaffold", "contig",
+                  "chromosome", "complete genome", "whole genome shotgun sequence", ]
+
+        full_seq = record.seq
+        len_genome = len(full_seq)
+        segments = []
+        for i in range(0, len_genome - window, window):
+            segment = SeqRecord.SeqRecord(full_seq[i: min(i + window - 1, len_genome - 1)],
+                                          record.id, record.name, record.description, record.dbxrefs, record.features,
+                                          record.annotations, record.letter_annotations)
+            segments.append(segment)
+
+        if write_fna:
+
+        if count_kmer:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
