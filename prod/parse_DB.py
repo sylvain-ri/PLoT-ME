@@ -25,7 +25,6 @@ from prod.util import PATHS, FilesInDir, is_valid_directory
 from prod.bio import kmers_dic, ncbi, CustomRead
 
 
-
 # #############################################################################
 # https://docs.python.org/3/howto/logging-cookbook.html
 # create formatter for the handlers
@@ -98,7 +97,7 @@ def kmer_pkl_path(kmer_folder, fna_path, taxo_ext="gff"):
     return taxo, bacteria_name, fna_name, out_path
 
 
-def scan_RefSeq_to_kmer_counts(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, window=1000, stop=3, ):
+def scan_RefSeq_to_kmer_counts(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, window=10000, stop=3, ):
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
@@ -109,13 +108,38 @@ def scan_RefSeq_to_kmer_counts(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, wind
               "target": [".kmer_count.pd", ]}
     FilesInDir.set_defaults_parse_RefSeq(scanning, folder_kmers, preset=preset)
 
+    dic_template = {"bacteria": "", "fna": "", "start": None,}
+
     for fastq in FilesInDir.tqdm_scan():
         if osp.isfile(fastq.target_file[".kmer_count.pd"]):
             continue
         genome = SeqIO.parse(fastq.abs_path, "fasta")
-        len_genome = len(genome.seq)
-        for i in range(0, len_genome - window, window):
-            segment = CustomRead()
+
+
+
+            # Count
+            rec = read_fna(file_i)  # go through all files
+            dic_template["bacteria"] = bacteria_name
+            dic_template["fna"] = fna_name
+            dic_template["len_genome"] = len(rec)
+            success_n, kmer_counts = \
+                count_kmers(rec, dic_template, k, bacteria_name, fna_name, w=window)
+            succ_fail = "Success" if len(rec) - 3 == success_n else "Fail   "
+            #                     print(f"{succ_fail} -> Bacteria: {bacteria_name},\t file: {fna_name},\t len: {len(rec)}")
+            nucleotides.append(success_n)
+
+            bac_kmers.extend(kmer_counts)
+        except Exception as e:
+        print("type error: " + str(e))
+        #                     print(traceback.format_exc())
+        print(file_i.path)
+
+        if len(bac_kmers) > 0:
+            # Pandas
+            df = to_pandas(bac_kmers, bacteria_name)
+            # Save to a file
+            df.to_pickle(kmer_freq_path)
+            n += 1
 
     # Ending
     elapsed_time = time() - start
