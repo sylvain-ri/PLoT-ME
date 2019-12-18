@@ -15,42 +15,14 @@ from datetime import date
 import os
 import os.path as osp
 import logging
-import traceback
-
-import ete3.ncbi_taxonomy
 
 # import sys
 # print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
 # print(sys.argv[0])
+from tqdm import tqdm
 
 util_logger = logging.getLogger('classify.util')
 util_logger.debug('write messages')
-
-
-# #############################################################################
-# Paths
-class ProjectPaths:
-    def __init__(self):
-        self.data = "/home/ubuntu/Data"
-        self.LOGS = f"/home/ubuntu/logs/{date.today()}.log"
-
-        self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
-        self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
-        self.RefSeq_4mer_freq = f"{self.RefSeq_kmer_freq}/4mer"
-
-        self.classifiers = ('kraken2', )
-        self.classifier_DB = "/home/ubuntu/database/kraken2"
-        self.kraken2_DB = {
-            "2015-10bins"  : f"{self.classifier_DB}/2015-10bins",
-            "2015-standard": f"{self.classifier_DB}/2015-standard",
-        }
-        self.folder_reports = f"{self.data}/Reports"
-        
-        self.models = f"{self.data}/kmer_freq/4mer/V4"
-        self.lda_model = f"{self.models}/LDA/lda_model_20_int.pd"
-        self.kmeans_model = f"{self.models}/clustering/10_kmeans_2019-05-09_04-08.pkl"
-
-# PATHS = ProjectPaths()
 
 
 # #############################################################################
@@ -89,83 +61,165 @@ def div_z(n, d):
 
 
 # #############################################################################
-# Methods for nucleotides manipulations
-nucleotides = "ACGT"
+# Paths
+class ProjectPaths:
+    def __init__(self):
+        self.data = "/home/ubuntu/Data"
+        self.LOGS = f"/home/ubuntu/logs/{date.today()}.log"
+
+        self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
+        self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
+        self.RefSeq_4mer_freq = f"{self.RefSeq_kmer_freq}/4mer"
+
+        self.classifiers = ('kraken2', )
+        self.classifier_DB = "/home/ubuntu/database/kraken2"
+        self.kraken2_DB = {
+            "2015-10bins"  : f"{self.classifier_DB}/2015-10bins",
+            "2015-standard": f"{self.classifier_DB}/2015-standard",
+        }
+        self.folder_reports = f"{self.data}/Reports"
+        
+        self.models = f"{self.data}/kmer_freq/4mer/V4"
+        self.lda_model = f"{self.models}/LDA/lda_model_20_int.pd"
+        self.kmeans_model = f"{self.models}/clustering/10_kmeans_2019-05-09_04-08.pkl"
 
 
-def kmers_dic(n, choice=nucleotides):
-    return {a:0 for a in combinaisons(choice, n)}
+PATHS = ProjectPaths()
 
 
-def combinaisons(combi, n, instances=nucleotides):
-    if n == 1:
-        return combi
-    else:
-        return [f"{a}{n}" for a in combinaisons(combi, n-1) for n in instances]
-
-
-def seq_to_window(seq, window_size=4):
-    """ Return a sliding window from a string """
-    for i in range(len(seq) - window_size + 1):
-        yield seq[i:i+window_size]
-
-
-def seq_count_kmer(seq, kmer_count, k=4, ignore_N=True):
-    """ Count all kmers, ignore kmers with N or other undecided nucleotides 
-        seq: string nucleotide input
-        kmer_count: dict with all combinations of nucleotides, initialized with zeros (kmer_template["AAAA"] = 0, kmer_count["AAAC"] = 0...)
-        the new string hashing behaviour, BiopythonWarning: Using str(seq) to use the new behaviour
+class FilesInDir:
+    """ Provide the root path, then scan the entire folder for all matching files
+        comes with file checking (extension, matching string, special methods like matching extension)
+        applied for genome files
     """
-    util_logger.info('counting kmers')
-    wrong_base = "N"*k
-    kmer_count[wrong_base] = 0
-    
-    try:
-        for kmer in seq_to_window(str(seq), k):
-            try:
-                kmer_count[kmer] += 1
-            except:
-                kmer_count[wrong_base] += 1
-                
-        if ignore_N:
-            kmer_count.pop(wrong_base)
-        return kmer_count
-    except Exception as e:
-        print("type error: " + str(e))
-        print(traceback.format_exc())
-        return kmer_count
+    obj_id = 0
+    file_count_root = None
+    root_folder = ""
+    target_folder = ""
+    matching_ext = (".fastq", ".fq", ".fna")
+    preset_expected_ext = {"root"  : [],
+                           "target": []}
+    _preset_genomes = {"root"  : [".taxon", ],
+                       "target": [".kmer_count.pd", ]}
+
+    def __init__(self, path):
+        FilesInDir.obj_id += 1
+        self.logger = logging.getLogger('parse_DB.Paths')
+
+        self.abs_path = os.path.abspath(path)
+        self.rel_path = osp.relpath(self.abs_path, self.root_folder)
+
+        self.root_file   = {}
+        self.target_file = {}
+        self.check_root = True
+        self.check_target = False
+        self.presets()
+
+    @property
+    def kmer_count_path(self):
+        kmer_path = osp.join(FilesInDir.target_folder, self.rel_path)
+        kmer_dir = osp.split(kmer_path)[0]
+        if not osp.isdir(kmer_dir):
+            os.makedirs(kmer_dir)
+        return kmer_path
+
+    @staticmethod
+    def create_target_path(path):
+        folder = osp.split(path)[0]
+        if not osp.isdir(folder):
+            os.makedirs(folder)
+
+    def add_tied_root_file(self, new_ext):
+        """ file that is related, in the same root directory, with different extension """
+        self.root_file[new_ext] = osp.splitext(self.abs_path)[0] + new_ext
+
+    def add_tied_target_file(self, new_ext):
+        """ file that is related, in the the target directory, with different extension. ensure the directory exists """
+        self.target_file[new_ext] = osp.join(FilesInDir.target_folder,
+                                             osp.splitext(self.rel_path)[0] + new_ext)
+        self.create_target_path(self.target_file)
+
+    def presets(self):
+        """ associated files expected, in root and target directories """
+        for v in self.preset_expected_ext["root"]:
+            self.add_tied_root_file(v)
+        for v in self.preset_expected_ext["target"]:
+            self.add_tied_target_file(v)
+
+    def file_matches_ext(self):
+        """ does the folder contains the file we are looking for (=with these extensions) """
+        return self.rel_path.lower().endswith(FilesInDir.matching_ext)
+
+    def file_complies(self):
+        """ Flags to not proceed """
+        if not self.file_matches_ext():
+            return False
+        if self.check_root:
+            for key in self.root_file.keys():
+                if not osp.isfile(self.root_file[key]):
+                    self.logger.warning(f"Related file {key} not found in root directory for {self}")
+                    return False
+        if self.check_target:
+            for key in self.root_file.keys():
+                if not osp.isfile(self.root_file[key]):
+                    self.logger.warning(f"Related file {key} not found in target directory "
+                                        f"({self.target_folder}) for {self}")
+                    return False
+        self.logger.info(f"Processing file {self}")
+        return True
+
+    @classmethod
+    def set_defaults_parse_RefSeq(cls, root, target, preset=None):
+        """ set where the root and target directories are (usually files are read from somewhere
+            and out files somewhere else
+            Creates expected files extensions. These extensions will be set in the object
+        """
+        cls.root_folder = root
+        cls.target_folder = target
+        cls.preset_expected_ext = cls._preset_genomes if preset is None else preset
+
+    @classmethod
+    def tqdm_scan(cls, folder=""):
+        """ replicated os.walk, with total file count, for a folder (default root folder)
+            yields a FileInDir object
+        """
+        if cls.file_count_root is None:
+            cls.count_root_files(folder)
+        for obj in tqdm(cls.walk_dir(folder), total=cls.file_count_root):
+            yield obj
 
 
-# #############################################################################
-# Related to taxonomy
+    @classmethod
+    def walk_dir(cls, folder=""):
+        """ Walk through every files in a directory (default root folder) and yield FileInDir """
+        for dir_path, dirs, files in os.walk(cls.root_folder if folder == "" else folder):
+            for filename in files:
+                file = cls(os.path.join(dir_path, filename))
+                if file.file_complies():
+                    yield file
 
-ncbi = ete3.ncbi_taxonomy.NCBITaxa()
+    @classmethod
+    def count_root_files(cls, folder):
+        file_count = 0
+        for _ in tqdm(cls.walk_dir(folder)):
+            file_count += 1
+        cls.file_count_root = file_count
 
+    def __repr__(self):
+        return self.abs_path
 
-def get_desired_ranks(taxid, desired_ranks, tolist=False):
-    """ Get all taxonomy ids of desired ranks
-        From stackoverflow
-        https://stackoverflow.com/questions/36503042/how-to-get-taxonomic-specific-ids-for-kingdom-phylum-class-order-family-gen
-    """
-    try:
-        lineage = ncbi.get_lineage(taxid)
-        lineage2ranks = ncbi.get_rank(lineage)
-        ranks2lineage = dict((rank, taxid) for (taxid, rank) in lineage2ranks.items())
-        if tolist: return [ranks2lineage.get(rank, 0) for rank in desired_ranks]
-        else:      return {f'{rank}_id': ranks2lineage.get(rank, 0) for rank in desired_ranks}
-    except:
-        print(f"retrieval of the lineage of {taxid} failed")
-        if tolist: return [0 for rank in desired_ranks]
-        else:      return {f'{rank}_id': 0 for rank in desired_ranks}
-
-
-def get_list_rank(taxids, desired_rank="species"):
-    """ Get the taxonomy id at the species level, from a list of id below species level """
-    res = []
-    for taxid in taxids:
-        name = get_desired_ranks(taxid, [desired_rank], tolist=True)[0]
-        res.append(name)
-    return res
+    # @property
+    # def taxon_path(self):
+    #     return osp.splitext(self.abs_path)[0] + ".taxon"
+    # @property
+    # def abs_path(self):
+    #     return osp.join(self.folder, self.file)
+    # @property
+    # def rel_path(self):
+    #     return osp.relpath(self.abs_path, self.NCBI_path)
+    # @property
+    # def kmer_count_path(self):
+    #     return osp.join(self.abs_path, self.NCBI_path)
 
 
 # #############################################################################
