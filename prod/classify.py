@@ -48,8 +48,6 @@ logger.addHandler(ch)
 if False:
     plt.rcParams['figure.figsize'] = 13, 8
     pd.options.display.float_format = '{:,.2f}'.format
-    
-
 
 
 # #############################################################################
