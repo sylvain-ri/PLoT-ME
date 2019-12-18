@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.metrics import auc
 
+from prod.bio import ncbi, get_list_rank
 from prod.util import *
 
 # pd.set_option('precision', 2)

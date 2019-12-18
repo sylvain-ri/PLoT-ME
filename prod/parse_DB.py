@@ -12,17 +12,19 @@
 #
 import argparse
 import logging
+import os
+import os.path as osp
 import re
 from time import time
 
-from tqdm import tqdm
 from Bio import SeqIO
-
-from prod.util import *
-
+from tqdm import tqdm
 
 # Import paths and constants for the whole project
-PATHS = ProjectPaths()
+from prod.util import PATHS, FilesInDir, is_valid_directory
+from prod.bio import kmers_dic, ncbi, CustomRead
+
+
 
 # #############################################################################
 # https://docs.python.org/3/howto/logging-cookbook.html
@@ -96,107 +98,30 @@ def kmer_pkl_path(kmer_folder, fna_path, taxo_ext="gff"):
     return taxo, bacteria_name, fna_name, out_path
 
 
-class Paths:
-    count = 0
-    NCBI_path = ""
-    kmer_folder = ""
-    fastQ_ext = (".fastq", ".fq")
-    fastQ_gzip_ext = (".fastq", ".fq", ".gz", ".gzip")
-
-    def __init__(self, folder, file):
-        Paths.count += 1
-        self.logger = logging.getLogger('parse_DB.Paths')
-
-        self.folder = folder
-        self.file  = file
-
-        self.abs_path = osp.join(self.folder, self.file)
-        self.rel_path = osp.relpath(self.abs_path, self.NCBI_path)
-        self.taxon_path = osp.splitext(self.abs_path)[0] + ".taxon"
-        # self.kmer_count_path = osp.join(Paths.kmer_folder, self.rel_path)
-
-    @property
-    def kmer_count_path(self):
-        kmer_path = osp.join(Paths.kmer_folder, self.rel_path)
-        kmer_dir = osp.split(kmer_path)[0]
-        if not osp.isdir(kmer_dir):
-            os.makedirs(kmer_dir)
-        return kmer_path
-
-    # @property
-    # def taxon_path(self):
-    #     return osp.splitext(self.abs_path)[0] + ".taxon"
-    # @property
-    # def abs_path(self):
-    #     return osp.join(self.folder, self.file)
-    # @property
-    # def rel_path(self):
-    #     return osp.relpath(self.abs_path, self.NCBI_path)
-    # @property
-    # def kmer_count_path(self):
-    #     return osp.join(self.abs_path, self.NCBI_path)
-
-    def is_fna(self, gzip_accepted=True):
-        return self.file.lower().endswith(Paths.fastQ_gzip_ext if gzip_accepted else Paths.fastQ_ext)
-
-    def has_taxon_file(self):
-        return osp.isfile(self.taxon_path)
-
-    def kmer_already_counted(self):
-        return osp.isfile(self.kmer_count_path)
-
-    def process_genome_file(self):
-        """ Flags to not proceed """
-        if not self.is_fna():
-            return False
-        if self.kmer_already_counted():
-            self.logger.info(f"kmer frequency already counted for {self}")
-            return False
-        if not self.has_taxon_file():
-            self.logger.warning(f"taxonomy file is missing for {self}")
-            return False
-        self.logger.info(f"Processing file {self}")
-        return True
-
-    @classmethod
-    def set_NCBI_path(cls, path):
-        cls.NCBI_path = path
-
-    @classmethod
-    def set_kmer_folder(cls, path):
-        cls.kmer_folder = path
-
-    def __repr__(self):
-        return self.abs_path
-
-
 def scan_RefSeq_to_kmer_counts(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, window=1000, stop=3, ):
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
     start = time()
-    nb_files = 0
-    Paths.set_NCBI_path(scanning)
-    Paths.set_kmer_folder(folder_kmers)
 
-    # todo: can add total file count with https://stackoverflow.com/a/37233621/4767645
-    for dir_path, dir_names, files in tqdm(os.walk(scanning)):
-        for file in files:
-            nb_files += 1
-            if nb_files > stop > 0:
-                break
+    # scanning folder Class set up:
+    preset = {"root"  : [".taxon", ],
+              "target": [".kmer_count.pd", ]}
+    FilesInDir.set_defaults_parse_RefSeq(scanning, folder_kmers, preset=preset)
 
-            path = Paths(dir_path, file)
-            if path.process_genome_file():
-                # todo: split into windows, make Customized Record from this path,
-                #  count kmers, save it.
-                pass
+    for fastq in FilesInDir.tqdm_scan():
+        if osp.isfile(fastq.target_file[".kmer_count.pd"]):
+            continue
+        genome = SeqIO.parse(fastq.abs_path, "fasta")
+        len_genome = len(genome.seq)
+        for i in range(0, len_genome - window, window):
+            segment = CustomRead()
 
     # Ending
     elapsed_time = time() - start
-    print(f"\n{nb_files} folders have been scanned\n"
+    print(f"\n{FilesInDir.file_count_root} folders have been scanned\n"
           f"Took {elapsed_time:,.1f}s / {elapsed_time / 60:.1f}min  to complete. "
-          f"{nb_files / elapsed_time:,.0f} genome/s")
+          f"{FilesInDir.file_count_root / elapsed_time:,.0f} genome/s")
 
 
 def count_all(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, window=1000, stop=3, skip={}):
@@ -271,7 +196,6 @@ def find_bins_DB(path_database, n_parts=10):
     NotImplementedError
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
         'Take a database of genomes and split it into bins according to the k-mer frequency of each genome. ' \
@@ -284,7 +208,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--threads',    default="10",       help='Number of threads')
     args = parser.parse_args()
 
-    classify_reads(args.input_fastq, args.output_folder, classifier=args.classifier, )
+    print("Not implemented yet")
         
 
 
