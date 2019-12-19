@@ -124,7 +124,7 @@ class FastQClassification:
             
     def kraken2_report_merging(self):
         self.logger.info('Merging kraken2 reports')
-        NotImplementedError
+        raise NotImplementedError
     
     def __repr__(self):
         return f"Fastq file located at <{self.path_original_fastq}>, ready to be classified with " \
@@ -150,6 +150,12 @@ def classify_reads(path_fastq, path_report, classifier, db):
     fastq_classifier.classify()
     
     logger.error('Classification not implemented yet')
+
+
+def test_classification():
+    """ Should have a toy data set that i can bin, classify, and check the results """
+    # todo: toy data set to check if it works
+    raise NotImplementedError
 
     
 if __name__ == '__main__':
