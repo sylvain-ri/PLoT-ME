@@ -116,30 +116,30 @@ def scan_RefSeq_to_kmer_counts(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, wind
         genome = SeqIO.parse(fastq.abs_path, "fasta")
 
 
-
-            # Count
-            rec = read_fna(file_i)  # go through all files
-            dic_template["bacteria"] = bacteria_name
-            dic_template["fna"] = fna_name
-            dic_template["len_genome"] = len(rec)
-            success_n, kmer_counts = \
-                count_kmers(rec, dic_template, k, bacteria_name, fna_name, w=window)
-            succ_fail = "Success" if len(rec) - 3 == success_n else "Fail   "
-            #                     print(f"{succ_fail} -> Bacteria: {bacteria_name},\t file: {fna_name},\t len: {len(rec)}")
-            nucleotides.append(success_n)
-
-            bac_kmers.extend(kmer_counts)
-        except Exception as e:
-        print("type error: " + str(e))
-        #                     print(traceback.format_exc())
-        print(file_i.path)
-
-        if len(bac_kmers) > 0:
-            # Pandas
-            df = to_pandas(bac_kmers, bacteria_name)
-            # Save to a file
-            df.to_pickle(kmer_freq_path)
-            n += 1
+        # try:
+        #     # Count
+        #     rec = read_fna(file_i)  # go through all files
+        #     dic_template["bacteria"] = bacteria_name
+        #     dic_template["fna"] = fna_name
+        #     dic_template["len_genome"] = len(rec)
+        #     success_n, kmer_counts = \
+        #         count_kmers(rec, dic_template, k, bacteria_name, fna_name, w=window)
+        #     succ_fail = "Success" if len(rec) - 3 == success_n else "Fail   "
+        #     #                     print(f"{succ_fail} -> Bacteria: {bacteria_name},\t file: {fna_name},\t len: {len(rec)}")
+        #     nucleotides.append(success_n)
+        #
+        #     bac_kmers.extend(kmer_counts)
+        # except Exception as e:
+        # print("type error: " + str(e))
+        # #                     print(traceback.format_exc())
+        # print(file_i.path)
+        #
+        # if len(bac_kmers) > 0:
+        #     # Pandas
+        #     df = to_pandas(bac_kmers, bacteria_name)
+        #     # Save to a file
+        #     df.to_pickle(kmer_freq_path)
+        #     n += 1
 
     # Ending
     elapsed_time = time() - start
