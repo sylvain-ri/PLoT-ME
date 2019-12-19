@@ -193,9 +193,10 @@ class CustomRead(SeqRecord.SeqRecord):
                                           record.annotations, record.letter_annotations)
             segments.append(segment)
 
-        if write_fna:
-
-        if count_kmer:
+        if "write_fna":
+            raise NotImplementedError
+        if "count_kmer":
+            raise NotImplementedError
 
 
 
