@@ -97,7 +97,7 @@ def kmer_pkl_path(kmer_folder, fna_path, taxo_ext="gff"):
     return taxo, bacteria_name, fna_name, out_path
 
 
-def scan_RefSeq_to_kmer_counts(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, window=10000, stop=3, ):
+def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3, ):
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
@@ -215,23 +215,39 @@ def count_all(folder_kmers, scanning=PATHS.RefSeq_DB, k=4, window=1000, stop=3, 
     return nucleotides_counts
 
 
-def find_bins_DB(path_database, n_parts=10):
+def find_bins_DB(folder_kmer_counts, n_parts=10):
     """ Given a database of genomes in fastq files, split it in n segments """
     NotImplementedError
+
+
+def combine_genome_kmer_counts():
+    raise NotImplementedError
+
+
+def main(folder_database, folder_intermediate_files, n_clusters, cores):
+    """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
+        Second part, load all the k-mer counts into one single Pandas dataframe
+        Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
+    """
+    scan_RefSeq_to_kmer_counts(folder_database, folder_intermediate_files, )
+    combine_genome_kmer_counts(folder_intermediate_files)
+    find_bins_DB(folder_intermediate_files)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
         'Take a database of genomes and split it into bins according to the k-mer frequency of each genome. ' \
         'Needs a lot of disk space. Build the part for a specified classifier if specified')
-    parser.add_argument('path_database',      help='Input file in fastq format', 
-                        type=lambda x: x if osp.isfile(x) else FileNotFoundError(f'The path is not a file : {x}'))
-    parser.add_argument('output_folder',      help='Folder for output reports', type=is_valid_directory)
-    parser.add_argument('-c', '--classifier', help='choose kraken2 or centrifuge', choices=('kraken2'))
-    parser.add_argument('-d', '--database',   default='standard', help='which reference to use', choices=['standard', 'mini', ])
-    parser.add_argument('-t', '--threads',    default="10",       help='Number of threads')
+    parser.add_argument('path_database', type=is_valid_directory,
+                        help='Database root folder. Support format: RefSeq 2019.')
+    parser.add_argument('path_intermediate_files', type=is_valid_directory,
+                        help='Folder for the k-mer counts per genome and for clustering models')
+    parser.add_argument('-c', '--clusters', default=10, type=int, help='Number of clusters to split the DB into')
+    parser.add_argument('-t', '--threads',  default="10", help='Number of threads')
     args = parser.parse_args()
 
+    main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
+         n_clusters=args.clusters, cores=args.threads)
     print("Not implemented yet")
         
 
