@@ -46,12 +46,14 @@ def seq_to_window(seq, window_size=4):
         yield seq[i:i+window_size]
 
 
-def seq_count_kmer(seq, kmer_count, k=4, ignore_N=True):
+def seq_count_kmer(seq, kmer_count=None, k=4, ignore_N=True):
     """ Count all kmers, ignore kmers with N or other undecided nucleotides
         seq: string nucleotide input
         kmer_count: dict with all combinations of nucleotides, initialized with zeros (kmer_template["AAAA"] = 0, kmer_count["AAAC"] = 0...)
         the new string hashing behaviour, BiopythonWarning: Using str(seq) to use the new behaviour
     """
+    if kmer_count is None:
+        kmer_count = kmers_dic(k)
     util_logger.info('counting kmers')
     wrong_base = "N"*k
     kmer_count[wrong_base] = 0
@@ -104,8 +106,8 @@ def get_list_rank(taxids, desired_rank="species"):
 
 
 # #############################################################################
-class CustomRead(SeqRecord.SeqRecord):
-    """ Customized Read Sequence. Wrapping SeqIO.Record """
+class Read(SeqRecord.SeqRecord):
+    """ General Read. Wrapping SeqIO.Record """
     KMER4 = kmers_dic(4)
     FASTQ_PATH = None
     BASE_PATH = None
@@ -168,39 +170,13 @@ class CustomRead(SeqRecord.SeqRecord):
         cls.set_fastq_path(fastq_file)
 
         for record in tqdm(SeqIO.parse(fastq_file, "fasta")):
-            custom_read = CustomRead(record)
+            custom_read = Read(record)
             custom_read.count_kmer()
             custom_read.lda_reduce()
             custom_read.find_bin()
             custom_read.to_fastq()
             counter += 1
         print(counter)
-
-    @staticmethod
-    def split_genome(record=SeqRecord.SeqRecord, window=10000):
-        """ Split a genome/plasmid into multiple windows, to count the k-mer
-            or to create the .fna files for kraken2-build
-        """
-        can_be = ["plasmid", "chloroplaste", "scaffold", "contig",
-                  "chromosome", "complete genome", "whole genome shotgun sequence", ]
-
-        full_seq = record.seq
-        len_genome = len(full_seq)
-        segments = []
-        for i in range(0, len_genome - window, window):
-            segment = SeqRecord.SeqRecord(full_seq[i: min(i + window - 1, len_genome - 1)],
-                                          record.id, record.name, record.description, record.dbxrefs, record.features,
-                                          record.annotations, record.letter_annotations)
-            segments.append(segment)
-
-        if "write_fna":
-            raise NotImplementedError
-        if "count_kmer":
-            raise NotImplementedError
-
-
-
-
 
 
 
