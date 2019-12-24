@@ -97,6 +97,7 @@ class FilesInDir:
     root_folder = ""
     target_folder = ""
     matching_ext = (".fastq", ".fq", ".fna")
+    folder_kmer = ""
     preset_expected_ext = {"root"  : [],
                            "target": []}
     _preset_genomes = {"root"  : [".taxon", ],
@@ -106,8 +107,12 @@ class FilesInDir:
         FilesInDir.obj_id += 1
         self.logger = logging.getLogger('parse_DB.Paths')
 
-        self.abs_path = os.path.abspath(path)
-        self.rel_path = osp.relpath(self.abs_path, self.root_folder)
+        self.abs_path      = os.path.abspath(path)
+        self.rel_path      = osp.relpath(self.abs_path, self.root_folder)
+        self.base          = osp.splitext(osp.split(self.abs_path)[1])[0]
+
+        self.taxon         = osp.splitext(self.abs_path)[0] + ".taxon"
+        self.kmer_count_pd = osp.join(self.folder_kmer, self.base) + ".kmers.pd"
 
         self.root_file   = {}
         self.target_file = {}
