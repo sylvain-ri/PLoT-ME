@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-# #############################################################################
-# Sylvain @ GIS / Biopolis / Singapore
-# Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
-# Started on 2019-12-11
-# Reads Binning Project
-#
-# #############################################################################
-#
-#
-# Script to classify sequences from fastq file
-# 
+"""
+#############################################################################
+Script to classify sequences from fastq file
+
+#############################################################################
+Sylvain @ GIS / Biopolis / Singapore
+Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
+Started on 2019-12-11
+Reads Binning Project
+#############################################################################
+"""
 
 import argparse
 import logging
@@ -22,7 +22,7 @@ import subprocess
 from tqdm import tqdm_notebook as tqdm
 
 # Import paths and constants for the whole project
-from prod.util import PATHS, init_logger
+from prod.tools import PATHS, init_logger
 
 
 logger = init_logger('classify')
