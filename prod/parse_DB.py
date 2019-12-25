@@ -26,8 +26,8 @@ from Bio.SeqRecord import SeqRecord
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from prod.util import PATHS, FilesInDir, is_valid_directory, init_logger
-from prod.bio import kmers_dic, ncbi, Read, seq_count_kmer
+from prod.tools import PATHS, FilesInDir, is_valid_directory, init_logger
+from prod.bio import kmers_dic, ncbi, seq_count_kmer
 
 
 logger = init_logger('parse_DB')
@@ -91,11 +91,6 @@ class Genome:
         df.to_pickle(self.path_kmers)
 
 
-def idkwhat():
-        if "write_fna":
-            raise NotImplementedError
-
-
 def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3, ):
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
@@ -145,10 +140,12 @@ def find_bins_DB(path_kmer_counts, n_parts=10):
 
 
 def write_split_to_bins(path_df_bins, path_db_bins):
+    """ Write .fna files from the binning for kraken build """
     pass
 
 
 def kraken_build(path_db_bins, path_bins_hash):
+    """ launch kraken build on each bin """
     pass
 
 
