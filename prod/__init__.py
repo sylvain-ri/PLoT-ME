@@ -11,8 +11,6 @@
 # Package script, testing who python works
 # 
 
-import logging
-
 import prod.classify, prod.parse_DB, prod.util
 
 # todo: need to check the imports and logging things
