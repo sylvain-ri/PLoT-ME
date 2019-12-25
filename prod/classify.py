@@ -22,26 +22,10 @@ import subprocess
 from tqdm import tqdm_notebook as tqdm
 
 # Import paths and constants for the whole project
-from prod.util import PATHS
+from prod.util import PATHS, init_logger
 
 
-# #############################################################################
-# https://docs.python.org/3/howto/logging-cookbook.html
-# create formatter for the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# create file handler which logs even debug messages
-fh = logging.FileHandler(PATHS.LOGS)
-fh.setLevel(logging.DEBUG)
-fh.setFormatter(formatter)
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
-ch.setFormatter(formatter)
-# create logger with classify.py and add the handlers to the logger
-logger = logging.getLogger('classify')
-logger.setLevel(logging.DEBUG)
-logger.addHandler(fh)
-logger.addHandler(ch)
+logger = init_logger('classify')
 
 
 # For display / ipynb only
@@ -51,7 +35,7 @@ if False:
 
 
 # #############################################################################
-class FastQClassification:
+class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
     def __init__(self, path_original_fastq, db_choice, folder_report, bin_nb=10, classifier="kraken2",
@@ -139,7 +123,7 @@ path_fastq_comm = "/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genom
 def classify_reads(path_fastq, path_report, classifier, db):
     """ Should load a file, do all the processing """
     logger.info("let's classify reads!")
-    fastq_classifier = FastQClassification(
+    fastq_classifier = MockCommunity(
         path_original_fastq=path_fastq, db_choice=db, folder_report=path_report, 
         bin_nb=10, classifier=classifier)
     

@@ -15,7 +15,6 @@ Reads Binning Project
 
 import argparse
 from copy import deepcopy
-import logging
 import os
 import os.path as osp
 import pandas as pd
@@ -27,27 +26,11 @@ from Bio.SeqRecord import SeqRecord
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from prod.util import PATHS, FilesInDir, is_valid_directory
+from prod.util import PATHS, FilesInDir, is_valid_directory, init_logger
 from prod.bio import kmers_dic, ncbi, Read, seq_count_kmer
 
 
-# #############################################################################
-# https://docs.python.org/3/howto/logging-cookbook.html
-# create formatter for the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# create file handler which logs even debug messages
-fh = logging.FileHandler(PATHS.LOGS)
-fh.setLevel(logging.DEBUG)
-fh.setFormatter(formatter)
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
-ch.setFormatter(formatter)
-# create logger with parse_DB.py and add the handlers to the logger
-logger = logging.getLogger('parse_DB')
-logger.setLevel(logging.DEBUG)
-logger.addHandler(fh)
-logger.addHandler(ch)
+logger = init_logger('parse_DB')
 
 
 class Genome:

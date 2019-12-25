@@ -87,6 +87,27 @@ class ProjectPaths:
 PATHS = ProjectPaths()
 
 
+# #############################################################################
+# https://docs.python.org/3/howto/logging-cookbook.html
+def init_logger(logger_name='reads_binning'):
+    # create formatter for the handlers
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler(PATHS.LOGS)
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.WARNING)
+    ch.setFormatter(formatter)
+    # create logger with parse_DB.py and add the handlers to the logger
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+    return logger
+
+
 class FilesInDir:
     """ Provide the root path, then scan the entire folder for all matching files
         comes with file checking (extension, matching string, special methods like matching extension)
