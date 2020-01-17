@@ -104,20 +104,20 @@ def check_step(func):
 
         # Time measurement
         start_time = process_time()
-        logger.debug(f"Step {check_step.step_nb}, function {func.__name__}({signature}) START")
+        logger.info(f"Step {check_step.step_nb}, function {func.__name__}({signature}) START")
 
         # If step already done, skip it
         to_check = args[1]
         if check_step.can_skip and \
-                (osp.isfile(to_check) or
-                 (osp.isdir(to_check) and len(os.listdir(to_check)) > 0)):
-            logger.debug(f"Output has already been generated : {to_check}")
+                (osp.isfile(to_check) or                           # there's already a file or
+                 (osp.isdir(to_check) and os.listdir(to_check))):  # there's a folder, and not empty
+            logger.info(f"Output has already been generated : {to_check}")
             result = None
         else:
             result = func(*args, **kwargs)
 
-        # print time used
-        logger.debug(f"Step {check_step.step_nb}, function {func.__name__} END, {process_time() - start_time:.3f}s")
+        # print time spent
+        logger.info(f"Step {check_step.step_nb}, function {func.__name__} END, {process_time() - start_time:.3f}s")
         check_step.step_nb += 1
         return result
     return wrapper
@@ -141,7 +141,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
     FilesInDir.folder_kmer = folder_kmers
 
     logger.info("scanning through all genomes in refseq " + scanning)
-    for i, fastq in enumerate(FilesInDir.tqdm_scan()):
+    for i, fastq in enumerate(FilesInDir.tqdm_scan(scanning)):
         if osp.isfile(fastq.target_file[".kmer_count.pd"]):
             continue
         with open(fastq.taxon) as f:
@@ -233,6 +233,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     check_step.can_skip = args.can_skip
+    logger.warning("**** Starting script ****")
     main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
          n_clusters=args.clusters, cores=args.threads)
     print("Not implemented yet")
