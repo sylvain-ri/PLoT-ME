@@ -41,7 +41,8 @@ class Genome:
     kmer_count_zeros = kmers_dic(4)
 
     def __init__(self, fna_file, kmer_file, taxon, window, k=4):
-        self.path_fna = fna_file
+        logger.debug("Created genome object")
+        self.path_fna    = fna_file
         self.path_kmers  = kmer_file
         self.taxon       = taxon
         self.window      = window
@@ -51,7 +52,10 @@ class Genome:
         # self.splits  = {cat: [] for cat in self.categories}
 
     def load_genome(self):
-        """ Loop through all chromosomes/plasmids/genomes/.. and parse them into the object """
+        """ Loop through all chromosomes/plasmids/genomes/.. and parse them into the object
+            Split them into various categories (plasmids, genomes, ...)
+        """
+        logger.debug(f"loading genome {self.path_fna}")
         for record in SeqIO.parse(self.path_fna, "fasta"):
             for cat in self.categories:
                 if cat in record.description:
@@ -90,6 +94,7 @@ class Genome:
         df.category    = df.category.astype('category')
         df.description = df.description.astype('category')
         df.to_pickle(self.path_kmers)
+        logger.info(f"saved kmer count to {self.path_kmers}")
 
 
 # Decorator for all these steps
@@ -133,8 +138,6 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
-    start = time()
-
     # scanning folder Class set up:
     preset = {"root"  : [".taxon", ],
               "target": [".kmer_count.pd", ]}
@@ -154,11 +157,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
             logger.warning("Early stop of the scanning")
             break
 
-    # Ending
-    elapsed_time = time() - start
-    print(f"\n{FilesInDir.file_count_root} folders have been scanned\n"
-          f"Took {elapsed_time:,.1f}s / {elapsed_time / 60:.1f}min  to complete. "
-          f"{FilesInDir.file_count_root / elapsed_time:,.0f} genome/s")
+    logger.info(f"{i} folders have been scanned")
 
 
 @check_step
@@ -206,7 +205,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, cores):
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
-    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=30)
+    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=5)
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
@@ -247,7 +246,6 @@ if __name__ == '__main__':
         logger.error(traceback.format_exc())
     except Exception as e:
         logger.exception(e)
-        logger.error(traceback.format_exc())
 
     logger.error("Not implemented yet")
         
