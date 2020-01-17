@@ -10,12 +10,14 @@
 #
 # About reports from Kraken2
 #
+import os
+import os.path as osp
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.metrics import auc
 
 from prod.bio import ncbi, get_list_rank
-from prod.tools import *
+from prod.tools import PATHS
 
 # pd.set_option('precision', 2)
 
