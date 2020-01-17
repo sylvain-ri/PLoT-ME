@@ -22,8 +22,8 @@ import logging
 # print(sys.argv[0])
 from tqdm import tqdm
 
-util_logger = logging.getLogger('classify.util')
-util_logger.debug('write messages')
+logger = logging.getLogger('tools')
+logger.debug('write messages')
 
 
 # #############################################################################
@@ -36,7 +36,7 @@ def is_valid_directory(x):
         if 'y' in reply.lower():
             os.makedirs(x)
         else:
-            util_logger.error('directory does not exist and has not been created ' + x)
+            logger.error('directory does not exist and has not been created ' + x)
             raise NotADirectoryError(f'The path is not a folder : {x}')
         return x
 
@@ -45,7 +45,7 @@ def is_valid_file(x):
     if osp.isfile(x):
         return x
     else:
-        util_logger.error('file does not exist ' + x)
+        logger.error('file does not exist ' + x)
         raise FileNotFoundError(f'The path is not a file : {x}')
 
 
@@ -128,7 +128,7 @@ class FilesInDir:
 
     def __init__(self, path):
         FilesInDir.obj_id += 1
-        self.logger = logging.getLogger('parse_DB.Paths')
+        self.logger = logging.getLogger('tools.FilesInDir')
 
         self.abs_path      = os.path.abspath(path)
         self.rel_path      = osp.relpath(self.abs_path, self.root_folder)
@@ -178,7 +178,7 @@ class FilesInDir:
         """ does the folder contains the file we are looking for (=with these extensions) """
         return self.rel_path.lower().endswith(FilesInDir.matching_ext)
 
-    def file_complies(self):
+    def file_complies(self, log=True):
         """ Flags to not proceed """
         if not self.file_matches_ext():
             return False
@@ -193,7 +193,7 @@ class FilesInDir:
                     self.logger.warning(f"Related file {key} not found in target directory "
                                         f"({self.target_folder}) for {self}")
                     return False
-        self.logger.info(f"Processing file {self}")
+        if log:  self.logger.info(f"file complies {self}")
         return True
 
     @classmethod
@@ -211,25 +211,27 @@ class FilesInDir:
         """ replicated os.walk, with total file count, for a folder (default root folder)
             yields a FileInDir object
         """
+        logger.debug(f"scanning the folder {folder}")
         if cls.file_count_root is None:
             cls.count_root_files(folder)
+        logger.debug(f"scanning the folder {folder}")
         for obj in tqdm(cls.walk_dir(folder), total=cls.file_count_root):
             yield obj
 
 
     @classmethod
-    def walk_dir(cls, folder=""):
+    def walk_dir(cls, folder="", log=True):
         """ Walk through every files in a directory (default root folder) and yield FileInDir """
         for dir_path, dirs, files in os.walk(cls.root_folder if folder == "" else folder):
             for filename in files:
                 file = cls(os.path.join(dir_path, filename))
-                if file.file_complies():
+                if file.file_complies(log):
                     yield file
 
     @classmethod
     def count_root_files(cls, folder):
         file_count = 0
-        for _ in tqdm(cls.walk_dir(folder)):
+        for _ in tqdm(cls.walk_dir(folder, log=False)):
             file_count += 1
         cls.file_count_root = file_count
 
