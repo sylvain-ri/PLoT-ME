@@ -94,7 +94,7 @@ class Genome:
         df.category    = df.category.astype('category')
         df.description = df.description.astype('category')
         df.to_pickle(self.path_kmers)
-        logger.info(f"saved kmer count to {self.path_kmers}")
+        logger.debug(f"saved kmer count to {self.path_kmers}")
 
 
 # Decorator for all these steps
