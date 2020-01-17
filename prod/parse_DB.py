@@ -128,7 +128,7 @@ check_step.can_skip = True
 
 
 @check_step
-def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3, ):
+def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=30, ):
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
@@ -149,7 +149,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
         genome = Genome(fastq.abs_path, fastq.kmer_count_pd, taxon, window=window, k=k)
         genome.load_genome()
         genome.count_kmers_to_df()
-        if i > stop:
+        if i > stop >= 0:
             logger.warning("Early stop of the scanning")
             break
 
@@ -201,7 +201,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, cores):
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
-    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=3)
+    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=-1)
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
