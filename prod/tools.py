@@ -14,6 +14,7 @@ Reads Binning Project
 from datetime import date
 import os
 import os.path as osp
+from pathlib import Path
 import logging
 
 # import sys
@@ -64,15 +65,16 @@ def div_z(n, d):
 # Paths
 class ProjectPaths:
     def __init__(self):
-        self.data = "~/Data"
-        self.LOGS = f"~/logs/{date.today()}.log"
+        self.home = str(Path.home())
+        self.data = f"{self.home}/Data"
+        self.LOGS = f"{self.home}/logs/{date.today()}.log"
 
         self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
         self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
         self.RefSeq_4mer_freq = f"{self.RefSeq_kmer_freq}/4mer"
 
         self.classifiers = ('kraken2', )
-        self.classifier_DB = "~/database/kraken2"
+        self.classifier_DB = f"{self.home}/database/kraken2"
         self.kraken2_DB = {
             "2015-10bins"  : f"{self.classifier_DB}/2015-10bins",
             "2015-standard": f"{self.classifier_DB}/2015-standard",
