@@ -115,6 +115,7 @@ class FilesInDir:
         comes with file checking (extension, matching string, special methods like matching extension)
         applied for genome files
     """
+    # todo: simplify..... just need one loop with .taxon and kmer target path, and one loop for kmer_counts
     obj_id = 0
     file_count_root = None
     root_folder = ""
