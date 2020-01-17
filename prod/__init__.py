@@ -11,7 +11,7 @@ Reads Binning Project
 #############################################################################
 """
 
-import prod.classify, prod.parse_DB, prod.util
+import classify, parse_DB, tools
 
 # todo: need to check the imports and logging things
 # todo: Should define global variables here ! like paths
