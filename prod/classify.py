@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 #############################################################################
-Script to classify sequences from fastq file
+Script to classify reads/sequences from fastq file, with a binning step to reduce memory consumption.
+Bins the reads into defined bins and launch a classifier loading one bin at the time.
 
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
@@ -22,7 +23,7 @@ import subprocess
 from tqdm import tqdm_notebook as tqdm
 
 # Import paths and constants for the whole project
-from prod.tools import PATHS, init_logger
+from tools import PATHS, init_logger
 
 
 logger = init_logger('classify')
@@ -143,13 +144,11 @@ def test_classification():
 
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=
-                                     'Provided a fastq file with reads, bins the reads into defined bins '
-                                     'and launch a classifier loading one bin at the time.')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-i', '--input_fastq',   help='Input file in fastq format', type=is_valid_file, 
                                                  default=path_fastq_comm)
     parser.add_argument('-o', '--output_folder', help='Folder for output reports', type=is_valid_directory,
-                        default=folder_today(PATHS.folder_reports))
+                                                 default=folder_today(PATHS.folder_reports))
     parser.add_argument('-c', '--classifier',    help='choose kraken2 or centrifuge', 
                                                  choices=PATHS.classifiers, default=PATHS.classifiers[0])
     parser.add_argument('-d', '--database',      default='standard', help='which reference to use', choices=('standard', 'mini', ))
