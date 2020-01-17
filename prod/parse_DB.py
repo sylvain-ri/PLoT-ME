@@ -110,7 +110,7 @@ def check_step(func):
         to_check = args[1]
         if check_step.can_skip and \
                 (osp.isfile(to_check) or
-                 (osp.isdir(to_check) and len(os.scandir(to_check)) > 0)):
+                 (osp.isdir(to_check) and len(os.listdir(to_check)) > 0)):
             logger.debug(f"Output has already been generated : {to_check}")
             result = None
         else:
