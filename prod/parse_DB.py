@@ -26,8 +26,8 @@ from Bio.SeqRecord import SeqRecord
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from prod.tools import PATHS, FilesInDir, is_valid_directory, init_logger
-from prod.bio import kmers_dic, ncbi, seq_count_kmer
+from tools import PATHS, FilesInDir, is_valid_directory, init_logger
+from bio import kmers_dic, ncbi, seq_count_kmer
 
 
 logger = init_logger('parse_DB')
