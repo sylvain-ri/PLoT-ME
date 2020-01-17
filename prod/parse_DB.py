@@ -242,7 +242,7 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Fail: " + repr(e))
 
-    print("Not implemented yet")
+    logger.error("Not implemented yet")
         
 
 
