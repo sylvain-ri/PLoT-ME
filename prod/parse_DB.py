@@ -205,7 +205,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, cores):
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
-    combine_genome_kmer_counts(folder_intermediate_files, path_stacked_kmer_counts)
+    combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
     # todo: find bins and write genomes' segments into bins
     # From kmer distributions, use clustering to set the bins per segment
@@ -234,8 +234,14 @@ if __name__ == '__main__':
 
     check_step.can_skip = args.can_skip
     logger.warning("**** Starting script ****")
-    main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
-         n_clusters=args.clusters, cores=args.threads)
+    try:
+        main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
+             n_clusters=args.clusters, cores=args.threads)
+    except KeyboardInterrupt:
+        logger.error("User interrupted")
+    except Exception as e:
+        logger.error(f"Fail: " + repr(e))
+
     print("Not implemented yet")
         
 
