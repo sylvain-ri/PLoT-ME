@@ -14,6 +14,7 @@ Reads Binning Project
 """
 
 import argparse
+import traceback
 from copy import deepcopy
 import os
 import os.path as osp
@@ -205,7 +206,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, cores):
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
-    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=-1)
+    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=30)
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
@@ -243,8 +244,10 @@ if __name__ == '__main__':
              n_clusters=args.clusters, cores=args.threads)
     except KeyboardInterrupt:
         logger.error("User interrupted")
+        logger.error(traceback.format_exc())
     except Exception as e:
-        logger.error(f"Fail: " + repr(e))
+        logger.exception(e)
+        logger.error(traceback.format_exc())
 
     logger.error("Not implemented yet")
         
