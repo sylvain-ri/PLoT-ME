@@ -21,7 +21,7 @@ from Bio import SeqRecord, SeqIO
 import ete3.ncbi_taxonomy
 from tqdm import tqdm
 
-from prod.util import PATHS, util_logger
+from tools import PATHS, util_logger
 
 
 # #############################################################################
