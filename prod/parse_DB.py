@@ -165,8 +165,12 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     """ Combine single dataframes into one. Might need high memory """
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
     dfs = []
+    added = 0
     for file in FilesInDir.tqdm_scan(folder_kmers):
-        dfs.append(pd.read_pickle(file.path))
+        if file.endswith(".kmers.pd"):
+            dfs.append(pd.read_pickle(file.path))
+            added += 1
+    logger.info(f"{added} kmer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Saving dataframe to {path_df}")
     df.to_pickle(path_df)
