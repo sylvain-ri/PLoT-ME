@@ -19,7 +19,7 @@ import os
 import os.path as osp
 import pandas as pd
 import re
-from time import time
+from time import time, process_time
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -91,6 +91,43 @@ class Genome:
         df.to_pickle(self.path_kmers)
 
 
+# Decorator for all these steps
+def check_step(func):
+    """ Decorator to print steps and check if results have already been computed
+        Need the second argument to be the output file/folder: it will check if the file exists / folder isn't empty
+    """
+    def wrapper(*args, **kwargs):
+        # Check arguments for debugging
+        args_repr = [repr(a) for a in args]
+        kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
+        signature = ", ".join(args_repr + kwargs_repr)
+
+        # Time measurement
+        start_time = process_time()
+        logger.debug(f"Step {check_step.step_nb}, function {func.__name__}({signature}) START")
+
+        # If step already done, skip it
+        to_check = args[1]
+        if check_step.can_skip and \
+                (osp.isfile(to_check) or
+                 (osp.isdir(to_check) and len(os.scandir(to_check)) > 0)):
+            logger.debug(f"Output has already been generated : {to_check}")
+            result = None
+        else:
+            result = func(*args, **kwargs)
+
+        # print time used
+        logger.debug(f"Step {check_step.step_nb}, function {func.__name__!r} END, {process_time() - start_time:.3f}s")
+        check_step.step_nb += 1
+        return result
+    return wrapper
+
+
+check_step.step_nb = 0
+check_step.can_skip = True
+
+
+@check_step
 def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3, ):
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
@@ -123,6 +160,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
           f"{FilesInDir.file_count_root / elapsed_time:,.0f} genome/s")
 
 
+@check_step
 def combine_genome_kmer_counts(folder_kmers, path_df):
     """ Combine single dataframes into one. Might need high memory """
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
@@ -134,16 +172,19 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     df.to_pickle(path_df)
 
 
+@check_step
 def find_bins_DB(path_kmer_counts, n_parts=10):
     """ Given a database of genomes in fastq files, split it in n segments """
     raise NotImplementedError
 
 
+@check_step
 def write_split_to_bins(path_df_bins, path_db_bins):
     """ Write .fna files from the binning for kraken build """
     pass
 
 
+@check_step
 def kraken_build(path_db_bins, path_bins_hash):
     """ launch kraken build on each bin """
     pass
@@ -188,8 +229,10 @@ if __name__ == '__main__':
                         help='Folder for the k-mer counts per genome and for clustering models')
     parser.add_argument('-c', '--clusters', default=10, type=int, help='Number of clusters to split the DB into')
     parser.add_argument('-t', '--threads',  default="10", help='Number of threads')
+    parser.add_argument('-s', '--can_skip', help='Default, do not redo intermediate steps', action='store_false')
     args = parser.parse_args()
 
+    check_step.can_skip = args.can_skip
     main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
          n_clusters=args.clusters, cores=args.threads)
     print("Not implemented yet")
