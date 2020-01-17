@@ -117,7 +117,7 @@ def check_step(func):
             result = func(*args, **kwargs)
 
         # print time used
-        logger.debug(f"Step {check_step.step_nb}, function {func.__name__!r} END, {process_time() - start_time:.3f}s")
+        logger.debug(f"Step {check_step.step_nb}, function {func.__name__} END, {process_time() - start_time:.3f}s")
         check_step.step_nb += 1
         return result
     return wrapper
@@ -165,7 +165,7 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     """ Combine single dataframes into one. Might need high memory """
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
     dfs = []
-    for file in os.scandir(folder_kmers):
+    for file in FilesInDir.tqdm_scan(folder_kmers):
         dfs.append(pd.read_pickle(file.path))
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Saving dataframe to {path_df}")
