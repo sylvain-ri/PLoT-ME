@@ -165,7 +165,7 @@ class FilesInDir:
         """ file that is related, in the the target directory, with different extension. ensure the directory exists """
         self.target_file[new_ext] = osp.join(FilesInDir.target_folder,
                                              osp.splitext(self.rel_path)[0] + new_ext)
-        self.create_target_path(self.target_file)
+        self.create_target_path(self.target_file[new_ext])
 
     def presets(self):
         """ associated files expected, in root and target directories """
