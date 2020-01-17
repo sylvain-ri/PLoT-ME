@@ -21,7 +21,10 @@ from Bio import SeqRecord, SeqIO
 import ete3.ncbi_taxonomy
 from tqdm import tqdm
 
-from tools import PATHS, util_logger
+from tools import PATHS, init_logger
+
+
+logger = init_logger("bio")
 
 
 # #############################################################################
@@ -54,7 +57,7 @@ def seq_count_kmer(seq, kmer_count=None, k=4, ignore_N=True):
     """
     if kmer_count is None:
         kmer_count = kmers_dic(k)
-    util_logger.info('counting kmers')
+    logger.info('counting kmers')
     wrong_base = "N"*k
     kmer_count[wrong_base] = 0
 
