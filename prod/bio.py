@@ -57,7 +57,7 @@ def seq_count_kmer(seq, kmer_count=None, k=4, ignore_N=True):
     """
     if kmer_count is None:
         kmer_count = kmers_dic(k)
-    logger.trace('counting kmers')
+    logger.log(5, 'counting kmers')
     wrong_base = "N"*k
     kmer_count[wrong_base] = 0
 
