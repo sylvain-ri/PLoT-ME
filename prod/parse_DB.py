@@ -156,16 +156,28 @@ def main(folder_database, folder_intermediate_files, n_clusters, cores):
         folder_database          : RefSeq root folder
         folder_intermediate_files: empty root folder to store kmer counts
     """
-    scan_RefSeq_to_kmer_counts(folder_database, folder_intermediate_files, stop=3)
-    path_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
-    combine_genome_kmer_counts(folder_intermediate_files, path_kmer_counts)
-    # todo: find bins and write split genomes into bins
-    path_df_bins = "todo"
-    find_bins_DB(path_kmer_counts, path_df_bins)
-    path_db_bins = "todo"
-    write_split_to_bins(path_df_bins, path_db_bins)
-    path_bins_hash = "todo"
-    kraken_build(path_db_bins, path_bins_hash)
+    # todo: decorator to avoid recomputing steps that have already been done (maybe check if output file already exist?)
+
+    # get kmer distribution for each window of each genome, parallel folder with same structure
+    path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
+    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=3)
+
+    # combine all kmer distributions into one single file
+    path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
+    combine_genome_kmer_counts(folder_intermediate_files, path_stacked_kmer_counts)
+
+    # todo: find bins and write genomes' segments into bins
+    # From kmer distributions, use clustering to set the bins per segment
+    path_segments_bins = osp.join(folder_intermediate_files, "_genomes_segments_bins.pd")
+    find_bins_DB(path_stacked_kmer_counts, path_segments_bins, n_clusters)
+
+    # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
+    path_DB_bins = osp.join(folder_intermediate_files, "bins_genomes_segments")
+    write_split_to_bins(path_segments_bins, path_DB_bins, n_clusters)
+
+    # Run kraken2-build into database folder
+    path_bins_hash = osp.join(folder_database, "bins_kraken2_DB")
+    kraken_build(path_DB_bins, path_bins_hash)
 
 
 if __name__ == '__main__':
