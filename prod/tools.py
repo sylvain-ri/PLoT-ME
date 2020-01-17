@@ -100,7 +100,7 @@ def init_logger(logger_name='reads_binning'):
     fh.setFormatter(formatter)
     # create console handler with a higher log level
     ch = logging.StreamHandler()
-    ch.setLevel(logging.WARNING)
+    ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     # create logger with parse_DB.py and add the handlers to the logger
     logger = logging.getLogger(logger_name)
@@ -193,7 +193,7 @@ class FilesInDir:
                     self.logger.warning(f"Related file {key} not found in target directory "
                                         f"({self.target_folder}) for {self}")
                     return False
-        if log:  self.logger.info(f"file complies {self}")
+        if log:  self.logger.debug(f"file complies {self}")
         return True
 
     @classmethod
@@ -211,10 +211,10 @@ class FilesInDir:
         """ replicated os.walk, with total file count, for a folder (default root folder)
             yields a FileInDir object
         """
-        logger.debug(f"scanning the folder {folder}")
+        logger.info(f"scanning the folder {folder}")
         if cls.file_count_root is None:
             cls.count_root_files(folder)
-        logger.debug(f"scanning the folder {folder}")
+        logger.info(f"scanning the folder {folder}")
         for obj in tqdm(cls.walk_dir(folder), total=cls.file_count_root):
             yield obj
 
