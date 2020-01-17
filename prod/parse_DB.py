@@ -150,7 +150,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
             continue
         with open(fastq.taxon) as f:
             taxon = int(f.read())
-        genome = Genome(fastq.abs_path, fastq.kmer_count_pd, taxon, window=window, k=k)
+        genome = Genome(fastq.abs_path, fastq.kmer_count_path, taxon, window=window, k=k)
         genome.load_genome()
         genome.count_kmers_to_df()
         if i > stop >= 0:
