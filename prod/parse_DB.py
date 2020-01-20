@@ -32,7 +32,7 @@ from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, ScanFolder, is_valid_directory, init_logger
+from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path
 from bio import kmers_dic, ncbi, seq_count_kmer
 
 
@@ -217,26 +217,27 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
     """
     # todo: decorator to avoid recomputing steps that have already been done (maybe check if output file already exist?)
 
+    path_setup = f"{k}mer_s{segments}"
     # get kmer distribution for each window of each genome, parallel folder with same structure
-    path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
+    path_individual_kmer_counts = osp.join(folder_intermediate_files, path_setup, f"counts_{k}mer_s{segments}")
     scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts,
                                k=k, segments=segments, stop=5, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
-    path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
+    path_stacked_kmer_counts = osp.join(folder_intermediate_files, path_setup, f"_all_counts.{k}mer_s{segments}.pd")
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts, k=k)
 
     # todo: find bins and write genomes' segments into bins
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_bins = osp.join(folder_intermediate_files, "_genomes_segments_bins.pd")
+    path_segments_bins = osp.join(folder_intermediate_files, path_setup, f"_genomes_bins_{k}mer_s{segments}.pd")
     define_cluster_bins(path_stacked_kmer_counts, path_segments_bins, n_clusters)
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
-    path_DB_bins = osp.join(folder_intermediate_files, "bins_genomes_segments")
+    path_DB_bins = osp.join(folder_intermediate_files, path_setup, f"_bins_DB")
     write_split_to_bins(path_segments_bins, path_DB_bins, n_clusters)
 
     # Run kraken2-build into database folder
-    path_bins_hash = osp.join(folder_database, "bins_kraken2_DB")
+    path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", path_setup)  # Separate hash tables by classifier
     kraken_build(path_DB_bins, path_bins_hash)
 
 

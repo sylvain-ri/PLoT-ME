@@ -98,6 +98,14 @@ def is_valid_file(x):
         raise FileNotFoundError(f'The path is not a file : {x}')
 
 
+def create_path(path, with_filename=True):
+    """ Create the intermediate folders if not existing. """
+    folder = osp.split(path)[0] if with_filename else path
+    if not osp.isdir(folder):
+        logger.debug(f"created folder {folder}")
+        os.makedirs(folder)
+
+
 def folder_today(path):
     s_today = f"{date.today()}"
     final_path = osp.join(path, s_today)
@@ -148,7 +156,7 @@ class ScanFolder:
         else:
             path_to_target = osp.join(ScanFolder.folder_target, self.path_rel)
             res = osp.splitext(path_to_target)[0] + ScanFolder.ext_create
-            self.create_path(res)
+            create_path(res)
             return res
 
     def file_matches_ext(self):
@@ -164,13 +172,6 @@ class ScanFolder:
             return False
         if log:  self.logger.debug(f"file complies {self}")
         return True
-
-    @staticmethod
-    def create_path(path):
-        folder = osp.split(path)[0]
-        if not osp.isdir(folder):
-            logger.debug(f"created folder {folder}")
-            os.makedirs(folder)
 
     @classmethod
     def set_folder_scan_options(cls, scanning="", target="", ext_find=(), ext_check="", ext_create=""):
