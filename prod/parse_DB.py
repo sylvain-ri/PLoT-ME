@@ -22,7 +22,7 @@ import argparse
 from copy import deepcopy
 from itertools import islice
 from joblib import Parallel, delayed
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Pool
 import os
 import os.path as osp
 import pandas as pd
@@ -195,8 +195,12 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop
     parallel_kmer_counting.segments = segments
     parallel_kmer_counting.force_recount = force_recount
     # Count in parallel. islice() to take a part of an iterable
-    results = Parallel(n_jobs=cores)(delayed(parallel_kmer_counting)(fastq, )
-                                     for fastq in islice(ScanFolder.tqdm_scan(), stop if stop > 0 else None))
+    with Pool(cores) as pool:
+        tqdm(pool.imap(parallel_kmer_counting, ScanFolder.tqdm_scan(with_tqdm=False)),
+             total=ScanFolder.count_root_files())
+
+    # results = Parallel(n_jobs=cores)(delayed(parallel_kmer_counting)(fastq, )
+    #                                  for fastq in islice(ScanFolder.tqdm_scan(scanning), stop if stop > 0 else None))
 
     # for i, fastq in enumerate(ScanFolder.tqdm_scan()):
     #     if osp.isfile(fastq.path_target) and force_recount is False:

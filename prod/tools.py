@@ -185,19 +185,24 @@ class ScanFolder:
         cls.ext_create    = ext_create
 
     @classmethod
-    def tqdm_scan(cls, folder=""):
+    def tqdm_scan(cls, folder="", with_tqdm=True):
         """ replicated os.walk, with total file count, for a folder (default root folder)
             yields a ScanFolder object
         """
         if folder != "":
             cls.folder_root = folder
         assert osp.isdir(cls.folder_root), logger.error(f"the provided path to scan is not a directory {cls.folder_root}")
-        logger.info(f"counting matching files in {cls.folder_root}")
-        if cls.count_files is None:
-            cls.count_root_files()
-        logger.info(f"Yielding the {cls.count_files} files found in folder {cls.folder_root}")
-        for obj in tqdm(cls.walk_dir(log=False), total=cls.count_files):
-            yield obj
+
+        if with_tqdm:
+            logger.info(f"counting matching files in {cls.folder_root}")
+            if cls.count_files is None:
+                cls.count_root_files()
+            logger.info(f"Yielding the {cls.count_files} files found in folder {cls.folder_root}")
+            for obj in tqdm(cls.walk_dir(log=False), total=cls.count_files):
+                yield obj
+        else:
+            for obj in cls.walk_dir(log=False):
+                yield obj
         logger.info(f"{cls.count_files} have been processed")
 
     @classmethod
@@ -215,6 +220,7 @@ class ScanFolder:
         for _ in tqdm(cls.walk_dir()):
             file_count += 1
         cls.count_files = file_count
+        return file_count
 
     def __repr__(self):
         return self.path_abs
