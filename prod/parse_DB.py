@@ -14,6 +14,7 @@ Reads Binning Project
 """
 
 import argparse
+from multiprocessing import cpu_count
 import traceback
 from copy import deepcopy
 import os
@@ -141,7 +142,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
     # scanning folder Class set up:
     ScanFolder.set_folder_scan_options(scanning=scanning, target=folder_kmers,
                                        ext_find=(".fastq", ".fq", ".fna"), ext_check=".taxon",
-                                       ext_create=".kmer_count.pd")
+                                       ext_create=f".{k}mer_count.pd")
 
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
     for i, fastq in enumerate(ScanFolder.tqdm_scan()):
@@ -161,25 +162,32 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
 
 
 @check_step
-def combine_genome_kmer_counts(folder_kmers, path_df):
+def combine_genome_kmer_counts(folder_kmers, path_df, k):
     """ Combine single dataframes into one. Might need high memory """
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
     dfs = []
     added = 0
     ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="",
-                                       ext_find=(".kmer_count.pd", ), ext_check="", ext_create="")
+                                       ext_find=(f".{k}mer_count.pd", ), ext_check="", ext_create="")
     for file in ScanFolder.tqdm_scan():
         dfs.append(pd.read_pickle(file.path_abs))
         added += 1
-    logger.info(f"{added} kmer distributions have been added. now concatenating")
+    logger.info(f"{added} {k}-mer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Saving dataframe to {path_df}")
     df.to_pickle(path_df)
 
 
 @check_step
-def find_bins_DB(path_kmer_counts, n_parts=10):
-    """ Given a database of genomes in fastq files, split it in n segments """
+def define_cluster_bins(path_kmer_counts, output, n_parts=10):
+    """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
+    logger.info(f"Clustering the genomes' segments into {n_parts} bins.")
+
+    df = pd.read_pickle(path_kmer_counts)
+
+
+
+
     raise NotImplementedError
 
 
@@ -195,7 +203,7 @@ def kraken_build(path_db_bins, path_bins_hash):
     pass
 
 
-def main(folder_database, folder_intermediate_files, n_clusters, cores, force_recount=False):
+def main(folder_database, folder_intermediate_files, n_clusters, k, cores, force_recount=False):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -206,16 +214,16 @@ def main(folder_database, folder_intermediate_files, n_clusters, cores, force_re
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
-    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=5, force_recount=force_recount)
+    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, k=k, stop=5, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
-    combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
+    combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts, k=k)
 
     # todo: find bins and write genomes' segments into bins
     # From kmer distributions, use clustering to set the bins per segment
     path_segments_bins = osp.join(folder_intermediate_files, "_genomes_segments_bins.pd")
-    find_bins_DB(path_stacked_kmer_counts, path_segments_bins, n_clusters)
+    define_cluster_bins(path_stacked_kmer_counts, path_segments_bins, n_clusters)
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_DB_bins = osp.join(folder_intermediate_files, "bins_genomes_segments")
@@ -232,18 +240,26 @@ if __name__ == '__main__':
                         help='Database root folder. Support format: RefSeq 2019.')
     parser.add_argument('path_intermediate_files', type=is_valid_directory,
                         help='Folder for the k-mer counts per genome and for clustering models')
-    parser.add_argument('-c', '--clusters', default=10, type=int, help='Number of clusters to split the DB into')
-    parser.add_argument('-t', '--threads',  default="10", help='Number of threads')
+    parser.add_argument('-k', '--kmer', default=4, type=int, help='Size of the kmers. Usual value : 4')
+    parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into')
+    parser.add_argument('-t', '--threads', default=cpu_count(), type=int, help='Number of threads')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
-                        help="By default, don't redo if files exist. Write 11011 to force redo the 2rd step, 0-indexed")
+                        help="By default, don't redo files that already exist. "
+                             "Write 11011 to force redo the 2rd step, 0-indexed. "
+                             "To continue counting kmers, write 01111. To recount all kmers, also add option -f")
     args = parser.parse_args()
 
+    # Set the skip variable for the decorator of each step
     check_step.can_skip = args.skip_existing
+    # If force recount of the kmer, disable the skip of the step
+    if args.force:
+        args.skip_existing = "0" + args.skip_existing[1:]
+
     logger.warning("**** Starting script ****")
     try:
         main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
-             n_clusters=args.clusters, cores=args.threads, force_recount=args.force)
+             n_clusters=args.clusters, k=args.kmer, cores=args.threads, force_recount=args.force)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
