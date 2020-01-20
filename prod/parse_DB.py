@@ -267,7 +267,7 @@ if __name__ == '__main__':
     logger.warning("**** Starting script ****")
     try:
         main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
-             n_clusters=args.number_bins, k=args.kmer, segments=args.segments, force_recount=args.force)
+             n_clusters=args.number_bins, k=args.kmer, segments=args.window, force_recount=args.force)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
