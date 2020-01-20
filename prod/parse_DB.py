@@ -184,16 +184,15 @@ def combine_genome_kmer_counts(folder_kmers, path_df, k):
 
 
 @check_step
-def define_cluster_bins(path_kmer_counts, output, n_parts=10):
+def define_cluster_bins(path_kmer_counts, output, clusters=10):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
-    logger.info(f"Clustering the genomes' segments into {n_parts} bins.")
+    logger.info(f"Clustering the genomes' segments into {clusters} bins.")
 
     df = pd.read_pickle(path_kmer_counts)
 
 
-    #
+    logger.info(f"Defined {clusters} clusters in {output}")
     df.to_pickle(output)
-    return
 
 
 @check_step
@@ -268,7 +267,7 @@ if __name__ == '__main__':
     logger.warning("**** Starting script ****")
     try:
         main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
-             n_clusters=args.clusters, k=args.kmer, segments=args.segments, force_recount=args.force)
+             n_clusters=args.number_bins, k=args.kmer, segments=args.segments, force_recount=args.force)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
