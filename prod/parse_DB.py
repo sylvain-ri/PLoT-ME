@@ -103,6 +103,12 @@ class Genome:
         logger.debug(f"saved kmer count to {self.path_kmers}")
 
 
+def create_n_folders(path, n):
+    """ Create the sub-folders of bins from 0/ to n/ """
+    for i in range(n):
+        create_path(osp.join(path, str(i)), with_filename=False)
+
+
 # Decorator for all these steps
 def check_step(func):
     """ Decorator to print steps and check if results have already been computed
@@ -190,6 +196,7 @@ def define_cluster_bins(path_kmer_counts, output, clusters=10):
     logger.info(f"Clustering the genomes' segments into {clusters} bins.")
 
     df = pd.read_pickle(path_kmer_counts)
+    cols_kmers = df.columns[-256:]
 
 
     logger.info(f"Defined {clusters} clusters in {output}")
@@ -197,15 +204,19 @@ def define_cluster_bins(path_kmer_counts, output, clusters=10):
 
 
 @check_step
-def write_split_to_bins(path_df_bins, path_db_bins):
+def write_split_to_bins(path_bins_assignemnts, path_db_bins, clusters):
     """ Write .fna files from the binning for kraken build """
-    pass
+    create_n_folders(path_db_bins, clusters)
+
+    # todo: copy each segment of genome into the specific bin
+    df = pd.read_pickle(path_bins_assignemnts)
 
 
 @check_step
-def kraken_build(path_db_bins, path_bins_hash):
+def kraken_build(path_db_bins, path_bins_hash, clusters):
     """ launch kraken build on each bin """
-    pass
+    create_n_folders(path_bins_hash, clusters)
+    # todo: run kraken2-build on each subfolder (add to library and build)
 
 
 def main(folder_database, folder_intermediate_files, n_clusters, k, segments, force_recount=False):
@@ -215,30 +226,30 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
         folder_database          : RefSeq root folder
         folder_intermediate_files: empty root folder to store kmer counts
     """
-    # todo: decorator to avoid recomputing steps that have already been done (maybe check if output file already exist?)
+    # Common folder name keeping parameters
+    parameters = f"{k}mer_s{segments}"
 
-    path_setup = f"{k}mer_s{segments}"
     # get kmer distribution for each window of each genome, parallel folder with same structure
-    path_individual_kmer_counts = osp.join(folder_intermediate_files, path_setup, f"counts_{k}mer_s{segments}")
+    path_individual_kmer_counts = osp.join(folder_intermediate_files, parameters, f"counts_{k}mer_s{segments}")
     scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts,
                                k=k, segments=segments, stop=5, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
-    path_stacked_kmer_counts = osp.join(folder_intermediate_files, path_setup, f"_all_counts.{k}mer_s{segments}.pd")
+    path_stacked_kmer_counts = osp.join(folder_intermediate_files, parameters, f"_all_counts.{k}mer_s{segments}.pd")
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts, k=k)
 
     # todo: find bins and write genomes' segments into bins
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_bins = osp.join(folder_intermediate_files, path_setup, f"_genomes_bins_{k}mer_s{segments}.pd")
+    path_segments_bins = osp.join(folder_intermediate_files, parameters, f"_genomes_bins_{k}mer_s{segments}.pd")
     define_cluster_bins(path_stacked_kmer_counts, path_segments_bins, n_clusters)
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
-    path_DB_bins = osp.join(folder_intermediate_files, path_setup, f"_bins_DB")
+    path_DB_bins = osp.join(folder_intermediate_files, parameters, f"_bins_DB")
     write_split_to_bins(path_segments_bins, path_DB_bins, n_clusters)
 
     # Run kraken2-build into database folder
-    path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", path_setup)  # Separate hash tables by classifier
-    kraken_build(path_DB_bins, path_bins_hash)
+    path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", parameters)  # Separate hash tables by classifier
+    kraken_build(path_DB_bins, path_bins_hash, n_clusters)
 
 
 if __name__ == '__main__':
