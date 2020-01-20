@@ -196,12 +196,11 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop
     parallel_kmer_counting.force_recount = force_recount
     # Count in parallel. islice() to take a part of an iterable
     with Pool(cores) as pool:
-        results = list(tqdm(pool.imap(parallel_kmer_counting, ScanFolder.tqdm_scan(with_tqdm=False)),
+        results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
+                                                                     stop if stop>0 else None)),
                             total=ScanFolder.count_root_files()))
 
-    # results = Parallel(n_jobs=cores)(delayed(parallel_kmer_counting)(fastq, )
-    #                                  for fastq in islice(ScanFolder.tqdm_scan(scanning), stop if stop > 0 else None))
-
+    # Traditional sequential run
     # for i, fastq in enumerate(ScanFolder.tqdm_scan()):
     #     if osp.isfile(fastq.path_target) and force_recount is False:
     #         logger.debug(f"File already existing, skipping ({fastq.path_target})")
@@ -281,7 +280,7 @@ copy_segments_to_bin.path_db_bins = ""
 
 
 @check_step
-def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters):
+def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1):
     """ Write .fna files from the binning for kraken build """
     create_n_folders(path_db_bins, clusters)
 
@@ -295,9 +294,12 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters):
 
     # Copy in parallel
     copy_segments_to_bin.path_db_bins = path_db_bins
-    results = Parallel(n_jobs=cores)(delayed(copy_segments_to_bin)(df_fna)
-                                     for df_fna in tqdm(df_per_fna))
-    results
+
+    with Pool(cores) as pool:
+        results = list(tqdm(pool.imap(copy_segments_to_bin, islice(df_per_fna, stop if stop>0 else None)),
+                            total=len(df_per_fna)))
+
+    logger.info(f"got {len(results)} results...")
 
 
 
@@ -336,7 +338,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_DB_bins = osp.join(folder_intermediate_files, parameters, f"_bins_DB")
-    split_genomes_to_bins(path_segments_to_bins, path_DB_bins, n_clusters)
+    split_genomes_to_bins(path_segments_to_bins, path_DB_bins, n_clusters, stop=early_stop)
 
     # Run kraken2-build into database folder
     path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", parameters)  # Separate hash tables by classifier
