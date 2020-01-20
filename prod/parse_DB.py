@@ -27,7 +27,7 @@ from Bio.SeqRecord import SeqRecord
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, FilesInDir, is_valid_directory, init_logger
+from tools import PATHS, ScanFolder, is_valid_directory, init_logger
 from bio import kmers_dic, ncbi, seq_count_kmer
 
 
@@ -139,18 +139,18 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
         Compatible with 2019 RefSeq format hopefully
     """
     # scanning folder Class set up:
-    preset = {"root"  : [".taxon", ],
-              "target": [".kmer_count.pd", ]}
-    FilesInDir.set_defaults_parse_RefSeq(scanning, folder_kmers, preset=preset)
-    FilesInDir.folder_kmer = folder_kmers
+    ScanFolder.set_folder_scan_options(scanning=scanning, target=folder_kmers,
+                                       ext_find=(".fastq", ".fq", ".fna"), ext_check=".taxon",
+                                       ext_create=".kmer_count.pd")
 
     logger.info("scanning through all genomes in refseq " + scanning)
-    for i, fastq in enumerate(FilesInDir.tqdm_scan(scanning)):
-        if osp.isfile(fastq.target_file[".kmer_count.pd"]):
+    for i, fastq in enumerate(ScanFolder.tqdm_scan()):
+        if osp.isfile(fastq.path_target):
+            logger.info(f"File already existing, skipping ({fastq.path_target})")
             continue
-        with open(fastq.taxon) as f:
+        with open(fastq.path_check) as f:
             taxon = int(f.read())
-        genome = Genome(fastq.abs_path, fastq.kmer_count_path, taxon, window=window, k=k)
+        genome = Genome(fastq.path_abs, fastq.path_target, taxon, window=window, k=k)
         genome.load_genome()
         genome.count_kmers_to_df()
         if i > stop >= 0:
@@ -166,10 +166,11 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
     dfs = []
     added = 0
-    for file in FilesInDir.tqdm_scan(folder_kmers):
-        if file.endswith(".kmers.pd"):
-            dfs.append(pd.read_pickle(file.path))
-            added += 1
+    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="",
+                                       ext_find=(".kmer_count.pd", ), ext_check="", ext_create="")
+    for file in ScanFolder.tqdm_scan():
+        dfs.append(pd.read_pickle(file.path))
+        added += 1
     logger.info(f"{added} kmer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Saving dataframe to {path_df}")
