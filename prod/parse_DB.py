@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 #############################################################################
-Script to divide a Database of genomes (RefSeq) and split it into bins
-according to the k-mer frequency of each genome. Needs a lot of disk space,
-and RAM according to the largest genome to process.
+Script to divide a Database of genomes (RefSeq), split them into segments and
+cluster them into bins according to their k-mer frequency.
+Needs a lot of disk space, and RAM according to the largest genome to process.
 
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
@@ -25,6 +25,10 @@ from time import time, process_time
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+from sklearn.cluster import KMeans, MiniBatchKMeans
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
+
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
@@ -33,6 +37,7 @@ from bio import kmers_dic, ncbi, seq_count_kmer
 
 
 logger = init_logger('parse_DB')
+cores = 1
 
 
 class Genome:
@@ -41,12 +46,12 @@ class Genome:
                   "chromosome", "complete genome", "whole genome shotgun sequence", ]
     kmer_count_zeros = kmers_dic(4)
 
-    def __init__(self, fna_file, kmer_file, taxon, window, k=4):
+    def __init__(self, fna_file, kmer_file, taxon, segments, k=4):
         logger.debug("Created genome object")
         self.path_fna    = fna_file
         self.path_kmers  = kmer_file
         self.taxon       = taxon
-        self.window      = window
+        self.segments    = segments
         self.k           = k
         # records is a dict of SeqRecord
         self.records = {cat: [] for cat in self.categories}
@@ -64,7 +69,7 @@ class Genome:
                     break
 
     def yield_genome_split(self):
-        """ Split a genome/plasmid into multiple windows, to count the k-mer
+        """ Split a genome/plasmid into multiple segments, to count the k-mer
             or to create the .fna files for kraken2-build
         """
         for cat in self.categories:
@@ -72,8 +77,8 @@ class Genome:
 
                 full_seq = record.seq
                 len_genome = len(full_seq)
-                for start in range(0, len_genome - self.window, self.window):
-                    end = min(start + self.window, len_genome - 1)
+                for start in range(0, len_genome - self.segments, self.segments):
+                    end = min(start + self.segments, len_genome - 1)
                     # Include the taxonomy id, start and end of the segment into the description
                     description = f"|kraken:taxid|{self.taxon}|s:{start}-e:{end-1}|{record.description}"
                     segment = SeqRecord(full_seq[start:end],
@@ -135,8 +140,8 @@ check_step.can_skip = "11111"
 
 
 @check_step
-def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=30, force_recount=False):
-    """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
+def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop=30, force_recount=False):
+    """ Scan through RefSeq, split genomes into segments, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
     # scanning folder Class set up:
@@ -151,7 +156,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
             continue
         with open(fastq.path_check) as f:
             taxon = int(f.read())
-        genome = Genome(fastq.path_abs, fastq.path_target, taxon, window=window, k=k)
+        genome = Genome(fastq.path_abs, fastq.path_target, taxon, segments=segments, k=k)
         genome.load_genome()
         genome.count_kmers_to_df()
         if i > stop >= 0:
@@ -186,9 +191,9 @@ def define_cluster_bins(path_kmer_counts, output, n_parts=10):
     df = pd.read_pickle(path_kmer_counts)
 
 
-
-
-    raise NotImplementedError
+    #
+    df.to_pickle(output)
+    return
 
 
 @check_step
@@ -203,7 +208,7 @@ def kraken_build(path_db_bins, path_bins_hash):
     pass
 
 
-def main(folder_database, folder_intermediate_files, n_clusters, k, cores, force_recount=False):
+def main(folder_database, folder_intermediate_files, n_clusters, k, segments, force_recount=False):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -214,7 +219,8 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, cores, force
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
-    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, k=k, stop=5, force_recount=force_recount)
+    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts,
+                               k=k, segments=segments, stop=5, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
@@ -241,8 +247,9 @@ if __name__ == '__main__':
     parser.add_argument('path_intermediate_files', type=is_valid_directory,
                         help='Folder for the k-mer counts per genome and for clustering models')
     parser.add_argument('-k', '--kmer', default=4, type=int, help='Size of the kmers. Usual value : 4')
+    parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes')
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into')
-    parser.add_argument('-t', '--threads', default=cpu_count(), type=int, help='Number of threads')
+    parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, don't redo files that already exist. "
@@ -252,6 +259,7 @@ if __name__ == '__main__':
 
     # Set the skip variable for the decorator of each step
     check_step.can_skip = args.skip_existing
+    cores = args.cores
     # If force recount of the kmer, disable the skip of the step
     if args.force:
         args.skip_existing = "0" + args.skip_existing[1:]
@@ -259,7 +267,7 @@ if __name__ == '__main__':
     logger.warning("**** Starting script ****")
     try:
         main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
-             n_clusters=args.clusters, k=args.kmer, cores=args.threads, force_recount=args.force)
+             n_clusters=args.clusters, k=args.kmer, segments=args.segments, force_recount=args.force)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
