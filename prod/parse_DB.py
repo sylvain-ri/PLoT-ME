@@ -126,6 +126,7 @@ def check_step(func):
             logger.info(f"Step {check_step.step_nb} SKIPPING, Output has already been generated : {to_check}")
             result = None
         else:
+            create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
             result = func(*args, **kwargs)
 
         # print time spent
