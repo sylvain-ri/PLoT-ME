@@ -143,7 +143,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
                                        ext_find=(".fastq", ".fq", ".fna"), ext_check=".taxon",
                                        ext_create=".kmer_count.pd")
 
-    logger.info("scanning through all genomes in refseq " + scanning)
+    logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
     for i, fastq in enumerate(ScanFolder.tqdm_scan()):
         if osp.isfile(fastq.path_target):
             logger.info(f"File already existing, skipping ({fastq.path_target})")
@@ -157,7 +157,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
             logger.warning("Early stop of the scanning")
             break
 
-    logger.info(f"{i} folders have been scanned")
+    logger.info(f"{i} genomes have been scanned and kmer counted.")
 
 
 @check_step

@@ -159,7 +159,7 @@ class ScanFolder:
         """ Find files with the extension to find, check if related file (check) """
         if not self.file_matches_ext():
             return False
-        if self.ext_check == "" and not osp.isfile(self.path_check):
+        if self.ext_check != "" and not osp.isfile(self.path_check):
             self.logger.warning(f"Related file with extension {self.ext_check} not found in root directory for {self}")
             return False
         if log:  self.logger.debug(f"file complies {self}")
