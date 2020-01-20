@@ -114,7 +114,7 @@ def check_step(func):
 
         # If step already done, skip it
         to_check = args[1]
-        if check_step.can_skip and \
+        if check_step.can_skip[check_step.step_nb] == "1" and \
                 (osp.isfile(to_check) or                           # there's already a file or
                  (osp.isdir(to_check) and os.listdir(to_check))):  # there's a folder, and not empty
             logger.info(f"Output has already been generated : {to_check}")
@@ -130,11 +130,11 @@ def check_step(func):
 
 
 check_step.step_nb = 0
-check_step.can_skip = True
+check_step.can_skip = "11111"
 
 
 @check_step
-def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=30, ):
+def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=30, force_recount=False):
     """ Scan through RefSeq, split genomes into windows, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
@@ -145,7 +145,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, window=10000, stop=3
 
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
     for i, fastq in enumerate(ScanFolder.tqdm_scan()):
-        if osp.isfile(fastq.path_target):
+        if osp.isfile(fastq.path_target) and force_recount is False:
             logger.info(f"File already existing, skipping ({fastq.path_target})")
             continue
         with open(fastq.path_check) as f:
@@ -169,7 +169,7 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="",
                                        ext_find=(".kmer_count.pd", ), ext_check="", ext_create="")
     for file in ScanFolder.tqdm_scan():
-        dfs.append(pd.read_pickle(file.path))
+        dfs.append(pd.read_pickle(file.path_abs))
         added += 1
     logger.info(f"{added} kmer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
@@ -195,7 +195,7 @@ def kraken_build(path_db_bins, path_bins_hash):
     pass
 
 
-def main(folder_database, folder_intermediate_files, n_clusters, cores):
+def main(folder_database, folder_intermediate_files, n_clusters, cores, force_recount=False):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -206,7 +206,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, cores):
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, "kmer_counts")
-    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=5)
+    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts, stop=5, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, "_all_counts.kmer.pd")
@@ -234,14 +234,16 @@ if __name__ == '__main__':
                         help='Folder for the k-mer counts per genome and for clustering models')
     parser.add_argument('-c', '--clusters', default=10, type=int, help='Number of clusters to split the DB into')
     parser.add_argument('-t', '--threads',  default="10", help='Number of threads')
-    parser.add_argument('-s', '--can_skip', help='Default, do not redo intermediate steps', action='store_false')
+    parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
+    parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
+                        help="By default, don't redo if files exist. Write 11011 to force redo the 2rd step, 0-indexed")
     args = parser.parse_args()
 
     check_step.can_skip = args.can_skip
     logger.warning("**** Starting script ****")
     try:
         main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
-             n_clusters=args.clusters, cores=args.threads)
+             n_clusters=args.clusters, cores=args.threads, force_recount=args.force)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
