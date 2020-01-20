@@ -5,6 +5,11 @@ Script to divide a Database of genomes (RefSeq), split them into segments and
 cluster them into bins according to their k-mer frequency.
 Needs a lot of disk space, and RAM according to the largest genome to process.
 
+** kmer counts DataFrames are under this format:
+taxon	category	start	end	name	description	fna_path	AAAA .... TTTT
+
+** cluster/bin assignments trade the nucleotides columns to a "cluster" column
+
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
@@ -14,6 +19,7 @@ Reads Binning Project
 """
 
 import argparse
+import pickle
 from multiprocessing import cpu_count
 import traceback
 from copy import deepcopy
@@ -109,6 +115,13 @@ def create_n_folders(path, n):
         create_path(osp.join(path, str(i)), with_filename=False)
 
 
+def scale_df_by_length(df, kmer_cols, k, w):
+    """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
+    ratio = 4**k / (w - k + 1)
+    for col in kmer_cols:
+        df[col] *= ratio
+
+
 # Decorator for all these steps
 def check_step(func):
     """ Decorator to print steps and check if results have already been computed
@@ -159,7 +172,7 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
     for i, fastq in enumerate(ScanFolder.tqdm_scan()):
         if osp.isfile(fastq.path_target) and force_recount is False:
-            logger.info(f"File already existing, skipping ({fastq.path_target})")
+            logger.debug(f"File already existing, skipping ({fastq.path_target})")
             continue
         with open(fastq.path_check) as f:
             taxon = int(f.read())
@@ -191,16 +204,39 @@ def combine_genome_kmer_counts(folder_kmers, path_df, k):
 
 
 @check_step
-def define_cluster_bins(path_kmer_counts, output, clusters=10):
+def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
-    logger.info(f"Clustering the genomes' segments into {clusters} bins.")
+    logger.info(f"Clustering the genomes' segments into {n_clusters} bins.")
 
     df = pd.read_pickle(path_kmer_counts)
     cols_kmers = df.columns[-256:]
+    cols_spe = df.columns[:-256]
 
+    # ## 1 ## Scaling by length and kmers
+    scale_df_by_length(df, cols_kmers, k, w)
 
-    logger.info(f"Defined {clusters} clusters in {output}")
-    df.to_pickle(output)
+    # ## 2 ## Could add PCA
+
+    # Model learning
+    name = "KMeans"
+    ml_model = KMeans(n_clusters=n_clusters, n_jobs=cores, random_state=3)
+    # name = "miniKM"
+    # ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
+
+    ml_model.fit(df[cols_kmers])
+
+    # Model saving
+    path_kmeans = osp.join(path_models, f"{name}_{k}mer_s{w}.pkl")
+    with open(path_kmeans, 'wb') as f:
+        pickle.dump(ml_model, f)
+    logger.info(f"{name} model saved for k={k} s={w} at {path_kmeans}")
+
+    # ## 3 ##
+    predicted = ml_model.predict(df[cols_kmers])
+    df["cluster"] = predicted
+
+    df[list(cols_spe) + ["cluster"]].to_pickle(output)
+    logger.info(f"Defined {n_clusters} clusters in {output} with ML model {name}.")
 
 
 @check_step
@@ -240,12 +276,13 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
 
     # todo: find bins and write genomes' segments into bins
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_bins = osp.join(folder_intermediate_files, parameters, f"_genomes_bins_{k}mer_s{segments}.pd")
-    define_cluster_bins(path_stacked_kmer_counts, path_segments_bins, n_clusters)
+    path_segments_to_bins = osp.join(folder_intermediate_files, parameters, f"_genomes_bins_{k}mer_s{segments}.pd")
+    path_models           = osp.join(folder_intermediate_files, parameters, "models")
+    define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters, k, segments)
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_DB_bins = osp.join(folder_intermediate_files, parameters, f"_bins_DB")
-    write_split_to_bins(path_segments_bins, path_DB_bins, n_clusters)
+    write_split_to_bins(path_segments_to_bins, path_DB_bins, n_clusters)
 
     # Run kraken2-build into database folder
     path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", parameters)  # Separate hash tables by classifier
