@@ -230,6 +230,11 @@ def combine_genome_kmer_counts(folder_kmers, path_df, k):
         added += 1
     logger.info(f"{added} {k}-mer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
+    # todo: test if redo categorical is needed
+    #  https://pandas.pydata.org/pandas-docs/stable/user_guide/categorical.html#merging
+    # df.taxon       = df.taxon.astype('category')
+    # df.category    = df.category.astype('category')
+    # df.description = df.description.astype('category')
     logger.info(f"Saving dataframe to {path_df}")
     df.to_pickle(path_df)
 
@@ -268,11 +273,12 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
     df["cluster"] = predicted
 
     df[list(cols_spe) + ["cluster"]].to_pickle(output)
-    logger.info(f"Defined {n_clusters} clusters in {output} with ML model {name}.")
+    logger.info(f"Defined {n_clusters} clusters, assignments here: {output} with ML model {name}.")
 
 
 def copy_segments_to_bin(df):
-    # todo: call the Genome methods
+    # todo: call the Genome methods, split into segments, recombine consecutive segments,
+    #  write the file with taxo to the appropriate bin
     logger.info(f"got a df of shape {df.shape} and the variable is {copy_segments_to_bin.path_db_bins}")
     return
 
@@ -301,8 +307,6 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1
                             total=len(df_per_fna)))
 
     logger.info(f"got {len(results)} results...")
-
-
 
 
 @check_step
