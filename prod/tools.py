@@ -81,7 +81,7 @@ def is_valid_directory(x):
     if osp.isdir(x):
         return x
     else:
-        reply = input('Folder not found, would like to create it ? y/[n]')
+        reply = input(f'Folder not found, would like to create it ? y/[n] \n{x}')
         if 'y' in reply.lower():
             os.makedirs(x)
         else:
@@ -187,30 +187,30 @@ class ScanFolder:
         """ replicated os.walk, with total file count, for a folder (default root folder)
             yields a ScanFolder object
         """
-        folder = cls.folder_root if folder == "" else folder
+        if folder != "":
+            cls.folder_root = folder
         assert osp.isdir(folder), logger.error(f"the provided path to scan is not a directory {folder}")
-        logger.info(f"counting matching files in {folder}")
+        logger.info(f"counting matching files in {cls.folder_root}")
         if cls.count_files is None:
-            cls.count_root_files(folder)
-        logger.info(f"scanning the folder {folder}")
-        for obj in tqdm(cls.walk_dir(folder), total=cls.count_files):
+            cls.count_root_files()
+        logger.info(f"Yielding the {cls.count_files} from the folder {cls.folder_root}")
+        for obj in tqdm(cls.walk_dir(log=False), total=cls.count_files):
             yield obj
+        logger.info(f"{cls.count_files} have been processed")
 
     @classmethod
-    def walk_dir(cls, folder="", log=True):
+    def walk_dir(cls, log=True):
         """ Walk through every files in a directory (default root folder) and yield FileInDir """
-        folder = cls.folder_root if folder == "" else folder
-        for dir_path, dirs, files in os.walk(folder):
+        for dir_path, dirs, files in os.walk(cls.folder_root):
             for filename in files:
                 file = ScanFolder(os.path.join(dir_path, filename))
                 if file.file_complies(log):
                     yield file
 
     @classmethod
-    def count_root_files(cls, folder=""):
-        folder = cls.folder_root if folder == "" else folder
+    def count_root_files(cls):
         file_count = 0
-        for _ in tqdm(cls.walk_dir(folder, log=False)):
+        for _ in tqdm(cls.walk_dir()):
             file_count += 1
         cls.count_files = file_count
 
