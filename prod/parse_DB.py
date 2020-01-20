@@ -19,15 +19,17 @@ Reads Binning Project
 """
 
 import argparse
-import pickle
-from multiprocessing import cpu_count
-import traceback
 from copy import deepcopy
+from itertools import islice
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
 import os
 import os.path as osp
 import pandas as pd
+import pickle
 import re
 from time import time, process_time
+import traceback
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -159,6 +161,23 @@ check_step.step_nb = 0
 check_step.can_skip = "11111"
 
 
+def parallel_kmer_counting(fastq, ):
+    if osp.isfile(fastq.path_target) and parallel_kmer_counting.force_recount is False:
+        logger.debug(f"File already existing, skipping ({fastq.path_target})")
+        return
+    with open(fastq.path_check) as f:
+        taxon = int(f.read())
+    genome = Genome(fastq.path_abs, fastq.path_target, taxon,
+                    segments=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
+    genome.load_genome()
+    genome.count_kmers_to_df()
+
+
+parallel_kmer_counting.k = 4
+parallel_kmer_counting.segments = 10000
+parallel_kmer_counting.force_recount = True
+
+
 @check_step
 def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop=30, force_recount=False):
     """ Scan through RefSeq, split genomes into segments, count their k-mer, save in similar structure
@@ -170,20 +189,29 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop
                                        ext_create=f".{k}mer_count.pd")
 
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
-    for i, fastq in enumerate(ScanFolder.tqdm_scan()):
-        if osp.isfile(fastq.path_target) and force_recount is False:
-            logger.debug(f"File already existing, skipping ({fastq.path_target})")
-            continue
-        with open(fastq.path_check) as f:
-            taxon = int(f.read())
-        genome = Genome(fastq.path_abs, fastq.path_target, taxon, segments=segments, k=k)
-        genome.load_genome()
-        genome.count_kmers_to_df()
-        if i > stop >= 0:
-            logger.warning("Early stop of the scanning")
-            break
 
-    logger.info(f"{i} genomes have been scanned and kmer counted.")
+    # Set constants to avoid arguments passing
+    parallel_kmer_counting.k = k
+    parallel_kmer_counting.segments = segments
+    parallel_kmer_counting.force_recount = force_recount
+    # Count in parallel. islice() to take a part of an iterable
+    results = Parallel(n_jobs=cores)(delayed(parallel_kmer_counting)(fastq, )
+                                     for fastq in islice(ScanFolder.tqdm_scan(), stop))
+
+    # for i, fastq in enumerate(ScanFolder.tqdm_scan()):
+    #     if osp.isfile(fastq.path_target) and force_recount is False:
+    #         logger.debug(f"File already existing, skipping ({fastq.path_target})")
+    #         return
+    #     with open(fastq.path_check) as f:
+    #         taxon = int(f.read())
+    #     genome = Genome(fastq.path_abs, fastq.path_target, taxon, segments=segments, k=k)
+    #     genome.load_genome()
+    #     genome.count_kmers_to_df()
+    #     if i > stop >= 0:
+    #         logger.warning("Early stop of the scanning")
+    #         break
+
+    logger.info(f"{len(results)} genomes have been scanned and kmer counted.")
 
 
 @check_step
@@ -239,13 +267,35 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
     logger.info(f"Defined {n_clusters} clusters in {output} with ML model {name}.")
 
 
+def copy_segments_to_bin(df):
+    # todo: call the Genome methods
+    logger.info(f"got a df of shape {df.shape} and the variable is {copy_segments_to_bin.path_db_bins}")
+    return
+
+
+copy_segments_to_bin.path_db_bins = ""
+
+
 @check_step
-def write_split_to_bins(path_bins_assignemnts, path_db_bins, clusters):
+def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters):
     """ Write .fna files from the binning for kraken build """
     create_n_folders(path_db_bins, clusters)
 
     # todo: copy each segment of genome into the specific bin
     df = pd.read_pickle(path_bins_assignemnts)
+
+    # Split it per file to allow parallel processing
+    df_per_fna = []
+    for file in tqdm(df.fna_path.unique()):
+        df_per_fna.append(df[df.fna_path == file])
+
+    # Copy in parallel
+    copy_segments_to_bin.path_db_bins = path_db_bins
+    results = Parallel(n_jobs=cores)(delayed(copy_segments_to_bin)(df_fna)
+                                     for df_fna in tqdm(df_per_fna))
+    results
+
+
 
 
 @check_step
@@ -282,7 +332,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_DB_bins = osp.join(folder_intermediate_files, parameters, f"_bins_DB")
-    write_split_to_bins(path_segments_to_bins, path_DB_bins, n_clusters)
+    split_genomes_to_bins(path_segments_to_bins, path_DB_bins, n_clusters)
 
     # Run kraken2-build into database folder
     path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", parameters)  # Separate hash tables by classifier
