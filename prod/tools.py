@@ -174,8 +174,8 @@ class ScanFolder:
     @classmethod
     def set_folder_scan_options(cls, scanning="", target="", ext_find=(), ext_check="", ext_create=""):
         """ Set the options to scan a folder, filter files to find, files to check, and create the target path """
-        assert osp.isdir(scanning), NotADirectoryError(f"the provided path to scan is not a directory {scanning}")
-        assert target == "" or osp.isdir(target), AttributeError(f"the provided path as target is not a directory {target}")
+        assert osp.isdir(scanning), logger.error(f"the provided path to scan is not a directory {scanning}")
+        assert target == "" or osp.isdir(target), logger.error(f"the provided path as target is not a directory {target}")
         cls.folder_root   = scanning
         cls.folder_target = target
         cls.ext_find      = ext_find
@@ -189,7 +189,7 @@ class ScanFolder:
         """
         if folder != "":
             cls.folder_root = folder
-        assert osp.isdir(folder), logger.error(f"the provided path to scan is not a directory {folder}")
+        assert osp.isdir(cls.folder_root), logger.error(f"the provided path to scan is not a directory {cls.folder_root}")
         logger.info(f"counting matching files in {cls.folder_root}")
         if cls.count_files is None:
             cls.count_root_files()
