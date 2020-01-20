@@ -153,7 +153,7 @@ class ScanFolder:
 
     def file_matches_ext(self):
         """ does the folder contains the file we are looking for (=with these extensions) """
-        return self.base.lower().endswith(self.ext_find)
+        return self.path_rel.lower().endswith(self.ext_find)
 
     def file_complies(self, log=True):
         """ Find files with the extension to find, check if related file (check) """
@@ -172,16 +172,16 @@ class ScanFolder:
             logger.debug(f"created folder {folder}")
             os.makedirs(folder)
 
-    @staticmethod
-    def set_folder_scan_options(scanning="", target="", ext_find=(), ext_check="", ext_create=""):
+    @classmethod
+    def set_folder_scan_options(cls, scanning="", target="", ext_find=(), ext_check="", ext_create=""):
         """ Set the options to scan a folder, filter files to find, files to check, and create the target path """
         assert osp.isdir(scanning), logger.error(f"the provided path to scan is not a directory {scanning}")
         assert target == "" or osp.isdir(target), logger.error(f"the provided path as target is not a directory {target}")
-        ScanFolder.folder_root   = scanning
-        ScanFolder.folder_target = target
-        ScanFolder.ext_find      = ext_find
-        ScanFolder.ext_check     = ext_check
-        ScanFolder.ext_create    = ext_create
+        cls.folder_root   = scanning
+        cls.folder_target = target
+        cls.ext_find      = ext_find
+        cls.ext_check     = ext_check
+        cls.ext_create    = ext_create
 
     @classmethod
     def tqdm_scan(cls, folder=""):
@@ -194,7 +194,7 @@ class ScanFolder:
         logger.info(f"counting matching files in {cls.folder_root}")
         if cls.count_files is None:
             cls.count_root_files()
-        logger.info(f"Yielding the {cls.count_files} from the folder {cls.folder_root}")
+        logger.info(f"Yielding the {cls.count_files} files found in folder {cls.folder_root}")
         for obj in tqdm(cls.walk_dir(log=False), total=cls.count_files):
             yield obj
         logger.info(f"{cls.count_files} have been processed")
