@@ -219,7 +219,7 @@ def kraken_build(path_db_bins, path_bins_hash, clusters):
     # todo: run kraken2-build on each subfolder (add to library and build)
 
 
-def main(folder_database, folder_intermediate_files, n_clusters, k, segments, force_recount=False):
+def main(folder_database, folder_intermediate_files, n_clusters, k, segments, force_recount=False, early_stop=-1):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -232,7 +232,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, parameters, f"counts_{k}mer_s{segments}")
     scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts,
-                               k=k, segments=segments, stop=5, force_recount=force_recount)
+                               k=k, segments=segments, stop=early_stop, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, parameters, f"_all_counts.{k}mer_s{segments}.pd")
@@ -262,6 +262,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes')
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into')
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
+    parser.add_argument('-x', '--debug', default=10, type=int, help='For debug purpose')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, don't redo files that already exist. "
@@ -279,7 +280,8 @@ if __name__ == '__main__':
     logger.warning("**** Starting script ****")
     try:
         main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
-             n_clusters=args.number_bins, k=args.kmer, segments=args.window, force_recount=args.force)
+             n_clusters=args.number_bins, k=args.kmer, segments=args.window, force_recount=args.force,
+             early_stop=args.debug)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
