@@ -22,44 +22,6 @@ import logging
 # print(sys.argv[0])
 from tqdm import tqdm
 
-logger = logging.getLogger('tools')
-logger.debug('write messages')
-
-
-# #############################################################################
-# File directory checking
-def is_valid_directory(x):
-    if osp.isdir(x):
-        return x
-    else:
-        reply = input('Folder not found, would like to create it ? y/[n]')
-        if 'y' in reply.lower():
-            os.makedirs(x)
-        else:
-            logger.error('directory does not exist and has not been created ' + x)
-            raise NotADirectoryError(f'The path is not a folder : {x}')
-        return x
-
-
-def is_valid_file(x):
-    if osp.isfile(x):
-        return x
-    else:
-        logger.error('file does not exist ' + x)
-        raise FileNotFoundError(f'The path is not a file : {x}')
-
-
-def folder_today(path):
-    s_today = f"{date.today()}"
-    final_path = osp.join(path, s_today)
-    if not osp.isdir(final_path):
-        os.makedirs(final_path)
-    return final_path
-
-
-def div_z(n, d):
-    return n / d if d else 0
-
 
 # #############################################################################
 # Paths
@@ -110,147 +72,150 @@ def init_logger(logger_name='reads_binning'):
     return logger
 
 
-class FilesInDir:
-    """ Provide the root path, then scan the entire folder for all matching files
-        comes with file checking (extension, matching string, special methods like matching extension)
-        applied for genome files
+logger = init_logger('tools')
+
+
+# #############################################################################
+# File directory checking
+def is_valid_directory(x):
+    if osp.isdir(x):
+        return x
+    else:
+        reply = input('Folder not found, would like to create it ? y/[n]')
+        if 'y' in reply.lower():
+            os.makedirs(x)
+        else:
+            logger.error('directory does not exist and has not been created ' + x)
+            raise NotADirectoryError(f'The path is not a folder : {x}')
+        return x
+
+
+def is_valid_file(x):
+    if osp.isfile(x):
+        return x
+    else:
+        logger.error('file does not exist ' + x)
+        raise FileNotFoundError(f'The path is not a file : {x}')
+
+
+def folder_today(path):
+    s_today = f"{date.today()}"
+    final_path = osp.join(path, s_today)
+    if not osp.isdir(final_path):
+        os.makedirs(final_path)
+    return final_path
+
+
+def div_z(n, d):
+    return n / d if d else 0
+
+
+class ScanFolder:
+    """ Set class attributes, root & target folder, extensions to find and create
+        tqdm scan the folder and create abs, rel, target path
     """
-    # todo: simplify..... just need one loop with .taxon and kmer target path, and one loop for kmer_counts
-    obj_id = 0
-    file_count_root = None
-    root_folder = ""
-    target_folder = ""
-    matching_ext = (".fastq", ".fq", ".fna")
-    folder_kmer = ""
-    preset_expected_ext = {"root"  : [],
-                           "target": []}
-    _preset_genomes = {"root"  : [".taxon", ],
-                       "target": [".kmer_count.pd", ]}
+    obj_id        = 0
+    folder_root   = ""
+    folder_target = ""
+    count_files   = None
+    ext_find      = ()
+    ext_check     = ""
+    ext_create    = ""
 
     def __init__(self, path):
-        FilesInDir.obj_id += 1
-        self.logger = logging.getLogger('tools.FilesInDir')
+        ScanFolder.obj_id += 1
+        self.logger = logging.getLogger('tools.ScanFolder')
 
-        self.abs_path      = os.path.abspath(path)
-        self.rel_path      = osp.relpath(self.abs_path, self.root_folder)
-        self.base          = osp.splitext(osp.split(self.abs_path)[1])[0]
-
-        self.taxon         = osp.splitext(self.abs_path)[0] + ".taxon"
-        self.kmer_count_pd = osp.join(self.folder_kmer, self.base) + ".kmers.pd"
-
-        self.root_file   = {}
-        self.target_file = {}
-        self.check_root = True
-        self.check_target = False
-        self.presets()
+        self.path_abs      = os.path.abspath(path)
+        self.path_rel      = osp.relpath(self.path_abs, self.folder_root)
+        self.base          = osp.splitext(osp.split(self.path_abs)[1])[0]
 
     @property
-    def kmer_count_path(self):
-        kmer_path = osp.join(FilesInDir.target_folder, self.rel_path)
-        kmer_dir = osp.split(kmer_path)[0]
-        if not osp.isdir(kmer_dir):
-            os.makedirs(kmer_dir)
-        return kmer_path
+    def path_check(self):
+        """ Check if a file in the same folder, but different extension, is also in the same folder """
+        assert self.ext_check != "", logger.error(f"No file extension provided to check files "
+                                                  f"(define with ScanFolder.ext_check")
+        return osp.splitext(self.path_abs)[0] + self.ext_check
+
+    @property
+    def path_target(self):
+        if ScanFolder.folder_root == "":
+            self.logger.warning("no root folder, set it with ScanFolder.folder_root = <path>")
+            return ""
+        elif ScanFolder.ext_create == "":
+            self.logger.warning("no extension specified for the target file name")
+            return ""
+        else:
+            path_to_target = osp.join(ScanFolder.folder_target, self.path_rel)
+            res = osp.splitext(path_to_target)[0] + ScanFolder.ext_create
+            self.create_path(res)
+            return res
+
+    def file_matches_ext(self):
+        """ does the folder contains the file we are looking for (=with these extensions) """
+        return self.base.lower().endswith(self.ext_find)
+
+    def file_complies(self, log=True):
+        """ Find files with the extension to find, check if related file (check) """
+        if not self.file_matches_ext():
+            return False
+        if self.ext_check == "" and not osp.isfile(self.path_check):
+            self.logger.warning(f"Related file with extension {self.ext_check} not found in root directory for {self}")
+            return False
+        if log:  self.logger.debug(f"file complies {self}")
+        return True
 
     @staticmethod
-    def create_target_path(path):
+    def create_path(path):
         folder = osp.split(path)[0]
         if not osp.isdir(folder):
             os.makedirs(folder)
 
-    def add_tied_root_file(self, new_ext):
-        """ file that is related, in the same root directory, with different extension """
-        self.root_file[new_ext] = osp.splitext(self.abs_path)[0] + new_ext
-
-    def add_tied_target_file(self, new_ext):
-        """ file that is related, in the the target directory, with different extension. ensure the directory exists """
-        self.target_file[new_ext] = osp.join(FilesInDir.target_folder,
-                                             osp.splitext(self.rel_path)[0] + new_ext)
-        self.create_target_path(self.target_file[new_ext])
-
-    def presets(self):
-        """ associated files expected, in root and target directories """
-        for v in self.preset_expected_ext["root"]:
-            self.add_tied_root_file(v)
-        for v in self.preset_expected_ext["target"]:
-            self.add_tied_target_file(v)
-
-    def file_matches_ext(self):
-        """ does the folder contains the file we are looking for (=with these extensions) """
-        return self.rel_path.lower().endswith(FilesInDir.matching_ext)
-
-    def file_complies(self, log=True):
-        """ Flags to not proceed """
-        if not self.file_matches_ext():
-            return False
-        if self.check_root:
-            for key in self.root_file.keys():
-                if not osp.isfile(self.root_file[key]):
-                    self.logger.warning(f"Related file {key} not found in root directory for {self}")
-                    return False
-        if self.check_target:
-            for key in self.root_file.keys():
-                if not osp.isfile(self.root_file[key]):
-                    self.logger.warning(f"Related file {key} not found in target directory "
-                                        f"({self.target_folder}) for {self}")
-                    return False
-        if log:  self.logger.debug(f"file complies {self}")
-        return True
-
     @classmethod
-    def set_defaults_parse_RefSeq(cls, root, target, preset=None):
-        """ set where the root and target directories are (usually files are read from somewhere
-            and out files somewhere else
-            Creates expected files extensions. These extensions will be set in the object
-        """
-        cls.root_folder = root
-        cls.target_folder = target
-        cls.preset_expected_ext = cls._preset_genomes if preset is None else preset
+    def set_folder_scan_options(cls, scanning="", target="", ext_find=(), ext_check="", ext_create=""):
+        """ Set the options to scan a folder, filter files to find, files to check, and create the target path """
+        assert osp.isdir(scanning), logger.error(f"the provided path to scan is not a directory {scanning}")
+        assert target == "" or osp.isdir(target), logger.warning(f"the provided path as target is not a directory {target}")
+        cls.folder_root   = scanning
+        cls.folder_target = target
+        cls.ext_find      = ext_find
+        cls.ext_check     = ext_check
+        cls.ext_create    = ext_create
 
     @classmethod
     def tqdm_scan(cls, folder=""):
         """ replicated os.walk, with total file count, for a folder (default root folder)
-            yields a FileInDir object
+            yields a ScanFolder object
         """
-        logger.info(f"scanning the folder {folder}")
-        if cls.file_count_root is None:
+        folder = cls.folder_root if folder == "" else folder
+        assert osp.isdir(folder), logger.error(f"the provided path to scan is not a directory {folder}")
+        logger.info(f"counting matching files in {folder}")
+        if cls.count_files is None:
             cls.count_root_files(folder)
         logger.info(f"scanning the folder {folder}")
-        for obj in tqdm(cls.walk_dir(folder), total=cls.file_count_root):
+        for obj in tqdm(cls.walk_dir(folder), total=cls.count_files):
             yield obj
-
 
     @classmethod
     def walk_dir(cls, folder="", log=True):
         """ Walk through every files in a directory (default root folder) and yield FileInDir """
-        for dir_path, dirs, files in os.walk(cls.root_folder if folder == "" else folder):
+        folder = cls.folder_root if folder == "" else folder
+        for dir_path, dirs, files in os.walk(folder):
             for filename in files:
-                file = cls(os.path.join(dir_path, filename))
+                file = ScanFolder(os.path.join(dir_path, filename))
                 if file.file_complies(log):
                     yield file
 
     @classmethod
-    def count_root_files(cls, folder):
+    def count_root_files(cls, folder=""):
+        folder = cls.folder_root if folder == "" else folder
         file_count = 0
         for _ in tqdm(cls.walk_dir(folder, log=False)):
             file_count += 1
-        cls.file_count_root = file_count
+        cls.count_files = file_count
 
     def __repr__(self):
-        return self.abs_path
-
-    # @property
-    # def taxon_path(self):
-    #     return osp.splitext(self.abs_path)[0] + ".taxon"
-    # @property
-    # def abs_path(self):
-    #     return osp.join(self.folder, self.file)
-    # @property
-    # def rel_path(self):
-    #     return osp.relpath(self.abs_path, self.NCBI_path)
-    # @property
-    # def kmer_count_path(self):
-    #     return osp.join(self.abs_path, self.NCBI_path)
+        return self.path_abs
 
 
 # #############################################################################
