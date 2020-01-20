@@ -169,18 +169,19 @@ class ScanFolder:
     def create_path(path):
         folder = osp.split(path)[0]
         if not osp.isdir(folder):
+            logger.debug(f"created folder {folder}")
             os.makedirs(folder)
 
-    @classmethod
-    def set_folder_scan_options(cls, scanning="", target="", ext_find=(), ext_check="", ext_create=""):
+    @staticmethod
+    def set_folder_scan_options(scanning="", target="", ext_find=(), ext_check="", ext_create=""):
         """ Set the options to scan a folder, filter files to find, files to check, and create the target path """
         assert osp.isdir(scanning), logger.error(f"the provided path to scan is not a directory {scanning}")
         assert target == "" or osp.isdir(target), logger.error(f"the provided path as target is not a directory {target}")
-        cls.folder_root   = scanning
-        cls.folder_target = target
-        cls.ext_find      = ext_find
-        cls.ext_check     = ext_check
-        cls.ext_create    = ext_create
+        ScanFolder.folder_root   = scanning
+        ScanFolder.folder_target = target
+        ScanFolder.ext_find      = ext_find
+        ScanFolder.ext_check     = ext_check
+        ScanFolder.ext_create    = ext_create
 
     @classmethod
     def tqdm_scan(cls, folder=""):
