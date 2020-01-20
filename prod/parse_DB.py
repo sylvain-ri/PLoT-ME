@@ -262,7 +262,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes')
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into')
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
-    parser.add_argument('-x', '--debug', default=10, type=int, help='For debug purpose')
+    parser.add_argument('-x', '--debug', default=-1, type=int, help='For debug purpose')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, don't redo files that already exist. "
