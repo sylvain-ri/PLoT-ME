@@ -239,7 +239,7 @@ if __name__ == '__main__':
                         help="By default, don't redo if files exist. Write 11011 to force redo the 2rd step, 0-indexed")
     args = parser.parse_args()
 
-    check_step.can_skip = args.can_skip
+    check_step.can_skip = args.skip_existing
     logger.warning("**** Starting script ****")
     try:
         main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
