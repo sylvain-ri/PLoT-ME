@@ -193,17 +193,20 @@ class ScanFolder:
             cls.folder_root = folder
         assert osp.isdir(cls.folder_root), logger.error(f"the provided path to scan is not a directory {cls.folder_root}")
 
+        n = 0
         if with_tqdm:
             logger.info(f"counting matching files in {cls.folder_root}")
             if cls.count_files is None:
                 cls.count_root_files()
             logger.info(f"Yielding the {cls.count_files} files found in folder {cls.folder_root}")
             for obj in tqdm(cls.walk_dir(log=False), total=cls.count_files):
+                n += 1
                 yield obj
         else:
             for obj in cls.walk_dir(log=False):
+                n += 1
                 yield obj
-        logger.info(f"{cls.count_files} have been processed")
+        logger.info(f"{n} have been processed")
 
     @classmethod
     def walk_dir(cls, log=True):

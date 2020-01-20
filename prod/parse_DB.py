@@ -258,6 +258,7 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
 
     # Model saving
     path_kmeans = osp.join(path_models, f"{name}_{k}mer_s{w}.pkl")
+    create_path(path_kmeans)
     with open(path_kmeans, 'wb') as f:
         pickle.dump(ml_model, f)
     logger.info(f"{name} model saved for k={k} s={w} at {path_kmeans}")
