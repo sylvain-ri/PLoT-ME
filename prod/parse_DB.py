@@ -117,7 +117,7 @@ def check_step(func):
         if check_step.can_skip[check_step.step_nb] == "1" and \
                 (osp.isfile(to_check) or                           # there's already a file or
                  (osp.isdir(to_check) and os.listdir(to_check))):  # there's a folder, and not empty
-            logger.info(f"Output has already been generated : {to_check}")
+            logger.info(f"Step {check_step.step_nb}: SKIPPING: Output has already been generated : {to_check}")
             result = None
         else:
             result = func(*args, **kwargs)
