@@ -5,6 +5,10 @@ Script to divide a Database of genomes (RefSeq), split them into segments and
 cluster them into bins according to their k-mer frequency.
 Needs a lot of disk space, and RAM according to the largest genome to process.
 
+For 17GB of kmer counts, combining dataframes took up to 55GB.
+KMeans crashed because it reached the 60GB RAM.
+Using AWS R4.2XLarge instance
+
 ** kmer counts DataFrames are under this format:
 taxon	category	start	end	name	description	fna_path	AAAA .... TTTT
 
@@ -19,9 +23,9 @@ Reads Binning Project
 """
 
 import argparse
+import subprocess
 from copy import deepcopy
 from itertools import islice
-from joblib import Parallel, delayed
 from multiprocessing import cpu_count, Pool
 import os
 import os.path as osp
@@ -35,7 +39,6 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 
 from tqdm import tqdm
 
@@ -261,10 +264,15 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
     # ## 2 ## Could add PCA
 
     # Model learning
-    name = "KMeans"
-    ml_model = KMeans(n_clusters=n_clusters, n_jobs=cores, random_state=3)
-    # name = "miniKM"
-    # ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
+    df_mem = df.memory_usage(deep=True)
+    if df_mem < 5*10**9:
+        logger.warning(f"df takes {df_mem/10**9:.2f} GB, choosing KMeans")
+        name = "KMeans"
+        ml_model = KMeans(n_clusters=n_clusters, n_jobs=cores, random_state=3)
+    else:
+        logger.warning(f"df takes {df_mem/10**9:.2f} GB, choosing Mini Batch KMeans")
+        name = "miniKM"
+        ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
 
     ml_model.fit(df[cols_kmers])
 
@@ -364,11 +372,26 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1
     logger.info(f"got {len(results)} results...")
 
 
+def pll_kraken2_add_lib():
+
+    # do
+    # find ~/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/$cluster/*/ -name '*.fa' -print0 | xargs -0 -I{} -n1 -P$cores kraken2-build --add-to-library {} --db /home/ubuntu/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/Kraken2_building/$cluster/
+    # done
+    cmd = []
+    return subprocess.check_output(cmd)
+
+
 @check_step
-def kraken_build(path_db_bins, path_bins_hash, clusters):
+def kraken_build(path_db_bins, path_bins_hash, n_clusters):
     """ launch kraken build on each bin """
-    create_n_folders(path_bins_hash, clusters)
+    create_n_folders(path_bins_hash, n_clusters)
     # todo: run kraken2-build on each subfolder (add to library and build)
+
+    with Pool(cores) as pool:
+        results = list(tqdm(pool.imap(pll_kraken2_add_lib, range(n_clusters)),
+                            total=len(n_clusters)))
+
+
 
 
 def main(folder_database, folder_intermediate_files, n_clusters, k, segments, force_recount=False, early_stop=-1):
