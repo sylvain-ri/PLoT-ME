@@ -379,48 +379,26 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     logger.info(f"got {len(results)} results...")
 
 
-def pll_kraken2_add_lib(cluster_n):
-
-    cmd = ["do", "find", f"{pll_kraken2_add_lib.path_bins_segments}/{cluster_n}/*/",
-           "-name", "'*.fna'", "", "",
-           "done", "done", ]
-    # do
-    # find ~/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/$cluster/*/
-    #  -name '*.fa' -print0 | xargs -0 -I{} -n1 -P$cores
-    #  kraken2-build --add-to-library {}
-    #  --db /home/ubuntu/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/Kraken2_building/$cluster/
-    # done
-    return subprocess.check_output(cmd)
-
-
-pll_kraken2_add_lib.path_bins_segments = ""
-pll_kraken2_add_lib.path_lib = ""
-pll_kraken2_add_lib.path_hash = ""
-
-
 @check_step
-def kraken_build(path_refseq_binned, path_bins_hash, path_bins_libs, n_clusters):
-    """ launch kraken build on each bin """
-    create_n_folders(path_bins_libs, n_clusters)
-    # Give values for parallel processing
-    pll_kraken2_add_lib.path_bins_segments = path_refseq_binned
-    pll_kraken2_add_lib.path_lib  = path_bins_libs
-    pll_kraken2_add_lib.path_hash = path_bins_hash
-
-    # todo: run kraken2-build on each subfolder (add to library and build)
-    # Add to library
-    with Pool(main.cores) as pool:
-        results = list(tqdm(pool.imap(pll_kraken2_add_lib, range(n_clusters)),
-                            total=len(n_clusters)))
-
+def kraken_build(path_refseq_binned, path_bins_hash, n_clusters):
+    """ launch kraken build on each bin
+        https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
+    """
     create_n_folders(path_bins_hash, n_clusters)
 
-    # Build hashes
-    with Pool(main.cores) as pool:
-        results = list(tqdm(pool.imap(build_hashes, range(n_clusters)),
-                            total=len(n_clusters)))
+    # Add to library
+    for cluster in tqdm(range(n_clusters)):
+        cmd = ["find", osp.join(path_refseq_binned, str(cluster)), "-name", "'*.fna'", "-print0", "|",
+               "xargs", "-0", "-I{}", "-n1", "-P", f"{main.cores}",
+               "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, str(cluster))]
+        logger.info(f"kraken2 add to library, bin {cluster}, cmd: " + " ".join(cmd))
+        res = subprocess.check_output(cmd)
+        logger.debug(res)
 
-    return
+        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, str(cluster))]
+        logger.info(f"kraken2 build, bin {cluster}, cmd: " + " ".join(cmd))
+        res = subprocess.check_output(cmd)
+        logger.debug(res)
 
 
 #   **************************************************    MAIN   **************************************************   #
@@ -460,10 +438,13 @@ def main(folder_database, folder_output, n_clusters, k, window, cores,
     split_genomes_to_bins(path_segments_to_bins, path_refseq_binned, n_clusters, stop=early_stop)
 
     # Run kraken2-build into database folder
-    path_bins_lib = osp.join(folder_intermediate_files, "kraken2_library")  # Separate hash tables by classifier
     path_bins_hash = osp.join(folder_output, parameters, "kraken2_hash")  # Separate hash tables by classifier
-    kraken_build(path_refseq_binned, path_bins_hash, path_bins_lib, n_clusters)
+    kraken_build(path_refseq_binned, path_bins_hash, n_clusters)
 
+    # End
+    logger.warning(f"Kraken2 finished building hash tables. You can clean the intermediate files in "
+                   f"{folder_intermediate_files} and with: kraken2-build --clean {path_bins_hash}/<bin number>")
+    logger.warning(f"Script ended successfully.")
 
 main.omit_folders = ""
 main.k            = 0
