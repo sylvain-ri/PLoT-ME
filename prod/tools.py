@@ -102,7 +102,7 @@ def create_path(path, with_filename=True):
     """ Create the intermediate folders if not existing. """
     folder = osp.split(path)[0] if with_filename else path
     if not osp.isdir(folder):
-        logger.debug(f"created folder {folder}")
+        logger.log(5, f"created folder {folder}")
         os.makedirs(folder)
 
 
@@ -170,7 +170,7 @@ class ScanFolder:
         if self.ext_check != "" and not osp.isfile(self.path_check):
             self.logger.warning(f"Related file with extension {self.ext_check} not found in root directory for {self}")
             return False
-        if log:  self.logger.debug(f"file complies {self}")
+        if log:  self.logger.log(5, f"file complies {self}")
         return True
 
     @classmethod
