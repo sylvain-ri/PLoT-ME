@@ -311,7 +311,7 @@ def pll_copy_segments_to_bin(df):
     taxon = df.taxon.iloc[0]
     genome_path = df.fna_path.iloc[0]
     logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
-                 f"for the genome located at {genome_path}")
+                 f"for the genome {osp.split(genome_path)[1]}")
 
     # First get the real segmentation depending on cluster continuity of the segments
     # Aggregate segments with same cluster (consecutive values of cluster), get start, end and description updated
@@ -343,7 +343,7 @@ def pll_copy_segments_to_bin(df):
                                      segment.features, segment.annotations, segment.letter_annotations)
 
             # Append the combined segment to avoid multiple files for the same taxon
-            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, cluster_id[i], f"{taxon}.fna")
+            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
             with open(path_bin_segment, "a") as f:
                 SeqIO.write(combined_seg, f, "fasta")
             logger.debug(f"Combined segment number {i}, added to bin {cluster_id[i]}, file: {path_bin_segment}")
@@ -366,10 +366,11 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1
     """ Write .fna files from the binning for kraken build """
     create_n_folders(path_db_bins, clusters)
 
-    # todo: copy each segment of genome into the specific bin
+    # Load bin assignment of each segment
     df = pd.read_pickle(path_bins_assignemnts)
 
     # Split it per file to allow parallel processing
+    logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignemnts}")
     df_per_fna = []
     for file in tqdm(df.fna_path.unique()):
         df_per_fna.append(df[df.fna_path == file])
@@ -377,6 +378,7 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1
     # Copy in parallel
     pll_copy_segments_to_bin.path_db_bins = path_db_bins
 
+    logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
     with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
                             total=len(df_per_fna)))
