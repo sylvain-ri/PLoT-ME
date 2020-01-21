@@ -5,7 +5,8 @@ Script to divide a Database of genomes (RefSeq), split them into segments and
 cluster them into bins according to their k-mer frequency.
 Needs a lot of disk space, and RAM according to the largest genome to process.
 
-For 17GB of kmer counts, combining dataframes took up to 55GB.
+For 17GB file of combined kmer counts, combining dataframes took up to 55GB,
+loading the file up to 35GB.
 KMeans crashed because it reached the 60GB RAM.
 Using AWS R4.2XLarge instance
 
@@ -259,12 +260,13 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
     cols_spe = df.columns[:-256]
 
     # ## 1 ## Scaling by length and kmers
+    df_mem = df.memory_usage(deep=True)
+    logger.info(f"Model loaded, scaling the values. Size: {df_mem/10**9:.2f} GB.")
     scale_df_by_length(df, cols_kmers, k, w)
 
     # ## 2 ## Could add PCA
 
     # Model learning
-    df_mem = df.memory_usage(deep=True)
     if df_mem < 5*10**9:
         logger.warning(f"df takes {df_mem/10**9:.2f} GB, choosing KMeans")
         name = "KMeans"
@@ -277,11 +279,11 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
     ml_model.fit(df[cols_kmers])
 
     # Model saving
-    path_kmeans = osp.join(path_models, f"{name}_{k}mer_s{w}.pkl")
-    create_path(path_kmeans)
-    with open(path_kmeans, 'wb') as f:
+    path_model = osp.join(path_models, f"{name}_{k}mer_s{w}.pkl")
+    create_path(path_model)
+    with open(path_model, 'wb') as f:
         pickle.dump(ml_model, f)
-    logger.info(f"{name} model saved for k={k} s={w} at {path_kmeans}")
+    logger.info(f"{name} model saved for k={k} s={w} at {path_model}")
 
     # ## 3 ##
     predicted = ml_model.predict(df[cols_kmers])
