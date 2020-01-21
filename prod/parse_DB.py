@@ -342,20 +342,15 @@ def pll_copy_segments_to_bin(df):
 
             # Write this assembled segment and reset everything
             logger.debug(f"to_combine={to_combine}")
-            if len(to_combine) == 1:
-                sequence = to_combine[0].seq
-            else:
-                sequence = "".join([segment.seq for segment in to_combine])
+            sequence = "".join([str(segment.seq) for segment in to_combine])
             logger.debug(f"sequence: len={len(sequence)}, type={type(sequence)} ")
-            if not isinstance(sequence, Seq):
-                sequence = Seq(sequence)
 
             # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
             descr = segment.description.replace(" ", "_")  # To avoid issues with bash
             descr_splits = descr.split("|")
             description = "|".join(descr_splits[:2] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[3:])
 
-            combined_seg = SeqRecord(sequence, segment.id, segment.name, description, segment.dbxrefs,
+            combined_seg = SeqRecord(Seq(sequence), segment.id, segment.name, description, segment.dbxrefs,
                                      segment.features, segment.annotations, segment.letter_annotations)
 
             # Append the combined segment to avoid multiple files for the same taxon
