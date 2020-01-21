@@ -253,15 +253,16 @@ def combine_genome_kmer_counts(folder_kmers, path_df, k):
 @check_step
 def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
-    logger.info(f"Clustering the genomes' segments into {n_clusters} bins.")
+    logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
 
     df = pd.read_pickle(path_kmer_counts)
     cols_kmers = df.columns[-256:]
     cols_spe = df.columns[:-256]
 
     # ## 1 ## Scaling by length and kmers
-    df_mem = df.memory_usage(deep=True)
-    logger.info(f"Model loaded, scaling the values. Size: {df_mem/10**9:.2f} GB.")
+    df_mem = df.memory_usage(deep=False).sum()
+    logger.info(f"Model loaded, scaling the values to the length of the segments. "
+                f"DataFrame size: {df_mem/10**9:.2f} GB.")
     scale_df_by_length(df, cols_kmers, k, w)
 
     # ## 2 ## Could add PCA
