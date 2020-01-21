@@ -148,23 +148,25 @@ def check_step(func):
         kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
         signature = ", ".join(args_repr + kwargs_repr)
 
-        # Time measurement
-        start_time = process_time()
-        logger.info(f"Step {check_step.step_nb} START, function {func.__name__}({signature})")
-
         # If step already done, skip it
         to_check = args[1]
         if check_step.can_skip[check_step.step_nb] == "1" and \
                 (osp.isfile(to_check) or                           # there's already a file or
                  (osp.isdir(to_check) and os.listdir(to_check))):  # there's a folder, and not empty
-            logger.info(f"Step {check_step.step_nb} SKIPPING, Output has already been generated : {to_check}")
+            logger.info(f"Step {check_step.step_nb} SKIPPING, function {func.__name__}({signature}, "
+                        f"Output has already been generated : {to_check}")
             result = None
+
         else:
+            # Time measurement
+            start_time = process_time()
+            logger.info(f"Step {check_step.step_nb} START, function {func.__name__}({signature})")
             create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
             result = func(*args, **kwargs)
+            # print time spent
+            logger.info(f"Step {check_step.step_nb} END, {process_time() - start_time:.3f}s, function {func.__name__}")
 
-        # print time spent
-        logger.info(f"Step {check_step.step_nb} END, {process_time() - start_time:.3f}s, function {func.__name__}")
+        # Step counter
         check_step.step_nb += 1
         return result
     return wrapper
@@ -335,8 +337,9 @@ def pll_copy_segments_to_bin(df):
                          f"id={segment.id}, to bin {cluster_id[i]}, file: {path_bin_segment}")
 
             # Write this assembled segment and reset everything
+            logger.debug(f"to_combine={to_combine}")
             if len(to_combine) == 1:
-                sequence = to_combine[0]
+                sequence = to_combine[0].seq
             else:
                 sequence = "".join([segment.seq for segment in to_combine])
             logger.debug(f"sequence: len={len(sequence)}, type={type(sequence)} sequence={sequence}")
