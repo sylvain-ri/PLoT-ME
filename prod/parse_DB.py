@@ -54,16 +54,18 @@ class Genome:
                   "chromosome", "complete genome", "whole genome shotgun sequence", ]
     kmer_count_zeros = kmers_dic(4)
 
-    def __init__(self, fna_file, kmer_file, taxon, segments, k=4):
-        logger.debug("Created genome object")
+    def __init__(self, fna_file, taxon, segments, k=4):
+        logger.log(0, "Created genome object")
         self.path_fna    = fna_file
-        self.path_kmers  = kmer_file
         self.taxon       = taxon
         self.segments    = segments
         self.k           = k
         # records is a dict of SeqRecord
         self.records = {cat: [] for cat in self.categories}
         # self.splits  = {cat: [] for cat in self.categories}
+
+    def __repr__(self):
+        return f"Genome object from {osp.split(self.path_fna)[1]}"
 
     def load_genome(self):
         """ Loop through all chromosomes/plasmids/genomes/.. and parse them into the object
@@ -94,7 +96,7 @@ class Genome:
                                         record.features, record.annotations, record.letter_annotations)
                     yield (segment, self.taxon, cat, start, end)
 
-    def count_kmers_to_df(self):
+    def count_kmers_to_df(self, path_kmers):
         """ Take all splits, count the kmer distribution and save to the kmer folder as pandas DataFrame """
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
@@ -107,8 +109,8 @@ class Genome:
         df.taxon       = df.taxon.astype('category')
         df.category    = df.category.astype('category')
         df.description = df.description.astype('category')
-        df.to_pickle(self.path_kmers)
-        logger.debug(f"saved kmer count to {self.path_kmers}")
+        df.to_pickle(path_kmers)
+        logger.debug(f"saved kmer count to {path_kmers}")
 
 
 def create_n_folders(path, n):
@@ -167,10 +169,10 @@ def parallel_kmer_counting(fastq, ):
         return
     with open(fastq.path_check) as f:
         taxon = int(f.read())
-    genome = Genome(fastq.path_abs, fastq.path_target, taxon,
+    genome = Genome(fastq.path_abs, taxon,
                     segments=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
     genome.load_genome()
-    genome.count_kmers_to_df()
+    genome.count_kmers_to_df(fastq.path_target)
 
 
 parallel_kmer_counting.k = 4
@@ -276,14 +278,48 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
     logger.info(f"Defined {n_clusters} clusters, assignments here: {output} with ML model {name}.")
 
 
-def copy_segments_to_bin(df):
+def pll_copy_segments_to_bin(df):
+    """ Function for parallel copying of segments of genomes to a bin, file path and bin number in a dataframe
+        Input is only ONE .fna file, which has to be split into segments, but these might be recombined
+        if their bin association are consecutive.
+    """
     # todo: call the Genome methods, split into segments, recombine consecutive segments,
     #  write the file with taxo to the appropriate bin
-    logger.info(f"got a df of shape {df.shape} and the variable is {copy_segments_to_bin.path_db_bins}")
+    taxon = df.taxon.iloc[0]
+    genome_path = df.fna_path.iloc[0]
+    bin_and_genome_path = osp.join(pll_copy_segments_to_bin.path_db_bins, taxon)
+    logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
+                 f"for the genome located at {genome_path}")
+
+    # First get the real segmentation depending on cluster continuity of the segments
+    # Aggregate segments with same cluster (consecutive values of cluster), get start, end and description updated
+    segment_starts = []
+    segment_ends = []
+    segment_descriptions = []
+    for i, df_split in df.groupby([(df.cluster != df.cluster.shift()).cumsum()]):
+        segment_starts.append(df_split.start.iloc[0])
+        segment_ends.append(df_split.end.iloc[-1])
+        # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
+        descr = df_split.description.iloc[0]
+        descr_splits = descr.split("|")
+        descr_formatted = "|".join(descr_splits[:2] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[3:])
+        segment_descriptions.append(descr_formatted)
+
+    # Then loop through all segments, recombine the consecutive ones
+    genome = Genome(genome_path, taxon, segments=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
+    genome.load_genome()
+    to_combine = []
+    for segment, taxon, cat, start, end in genome.yield_genome_split():
+        # todo: save segments until stop reached. Careful of end of genome
+
+    genome.yield_genome_split()
+
+    genome.save_splits(bin_and_genome_path)
+
     return
 
 
-copy_segments_to_bin.path_db_bins = ""
+pll_copy_segments_to_bin.path_db_bins = ""
 
 
 @check_step
@@ -300,10 +336,10 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1
         df_per_fna.append(df[df.fna_path == file])
 
     # Copy in parallel
-    copy_segments_to_bin.path_db_bins = path_db_bins
+    pll_copy_segments_to_bin.path_db_bins = path_db_bins
 
     with Pool(cores) as pool:
-        results = list(tqdm(pool.imap(copy_segments_to_bin, islice(df_per_fna, stop if stop>0 else None)),
+        results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
                             total=len(df_per_fna)))
 
     logger.info(f"got {len(results)} results...")
