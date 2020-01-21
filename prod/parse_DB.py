@@ -38,6 +38,7 @@ import traceback
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.decomposition import PCA
 
@@ -331,7 +332,7 @@ def pll_copy_segments_to_bin(df):
         # todo: save segments until stop reached. Careful of end of genome
         if end == segment_ends[i]:
             # Write this assembled segment and reset everything
-            sequence = "".join([segment.seq for segment in to_combine])
+            sequence = Seq("".join([segment.seq for segment in to_combine]))
 
             # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
             descr = segment.description.replace(" ", "_")  # To avoid issues with bash
