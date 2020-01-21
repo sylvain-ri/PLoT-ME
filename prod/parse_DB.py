@@ -330,6 +330,7 @@ def pll_copy_segments_to_bin(df):
     genome.load_genome()
     to_combine = []
     i = 0
+    logger.debug(f"len starts={len(segment_starts)}, end={len(segment_ends)}")
     for segment, taxon, cat, start, end in genome.yield_genome_split():
         # Stack the segments
         to_combine.append(segment)
@@ -338,12 +339,11 @@ def pll_copy_segments_to_bin(df):
         if end == segment_ends[i]:
             path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
             logger.debug(f"Adding combined segment number {i}, start={segment_starts[i]}, end={segment_ends[i]}, "
-                         f"id={segment.id}, to bin {cluster_id[i]}, file: {path_bin_segment}")
+                         f"id={segment.id}, from {len(to_combine)} seq, to bin {cluster_id[i]}, file: {path_bin_segment}")
 
             # Write this assembled segment and reset everything
-            logger.debug(f"to_combine={to_combine}")
             sequence = "".join([str(segment.seq) for segment in to_combine])
-            logger.debug(f"sequence: len={len(sequence)}, type={type(sequence)} ")
+            logger.log(2, f"sequence: len={len(sequence)}, type={type(sequence)} ")
 
             # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
             descr = segment.description.replace(" ", "_")  # To avoid issues with bash
@@ -520,9 +520,6 @@ if __name__ == '__main__':
         logger.error(traceback.format_exc())
     except Exception as e:
         logger.exception(e)
-
-    logger.error("Not implemented yet")
-        
 
 
 
