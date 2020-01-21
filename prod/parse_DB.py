@@ -108,7 +108,8 @@ class Genome:
                                            + kmer_keys)
         df.taxon       = df.taxon.astype('category')
         df.category    = df.category.astype('category')
-        df.description = df.description.astype('category')
+        df.name        = df.name.astype('category')
+        df.fna_path    = df.fna_path.astype('category')
         df.to_pickle(path_kmers)
         logger.debug(f"saved kmer count to {path_kmers}")
 
@@ -232,12 +233,11 @@ def combine_genome_kmer_counts(folder_kmers, path_df, k):
         added += 1
     logger.info(f"{added} {k}-mer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
-    # todo: test if redo categorical is needed
-    #  https://pandas.pydata.org/pandas-docs/stable/user_guide/categorical.html#merging
-    # df.taxon       = df.taxon.astype('category')
-    # df.category    = df.category.astype('category')
-    # df.description = df.description.astype('category')
-    logger.info(f"Saving dataframe to {path_df}")
+    # Need to set again as categories
+    df.taxon       = df.taxon.astype('category')
+    df.category    = df.category.astype('category')
+    df.name        = df.name.astype('category')
+    df.fna_path    = df.fna_path.astype('category')
     df.to_pickle(path_df)
 
 
