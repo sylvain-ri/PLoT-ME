@@ -315,52 +315,39 @@ def pll_copy_segments_to_bin(df):
     logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
                  f"for the genome {osp.split(genome_path)[1]}")
 
-    # First get the real segmentation depending on cluster continuity of the segments
-    # Aggregate segments with same cluster (consecutive values of cluster), get start, end and description updated
-    cluster_id = []
-    segment_starts = []
-    segment_ends = []
-    for i, df_split in df.groupby([(df.cluster != df.cluster.shift()).cumsum()]):
-        cluster_id.append(df_split.cluster.iloc[0])
-        segment_starts.append(df_split.start.iloc[0])
-        segment_ends.append(df_split.end.iloc[-1])
-
-    # Then loop through all segments, recombine the consecutive ones
+    # Load the entire genome
     genome = Genome(genome_path, taxon, window_size=main.w, k=main.k)
     genome.load_genome()
-    to_combine = []
-    i = 0
-    logger.debug(f"len starts={len(segment_starts)}, end={len(segment_ends)}")
-    for segment, taxon, cat, start, end in genome.yield_genome_split():
-        # Stack the segments
-        to_combine.append(segment)
+    # First get the real segmentation depending on cluster continuity of the segments
+    # Aggregate segments with same cluster (consecutive values of cluster), get start, end and description updated
+    count = 0
+    for i, df_split in df.groupby([(df.cluster != df.cluster.shift()).cumsum()]):
+        cluster_id = df_split.cluster.iloc[0]
+        description= df_split.description.iloc[0]
+        category   = df_split.category.iloc[0]
+        name       = df_split.name.iloc[0]
+        start      = df_split.start.iloc[0]
+        end        = df_split.end.iloc[-1]
 
-        # If all stacked, combine and write out
-        if end == segment_ends[i]:
-            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
-            logger.debug(f"Adding combined segment {i}, start={segment_starts[i]}, end={segment_ends[i]}, "
-                         f"id={segment.id}, from {len(to_combine)} seqs, to bin {cluster_id[i]}, file: {path_bin_segment}")
+        path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id), f"{taxon}.fna")
 
-            # Write this assembled segment and reset everything
-            sequence = "".join([str(segment.seq) for segment in to_combine])
-            logger.log(2, f"sequence: len={len(sequence)}, type={type(sequence)} ")
+        descr = description.replace(" ", "_")  # To avoid issues with bash
+        descr_splits = descr.split("|")
+        description_new = "|".join(descr_splits[:3] + [f"s:{start}-e:{end-1}"] + descr_splits[4:])
 
-            # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
-            descr = segment.description.replace(" ", "_")  # To avoid issues with bash
-            descr_splits = descr.split("|")
-            description = "|".join(descr_splits[:3] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[4:])
+        # Need to find the genome/plasmid/ and the right chromosome
+        for seq in genome.records[category]:
+            if seq.name == name:
+                logger.debug(f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
+                             f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
 
-            combined_seg = SeqRecord(Seq(sequence), segment.id, segment.name, description, segment.dbxrefs,
-                                     segment.features, segment.annotations, segment.letter_annotations)
-
-            # Append the combined segment to avoid multiple files for the same taxon
-            with open(path_bin_segment, "a") as f:
-                SeqIO.write(combined_seg, f, "fasta")
-
-            # Reset variables
-            to_combine = []
-            i += 1
-
+                segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
+                                    seq.features, seq.annotations, seq.letter_annotations)
+                # Append the combined segment to avoid multiple files for the same taxon
+                with open(path_bin_segment, "a") as f:
+                    SeqIO.write(segment, f, "fasta")
+                count += 1
+                break
     return
 
 
