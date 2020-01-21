@@ -49,7 +49,6 @@ from bio import kmers_dic, ncbi, seq_count_kmer
 
 
 logger = init_logger('parse_DB')
-cores = 1
 
 
 class Genome:
@@ -129,8 +128,10 @@ def create_n_folders(path, n):
 
 def scale_df_by_length(df, kmer_cols, k, w):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
+    logger.info(f"Scaling the dataframe, converting to float32")
     ratio = 4**k / (w - k + 1)
-    for col in kmer_cols:
+    for col in tqdm(kmer_cols):
+        df[col] = pd.to_numeric(df[col], downcast='float')
         df[col] *= ratio
 
 
@@ -178,34 +179,35 @@ def parallel_kmer_counting(fastq, ):
     with open(fastq.path_check) as f:
         taxon = int(f.read())
     genome = Genome(fastq.path_abs, taxon,
-                    window_size=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
+                    window_size=main.w, k=main.k)
     genome.load_genome()
     genome.count_kmers_to_df(fastq.path_target)
 
 
-parallel_kmer_counting.k = 4
-parallel_kmer_counting.segments = 10000
+# parallel_kmer_counting.k = 4
+# parallel_kmer_counting.segments = 10000
 parallel_kmer_counting.force_recount = True
 
 
 @check_step
-def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop=30, force_recount=False):
+def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000,
+                               stop=30, force_recount=False):
     """ Scan through RefSeq, split genomes into segments, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
     # scanning folder Class set up:
     ScanFolder.set_folder_scan_options(scanning=scanning, target=folder_kmers,
                                        ext_find=(".fastq", ".fq", ".fna"), ext_check=".taxon",
-                                       ext_create=f".{k}mer_count.pd")
+                                       ext_create=f".{main.k}mer_count.pd", skip_folders=main.omit_folders)
 
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
 
     # Set constants to avoid arguments passing
-    parallel_kmer_counting.k = k
-    parallel_kmer_counting.segments = segments
+    # parallel_kmer_counting.k = k
+    # parallel_kmer_counting.segments = segments
     parallel_kmer_counting.force_recount = force_recount
     # Count in parallel. islice() to take a part of an iterable
-    with Pool(cores) as pool:
+    with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
                                                                      stop if stop>0 else None)),
                             total=ScanFolder.count_root_files()))
@@ -228,17 +230,17 @@ def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000, stop
 
 
 @check_step
-def combine_genome_kmer_counts(folder_kmers, path_df, k):
+def combine_genome_kmer_counts(folder_kmers, path_df):
     """ Combine single dataframes into one. Might need high memory """
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
     dfs = []
     added = 0
-    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="",
-                                       ext_find=(f".{k}mer_count.pd", ), ext_check="", ext_create="")
+    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{main.k}mer_count.pd", ),
+                                       ext_check="", ext_create="", skip_folders=main.omit_folders)
     for file in ScanFolder.tqdm_scan():
         dfs.append(pd.read_pickle(file.path_abs))
         added += 1
-    logger.info(f"{added} {k}-mer distributions have been added. now concatenating")
+    logger.info(f"{added} {main.k}-mer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
     # Need to set again as categories
     df.taxon       = df.taxon.astype('category')
@@ -251,9 +253,11 @@ def combine_genome_kmer_counts(folder_kmers, path_df, k):
 
 
 @check_step
-def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w):
+def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
+    k = main.k
+    w = main.w
 
     df = pd.read_pickle(path_kmer_counts)
     cols_kmers = df.columns[-256:]
@@ -271,7 +275,7 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters, k, w)
     if df_mem < 5*10**9:
         logger.warning(f"df takes {df_mem/10**9:.2f} GB, choosing KMeans")
         name = "KMeans"
-        ml_model = KMeans(n_clusters=n_clusters, n_jobs=cores, random_state=3)
+        ml_model = KMeans(n_clusters=n_clusters, n_jobs=main.cores, random_state=3)
     else:
         logger.warning(f"df takes {df_mem/10**9:.2f} GB, choosing Mini Batch KMeans")
         name = "miniKM"
@@ -317,7 +321,7 @@ def pll_copy_segments_to_bin(df):
         segment_ends.append(df_split.end.iloc[-1])
 
     # Then loop through all segments, recombine the consecutive ones
-    genome = Genome(genome_path, taxon, window_size=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
+    genome = Genome(genome_path, taxon, window_size=main.w, k=main.k)
     genome.load_genome()
     to_combine = []
     i = 0
@@ -328,15 +332,17 @@ def pll_copy_segments_to_bin(df):
             sequence = "".join([segment.seq for segment in to_combine])
 
             # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
-            descr = segment.description
+            descr = segment.description.replace(" ", "_")  # To avoid issues with bash
             descr_splits = descr.split("|")
             description = "|".join(descr_splits[:2] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[3:])
 
             combined_seg = SeqRecord(sequence, segment.id, segment.name, description, segment.dbxrefs,
                                      segment.features, segment.annotations, segment.letter_annotations)
-            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, cluster_id[i],
-                                        f"{taxon}-s{segment_starts[i]}-e{segment_ends[i]}.fna")
-            SeqIO.write(combined_seg, path_bin_segment, "fasta")
+
+            # Append the combined segment to avoid multiple files for the same taxon
+            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, cluster_id[i], f"{taxon}.fna")
+            with open(path_bin_segment, "a") as f:
+                SeqIO.write(combined_seg, f, "fasta")
             logger.debug(f"Combined segment number {i}, added to bin {cluster_id[i]}, file: {path_bin_segment}")
 
             # Reset variables
@@ -368,7 +374,7 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1
     # Copy in parallel
     pll_copy_segments_to_bin.path_db_bins = path_db_bins
 
-    with Pool(cores) as pool:
+    with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
                             total=len(df_per_fna)))
 
@@ -390,7 +396,7 @@ def kraken_build(path_db_bins, path_bins_hash, n_clusters):
     create_n_folders(path_bins_hash, n_clusters)
     # todo: run kraken2-build on each subfolder (add to library and build)
 
-    with Pool(cores) as pool:
+    with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(pll_kraken2_add_lib, range(n_clusters)),
                             total=len(n_clusters)))
 
@@ -414,13 +420,13 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
 
     # combine all kmer distributions into one single file
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, parameters, f"_all_counts.{k}mer_s{segments}.pd")
-    combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts, k=k)
+    combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
     # todo: find bins and write genomes' segments into bins
     # From kmer distributions, use clustering to set the bins per segment
     path_segments_to_bins = osp.join(folder_intermediate_files, parameters, f"_genomes_bins_{k}mer_s{segments}.pd")
     path_models           = osp.join(folder_intermediate_files, parameters, "models")
-    define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters, k, segments)
+    define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_DB_bins = osp.join(folder_intermediate_files, parameters, f"_bins_DB")
@@ -429,6 +435,12 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
     # Run kraken2-build into database folder
     path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", parameters)  # Separate hash tables by classifier
     kraken_build(path_DB_bins, path_bins_hash, n_clusters)
+
+
+main.omit_folders = ""
+main.k            = 0
+main.w            = 0
+main.cores        = 0
 
 
 if __name__ == '__main__':
@@ -443,6 +455,8 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
     parser.add_argument('-x', '--debug', default=-1, type=int, help='For debug purpose')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
+    parser.add_argument('-o', '--omit', help='Omit some folder/families',
+                        default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"))
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, don't redo files that already exist. "
                              "Write 11011 to force redo the 2rd step, 0-indexed. "
@@ -451,7 +465,11 @@ if __name__ == '__main__':
 
     # Set the skip variable for the decorator of each step
     check_step.can_skip = args.skip_existing
-    cores = args.cores
+    main.omit_folders = args.omit
+    main.k            = args.kmer
+    main.w            = args.window
+    main.cores        = args.cores
+
     # If force recount of the kmer, disable the skip of the step
     if args.force:
         args.skip_existing = "0" + args.skip_existing[1:]
