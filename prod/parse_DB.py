@@ -372,7 +372,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     pll_copy_segments_to_bin.path_db_bins = path_db_bins
 
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
-    with Pool(main.cores) as pool:
+    with Pool(min(2, main.cores)) as pool:  # file copy don't need many cores (main.cores)
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
                             total=len(df_per_fna)))
 
@@ -395,16 +395,17 @@ def pll_kraken2_add_lib(cluster_n):
 
 pll_kraken2_add_lib.path_bins_segments = ""
 pll_kraken2_add_lib.path_lib = ""
+pll_kraken2_add_lib.path_hash = ""
 
 
 @check_step
-def kraken_build(path_db_bins, path_bins_hash, n_clusters):
+def kraken_build(path_refseq_binned, path_bins_hash, path_bins_libs, n_clusters):
     """ launch kraken build on each bin """
-    tmp_library = osp.join(path_bins_hash, "kraken2_library")
-    create_n_folders(tmp_library, n_clusters)
+    create_n_folders(path_bins_libs, n_clusters)
     # Give values for parallel processing
-    pll_kraken2_add_lib.path_bins_segments = path_db_bins
-    pll_kraken2_add_lib.path_lib = tmp_library
+    pll_kraken2_add_lib.path_bins_segments = path_refseq_binned
+    pll_kraken2_add_lib.path_lib  = path_bins_libs
+    pll_kraken2_add_lib.path_hash = path_bins_hash
 
     # todo: run kraken2-build on each subfolder (add to library and build)
     # Add to library
@@ -433,7 +434,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores,
     """
     # Common folder name keeping parameters
     parameters = f"{k}mer_s{window}"
-    folder_intermediate_files = osp.join(folder_output, "read_binning_tmp")
+    folder_intermediate_files = osp.join(folder_output, parameters, "read_binning_tmp")
     # Parameters
     check_step.can_skip = skip_existing
     main.omit_folders   = omit_folders
@@ -442,25 +443,26 @@ def main(folder_database, folder_output, n_clusters, k, window, cores,
     main.cores          = cores
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
-    path_individual_kmer_counts = osp.join(folder_intermediate_files, parameters, f"counts_{k}mer_s{window}")
+    path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_{k}mer_s{window}")
     scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, stop=early_stop, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
-    path_stacked_kmer_counts = osp.join(folder_intermediate_files, parameters, f"_all_counts.{k}mer_s{window}.pd")
+    path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts.{k}mer_s{window}.pd")
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_to_bins = osp.join(folder_intermediate_files, parameters, f"_genomes_bins_{k}mer_s{window}.pd")
-    path_models           = osp.join(folder_intermediate_files, parameters, "models")
+    path_segments_to_bins = osp.join(folder_intermediate_files, f"_genomes_bins_{k}mer_s{window}.pd")
+    path_models           = osp.join(folder_intermediate_files, "models")
     define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
-    path_DB_bins = osp.join(folder_output, parameters, f"_bins_DB")
-    split_genomes_to_bins(path_segments_to_bins, path_DB_bins, n_clusters, stop=early_stop)
+    path_refseq_binned = osp.join(folder_output, parameters, f"RefSeq_binned")
+    split_genomes_to_bins(path_segments_to_bins, path_refseq_binned, n_clusters, stop=early_stop)
 
     # Run kraken2-build into database folder
-    path_bins_hash = osp.join(folder_output, parameters, "bins_kraken2_DB")  # Separate hash tables by classifier
-    kraken_build(path_DB_bins, path_bins_hash, n_clusters)
+    path_bins_lib = osp.join(folder_intermediate_files, "kraken2_library")  # Separate hash tables by classifier
+    path_bins_hash = osp.join(folder_output, parameters, "kraken2_hash")  # Separate hash tables by classifier
+    kraken_build(path_refseq_binned, path_bins_hash, path_bins_lib, n_clusters)
 
 
 main.omit_folders = ""
