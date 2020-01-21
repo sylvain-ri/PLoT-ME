@@ -338,8 +338,8 @@ def pll_copy_segments_to_bin(df):
         # If all stacked, combine and write out
         if end == segment_ends[i]:
             path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
-            logger.debug(f"Adding combined segment number {i}, start={segment_starts[i]}, end={segment_ends[i]}, "
-                         f"id={segment.id}, from {len(to_combine)} seq, to bin {cluster_id[i]}, file: {path_bin_segment}")
+            logger.debug(f"Adding combined segment {i}, start={segment_starts[i]}, end={segment_ends[i]}, "
+                         f"id={segment.id}, from {len(to_combine)} seqs, to bin {cluster_id[i]}, file: {path_bin_segment}")
 
             # Write this assembled segment and reset everything
             sequence = "".join([str(segment.seq) for segment in to_combine])
@@ -348,7 +348,7 @@ def pll_copy_segments_to_bin(df):
             # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
             descr = segment.description.replace(" ", "_")  # To avoid issues with bash
             descr_splits = descr.split("|")
-            description = "|".join(descr_splits[:2] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[3:])
+            description = "|".join(descr_splits[:3] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[4:])
 
             combined_seg = SeqRecord(Seq(sequence), segment.id, segment.name, description, segment.dbxrefs,
                                      segment.features, segment.annotations, segment.letter_annotations)
