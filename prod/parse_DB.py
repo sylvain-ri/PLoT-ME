@@ -329,10 +329,16 @@ def pll_copy_segments_to_bin(df):
     to_combine = []
     i = 0
     for segment, taxon, cat, start, end in genome.yield_genome_split():
-        # todo: save segments until stop reached. Careful of end of genome
         if end == segment_ends[i]:
+            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
+            logger.debug(f"Adding combined segment number {i}, start={segment_starts[i]}, end={segment_ends[i]}, "
+                         f"to bin {cluster_id[i]}, file: {path_bin_segment}")
+
             # Write this assembled segment and reset everything
-            sequence = Seq("".join([segment.seq for segment in to_combine]))
+            if len(to_combine) == 1:
+                sequence = to_combine[0]
+            else:
+                sequence = Seq("".join([segment.seq for segment in to_combine]))
 
             # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
             descr = segment.description.replace(" ", "_")  # To avoid issues with bash
@@ -343,10 +349,8 @@ def pll_copy_segments_to_bin(df):
                                      segment.features, segment.annotations, segment.letter_annotations)
 
             # Append the combined segment to avoid multiple files for the same taxon
-            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
             with open(path_bin_segment, "a") as f:
                 SeqIO.write(combined_seg, f, "fasta")
-            logger.debug(f"Combined segment number {i}, added to bin {cluster_id[i]}, file: {path_bin_segment}")
 
             # Reset variables
             to_combine = []
@@ -362,15 +366,15 @@ pll_copy_segments_to_bin.path_db_bins = ""
 
 
 @check_step
-def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1):
+def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1):
     """ Write .fna files from the binning for kraken build """
     create_n_folders(path_db_bins, clusters)
 
     # Load bin assignment of each segment
-    df = pd.read_pickle(path_bins_assignemnts)
+    df = pd.read_pickle(path_bins_assignments)
 
     # Split it per file to allow parallel processing
-    logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignemnts}")
+    logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
     df_per_fna = []
     for file in tqdm(df.fna_path.unique()):
         df_per_fna.append(df[df.fna_path == file])
