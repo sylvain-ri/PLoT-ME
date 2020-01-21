@@ -54,11 +54,11 @@ class Genome:
                   "chromosome", "complete genome", "whole genome shotgun sequence", ]
     kmer_count_zeros = kmers_dic(4)
 
-    def __init__(self, fna_file, taxon, segments, k=4):
+    def __init__(self, fna_file, taxon, window_size, k=4):
         logger.log(0, "Created genome object")
         self.path_fna    = fna_file
         self.taxon       = taxon
-        self.segments    = segments
+        self.window_size = window_size
         self.k           = k
         # records is a dict of SeqRecord
         self.records = {cat: [] for cat in self.categories}
@@ -87,8 +87,8 @@ class Genome:
 
                 full_seq = record.seq
                 len_genome = len(full_seq)
-                for start in range(0, len_genome - self.segments, self.segments):
-                    end = min(start + self.segments, len_genome - 1)
+                for start in range(0, len_genome - self.window_size, self.window_size):
+                    end = min(start + self.window_size, len_genome - 1)
                     # Include the taxonomy id, start and end of the segment into the description
                     description = f"|kraken:taxid|{self.taxon}|s:{start}-e:{end-1}|{record.description}"
                     segment = SeqRecord(full_seq[start:end],
@@ -98,6 +98,9 @@ class Genome:
 
     def count_kmers_to_df(self, path_kmers):
         """ Take all splits, count the kmer distribution and save to the kmer folder as pandas DataFrame """
+        # todo: consider combining forward and backward kmers as well as complements.
+        #  Single counter for AAAT, TAAA, TTTA and ATTT
+
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
             kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k)
@@ -171,7 +174,7 @@ def parallel_kmer_counting(fastq, ):
     with open(fastq.path_check) as f:
         taxon = int(f.read())
     genome = Genome(fastq.path_abs, taxon,
-                    segments=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
+                    window_size=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
     genome.load_genome()
     genome.count_kmers_to_df(fastq.path_target)
 
@@ -238,7 +241,9 @@ def combine_genome_kmer_counts(folder_kmers, path_df, k):
     df.category    = df.category.astype('category')
     df.name        = df.name.astype('category')
     df.fna_path    = df.fna_path.astype('category')
+    # Save output file
     df.to_pickle(path_df)
+    logger.info(f"Combined file of all kmer counts save at: {path_df}")
 
 
 @check_step
@@ -287,34 +292,48 @@ def pll_copy_segments_to_bin(df):
     #  write the file with taxo to the appropriate bin
     taxon = df.taxon.iloc[0]
     genome_path = df.fna_path.iloc[0]
-    bin_and_genome_path = osp.join(pll_copy_segments_to_bin.path_db_bins, taxon)
     logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
                  f"for the genome located at {genome_path}")
 
     # First get the real segmentation depending on cluster continuity of the segments
     # Aggregate segments with same cluster (consecutive values of cluster), get start, end and description updated
+    cluster_id = []
     segment_starts = []
     segment_ends = []
-    segment_descriptions = []
     for i, df_split in df.groupby([(df.cluster != df.cluster.shift()).cumsum()]):
+        cluster_id.append(df_split.cluster.iloc[0])
         segment_starts.append(df_split.start.iloc[0])
         segment_ends.append(df_split.end.iloc[-1])
-        # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
-        descr = df_split.description.iloc[0]
-        descr_splits = descr.split("|")
-        descr_formatted = "|".join(descr_splits[:2] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[3:])
-        segment_descriptions.append(descr_formatted)
 
     # Then loop through all segments, recombine the consecutive ones
-    genome = Genome(genome_path, taxon, segments=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
+    genome = Genome(genome_path, taxon, window_size=parallel_kmer_counting.segments, k=parallel_kmer_counting.k)
     genome.load_genome()
     to_combine = []
+    i = 0
     for segment, taxon, cat, start, end in genome.yield_genome_split():
         # todo: save segments until stop reached. Careful of end of genome
+        if end == segment_ends[i]:
+            # Write this assembled segment and reset everything
+            sequence = "".join([segment.seq for segment in to_combine])
 
-    genome.yield_genome_split()
+            # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
+            descr = segment.description
+            descr_splits = descr.split("|")
+            description = "|".join(descr_splits[:2] + [f"s:{segment_starts[i]}-e:{segment_ends[i]}"] + descr_splits[3:])
 
-    genome.save_splits(bin_and_genome_path)
+            combined_seg = SeqRecord(sequence, segment.id, segment.name, description, segment.dbxrefs,
+                                     segment.features, segment.annotations, segment.letter_annotations)
+            path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, cluster_id[i],
+                                        f"{taxon}-s{segment_starts[i]}-e{segment_ends[i]}.fna")
+            SeqIO.write(combined_seg, path_bin_segment, "fasta")
+            logger.debug(f"Combined segment number {i}, added to bin {cluster_id[i]}, file: {path_bin_segment}")
+
+            # Reset variables
+            to_combine = []
+            i += 1
+        else:
+            # Stack the segments
+            to_combine.append(segment)
 
     return
 
