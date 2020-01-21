@@ -393,6 +393,7 @@ def kraken_build(path_refseq_binned, path_bins_hash, n_clusters):
                "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, str(cluster))]
         logger.info(f"kraken2 add to library, bin {cluster}, cmd: " + " ".join(cmd))
         res = subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL)
+        logger.debug(res)
         res = subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
         logger.debug(res)
         # with Pool(min(4, main.cores)) as pool:  # file copy don't need many cores (main.cores)
