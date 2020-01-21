@@ -431,11 +431,12 @@ def main(folder_database, folder_output, n_clusters, k, window, cores,
     scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, stop=early_stop, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
-    path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts.{k}mer_s{window}.pd")
+    ommitted = "" if len(omit_folders) == 0 else "_omitted_" + "_".join(omit_folders)
+    path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{ommitted}.{k}mer_s{window}.pd")
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_to_bins = osp.join(folder_intermediate_files, f"_genomes_bins_{k}mer_s{window}.pd")
+    path_segments_to_bins = osp.join(folder_intermediate_files, f"_genomes_bins{ommitted}.{k}mer_s{window}.pd")
     path_models           = osp.join(folder_intermediate_files, "models")
     define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
 
