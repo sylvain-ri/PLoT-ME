@@ -191,8 +191,7 @@ parallel_kmer_counting.force_recount = True
 
 
 @check_step
-def scan_RefSeq_to_kmer_counts(scanning, folder_kmers, k=4, segments=10000,
-                               stop=30, force_recount=False):
+def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=30, force_recount=False):
     """ Scan through RefSeq, split genomes into segments, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
@@ -430,29 +429,34 @@ def kraken_build(path_db_bins, path_bins_hash, n_clusters):
 
 
 #   **************************************************    MAIN   **************************************************   #
-def main(folder_database, folder_output, n_clusters, k, segments, force_recount=False, early_stop=-1):
+def main(folder_database, folder_output, n_clusters, k, window, cores,
+         skip_existing="11111", force_recount=False, early_stop=-1, omit_folders=("plant", "vertebrate")):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
-        folder_database          : RefSeq root folder
-        folder_intermediate_files: empty root folder to store kmer counts
+        folder_database : RefSeq root folder
+        folder_output   : empty root folder to store kmer counts
     """
     # Common folder name keeping parameters
-    parameters = f"{k}mer_s{segments}"
+    parameters = f"{k}mer_s{window}"
     folder_intermediate_files = osp.join(folder_output, "read_binning_tmp")
+    # Parameters
+    check_step.can_skip = skip_existing
+    main.omit_folders   = omit_folders
+    main.k              = k
+    main.w              = window
+    main.cores          = cores
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
-    path_individual_kmer_counts = osp.join(folder_intermediate_files, parameters, f"counts_{k}mer_s{segments}")
-    scan_RefSeq_to_kmer_counts(folder_database, path_individual_kmer_counts,
-                               k=k, segments=segments, stop=early_stop, force_recount=force_recount)
+    path_individual_kmer_counts = osp.join(folder_intermediate_files, parameters, f"counts_{k}mer_s{window}")
+    scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, stop=early_stop, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
-    path_stacked_kmer_counts = osp.join(folder_intermediate_files, parameters, f"_all_counts.{k}mer_s{segments}.pd")
+    path_stacked_kmer_counts = osp.join(folder_intermediate_files, parameters, f"_all_counts.{k}mer_s{window}.pd")
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
-    # todo: find bins and write genomes' segments into bins
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_to_bins = osp.join(folder_intermediate_files, parameters, f"_genomes_bins_{k}mer_s{segments}.pd")
+    path_segments_to_bins = osp.join(folder_intermediate_files, parameters, f"_genomes_bins_{k}mer_s{window}.pd")
     path_models           = osp.join(folder_intermediate_files, parameters, "models")
     define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
 
@@ -493,10 +497,6 @@ if __name__ == '__main__':
 
     # Set the skip variable for the decorator of each step
     check_step.can_skip = args.skip_existing
-    main.omit_folders = tuple(args.omit)
-    main.k            = args.kmer
-    main.w            = args.window
-    main.cores        = args.cores
 
     # If force recount of the kmer, disable the skip of the step
     if args.force:
@@ -504,9 +504,10 @@ if __name__ == '__main__':
 
     logger.warning("**** Starting script ****")
     try:
-        main(folder_database=args.path_database, folder_intermediate_files=args.path_output_files,
-             n_clusters=args.number_bins, k=args.kmer, segments=args.window, force_recount=args.force,
-             early_stop=args.debug)
+        main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
+             k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
+             force_recount=args.force, early_stop=args.debug,
+             omit_folders=tuple(args.omit))
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
