@@ -122,6 +122,7 @@ class Genome:
 
 def create_n_folders(path, n):
     """ Create the sub-folders of bins from 0/ to n/ """
+    logger.info(f"creates {n} folder under {path}")
     for i in range(n):
         create_path(osp.join(path, str(i)), with_filename=False)
 
@@ -267,6 +268,8 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters):
     df_mem = df.memory_usage(deep=False).sum()
     logger.info(f"Model loaded, scaling the values to the length of the segments. "
                 f"DataFrame size: {df_mem/10**9:.2f} GB.")
+
+    # todo: save intermediate data
     scale_df_by_length(df, cols_kmers, k, w)
 
     # ## 2 ## Could add PCA
@@ -381,28 +384,50 @@ def split_genomes_to_bins(path_bins_assignemnts, path_db_bins, clusters, stop=-1
     logger.info(f"got {len(results)} results...")
 
 
-def pll_kraken2_add_lib():
+def pll_kraken2_add_lib(cluster_n):
 
+    cmd = ["do", "find", f"{pll_kraken2_add_lib.path_bins_segments}/{cluster_n}/*/",
+           "-name", "'*.fna'", "", "",
+           "done", "done", ]
     # do
-    # find ~/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/$cluster/*/ -name '*.fa' -print0 | xargs -0 -I{} -n1 -P$cores kraken2-build --add-to-library {} --db /home/ubuntu/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/Kraken2_building/$cluster/
+    # find ~/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/$cluster/*/
+    #  -name '*.fa' -print0 | xargs -0 -I{} -n1 -P$cores
+    #  kraken2-build --add-to-library {}
+    #  --db /home/ubuntu/Disks/SSD500/Segmentation/Kraken_10_clusters_V1/Kraken2_building/$cluster/
     # done
-    cmd = []
     return subprocess.check_output(cmd)
+
+
+pll_kraken2_add_lib.path_bins_segments = ""
+pll_kraken2_add_lib.path_lib = ""
 
 
 @check_step
 def kraken_build(path_db_bins, path_bins_hash, n_clusters):
     """ launch kraken build on each bin """
-    create_n_folders(path_bins_hash, n_clusters)
-    # todo: run kraken2-build on each subfolder (add to library and build)
+    tmp_library = osp.join(path_bins_hash, "kraken2_library")
+    create_n_folders(tmp_library, n_clusters)
+    # Give values for parallel processing
+    pll_kraken2_add_lib.path_bins_segments = path_db_bins
+    pll_kraken2_add_lib.path_lib = tmp_library
 
+    # todo: run kraken2-build on each subfolder (add to library and build)
+    # Add to library
     with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(pll_kraken2_add_lib, range(n_clusters)),
                             total=len(n_clusters)))
 
+    create_n_folders(path_bins_hash, n_clusters)
+
+    # Build hashes
+    with Pool(main.cores) as pool:
+        results = list(tqdm(pool.imap(build_hashes, range(n_clusters)),
+                            total=len(n_clusters)))
+
+    return
 
 
-
+#   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_intermediate_files, n_clusters, k, segments, force_recount=False, early_stop=-1):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
@@ -455,7 +480,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
     parser.add_argument('-x', '--debug', default=-1, type=int, help='For debug purpose')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
-    parser.add_argument('-o', '--omit', help='Omit some folder/families',
+    parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families',
                         default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"))
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, don't redo files that already exist. "
@@ -465,7 +490,7 @@ if __name__ == '__main__':
 
     # Set the skip variable for the decorator of each step
     check_step.can_skip = args.skip_existing
-    main.omit_folders = args.omit
+    main.omit_folders = tuple(args.omit)
     main.k            = args.kmer
     main.w            = args.window
     main.cores        = args.cores
