@@ -331,6 +331,10 @@ def pll_copy_segments_to_bin(df):
     to_combine = []
     i = 0
     for segment, taxon, cat, start, end in genome.yield_genome_split():
+        # Stack the segments
+        to_combine.append(segment)
+
+        # If all stacked, combine and write out
         if end == segment_ends[i]:
             path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
             logger.debug(f"Adding combined segment number {i}, start={segment_starts[i]}, end={segment_ends[i]}, "
@@ -342,7 +346,7 @@ def pll_copy_segments_to_bin(df):
                 sequence = to_combine[0].seq
             else:
                 sequence = "".join([segment.seq for segment in to_combine])
-            logger.debug(f"sequence: len={len(sequence)}, type={type(sequence)} sequence={sequence}")
+            logger.debug(f"sequence: len={len(sequence)}, type={type(sequence)} ")
             if not isinstance(sequence, Seq):
                 sequence = Seq(sequence)
 
@@ -361,9 +365,6 @@ def pll_copy_segments_to_bin(df):
             # Reset variables
             to_combine = []
             i += 1
-        else:
-            # Stack the segments
-            to_combine.append(segment)
 
     return
 
