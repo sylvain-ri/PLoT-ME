@@ -430,7 +430,7 @@ def kraken_build(path_db_bins, path_bins_hash, n_clusters):
 
 
 #   **************************************************    MAIN   **************************************************   #
-def main(folder_database, folder_intermediate_files, n_clusters, k, segments, force_recount=False, early_stop=-1):
+def main(folder_database, folder_output, n_clusters, k, segments, force_recount=False, early_stop=-1):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -439,6 +439,7 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
     """
     # Common folder name keeping parameters
     parameters = f"{k}mer_s{segments}"
+    folder_intermediate_files = osp.join(folder_output, "read_binning_tmp")
 
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, parameters, f"counts_{k}mer_s{segments}")
@@ -456,11 +457,11 @@ def main(folder_database, folder_intermediate_files, n_clusters, k, segments, fo
     define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
 
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
-    path_DB_bins = osp.join(folder_intermediate_files, parameters, f"_bins_DB")
+    path_DB_bins = osp.join(folder_output, parameters, f"_bins_DB")
     split_genomes_to_bins(path_segments_to_bins, path_DB_bins, n_clusters, stop=early_stop)
 
     # Run kraken2-build into database folder
-    path_bins_hash = osp.join(folder_database, "bins_kraken2_DB", parameters)  # Separate hash tables by classifier
+    path_bins_hash = osp.join(folder_output, parameters, "bins_kraken2_DB")  # Separate hash tables by classifier
     kraken_build(path_DB_bins, path_bins_hash, n_clusters)
 
 
@@ -474,8 +475,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019.')
-    parser.add_argument('path_intermediate_files', type=is_valid_directory,
-                        help='Folder for the k-mer counts per genome and for clustering models')
+    parser.add_argument('path_output_files', type=is_valid_directory,
+                        help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
     parser.add_argument('-k', '--kmer', default=4, type=int, help='Size of the kmers. Usual value : 4')
     parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes')
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into')
@@ -503,7 +504,7 @@ if __name__ == '__main__':
 
     logger.warning("**** Starting script ****")
     try:
-        main(folder_database=args.path_database, folder_intermediate_files=args.path_intermediate_files,
+        main(folder_database=args.path_database, folder_intermediate_files=args.path_output_files,
              n_clusters=args.number_bins, k=args.kmer, segments=args.window, force_recount=args.force,
              early_stop=args.debug)
     except KeyboardInterrupt:
