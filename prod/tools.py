@@ -129,6 +129,7 @@ class ScanFolder:
     ext_find      = ()
     ext_check     = ""
     ext_create    = ""
+    skip_folders  = ()
 
     def __init__(self, path):
         ScanFolder.obj_id += 1
@@ -174,7 +175,7 @@ class ScanFolder:
         return True
 
     @classmethod
-    def set_folder_scan_options(cls, scanning="", target="", ext_find=(), ext_check="", ext_create=""):
+    def set_folder_scan_options(cls, scanning="", target="", ext_find=(), ext_check="", ext_create="", skip_folders=()):
         """ Set the options to scan a folder, filter files to find, files to check, and create the target path """
         assert osp.isdir(scanning), logger.error(f"the provided path to scan is not a directory {scanning}")
         assert target == "" or osp.isdir(target), logger.error(f"the provided path as target is not a directory {target}")
@@ -183,6 +184,7 @@ class ScanFolder:
         cls.ext_find      = ext_find
         cls.ext_check     = ext_check
         cls.ext_create    = ext_create
+        cls.skip_folders  = skip_folders
 
     @classmethod
     def tqdm_scan(cls, folder="", with_tqdm=True):
@@ -212,6 +214,12 @@ class ScanFolder:
     def walk_dir(cls, log=True):
         """ Walk through every files in a directory (default root folder) and yield FileInDir """
         for dir_path, dirs, files in os.walk(cls.folder_root):
+            # Skip folders
+            rel_path = osp.relpath(dir_path, cls.folder_root)
+            if any((name_to_skip in rel_path for name_to_skip in cls.skip_folders)):
+                logger.debug(f"omitting folder {rel_path}")
+                continue
+
             for filename in files:
                 file = ScanFolder(os.path.join(dir_path, filename))
                 if file.file_complies(log):
