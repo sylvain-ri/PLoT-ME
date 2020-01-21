@@ -332,13 +332,16 @@ def pll_copy_segments_to_bin(df):
         if end == segment_ends[i]:
             path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id[i]), f"{taxon}.fna")
             logger.debug(f"Adding combined segment number {i}, start={segment_starts[i]}, end={segment_ends[i]}, "
-                         f"to bin {cluster_id[i]}, file: {path_bin_segment}")
+                         f"id={segment.id}, to bin {cluster_id[i]}, file: {path_bin_segment}")
 
             # Write this assembled segment and reset everything
             if len(to_combine) == 1:
                 sequence = to_combine[0]
             else:
-                sequence = Seq("".join([segment.seq for segment in to_combine]))
+                sequence = "".join([segment.seq for segment in to_combine])
+            logger.debug(f"sequence: len={len(sequence)}, type={type(sequence)} sequence={sequence}")
+            if not isinstance(sequence, Seq):
+                sequence = Seq(sequence)
 
             # EX: '|kraken:taxid|456320|s:0-e:9999|NC_014222.1 Methanococcus voltae A3, complete genome'
             descr = segment.description.replace(" ", "_")  # To avoid issues with bash
