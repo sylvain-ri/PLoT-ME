@@ -392,16 +392,18 @@ def kraken_build(path_refseq_binned, path_bins_hash, n_clusters):
         cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
                "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
                "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
-        logger.info(f"kraken2 add to library, bin {cluster}, cmd: " + " ".join(cmd))
-        res = subprocess.check_output(cmd, shell=True)
+        logger.info(f"kraken2 add_to_library, bin {cluster}.... (cmd=" + " ".join(cmd) + ")")
+        res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
         logger.debug(res)
         # with Pool(min(4, main.cores)) as pool:  # file copy don't need many cores (main.cores)
         #     list_files = os.listdir(osp.join(path_refseq_binned, bin_id)
         #     results = list(tqdm(pool.imap(kraken2_build_lib, list_files), total=len(list_files)))
 
+        # todo: create link to kraken2 taxonomy
+
         cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
         logger.info(f"kraken2 build, bin {cluster}, cmd: " + " ".join(cmd))
-        res = subprocess.check_output(cmd)
+        res = subprocess.call(cmd)
         logger.debug(res)
 
 
