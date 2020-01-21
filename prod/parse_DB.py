@@ -390,7 +390,7 @@ def kraken_build(path_refseq_binned, path_bins_hash, n_clusters):
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
         cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
-               "xargs", "-0", "-I{}", "-n1", "-P", f"{main.cores}",
+               "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
                "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
         logger.info(f"kraken2 add to library, bin {cluster}, cmd: " + " ".join(cmd))
         res = subprocess.check_output(cmd, shell=True)
