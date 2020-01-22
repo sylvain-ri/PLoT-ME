@@ -545,7 +545,7 @@ if __name__ == '__main__':
                         help='Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)')
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families',
                         default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"), metavar='')
-    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true', metavar='')
+    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, skip files/folders that already exist. Write 110000 to skip steps 0 and 1. "
                              "To recount all kmers, and stop after combining the kmer dataframes, write -s 011111, "
