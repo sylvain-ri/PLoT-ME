@@ -515,9 +515,9 @@ if __name__ == '__main__':
                         default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"))
     parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
-                        help="By default, don't redo files/folders that already exist. "
-                             "Write 110000 to skip steps 0 and 1. "
-                             "To continue counting kmers, write 01111. To recount all kmers, also add option -f")
+                        help="By default, skip files/folders that already exist. Write 110000 to skip steps 0 and 1. "
+                             "To recount all kmers, and stop after combining the kmer dataframes, write -s 011111, "
+                             "add option -f, and option -e 0.")
     args = parser.parse_args()
 
     # Set the skip variable for the decorator of each step
