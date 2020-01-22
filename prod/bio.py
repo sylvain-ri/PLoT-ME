@@ -116,8 +116,8 @@ class Read(SeqRecord.SeqRecord):
     BASE_PATH = None
 
     # Load the models to be able to apply them on each read
-    LDA = pickle.load(open(PATHS.lda_model, 'rb'))
-    KMEANS = pickle.load(open(PATHS.kmeans_model, 'rb'))
+    # LDA = pickle.load(open(PATHS.lda_model, 'rb'))
+    # KMEANS = pickle.load(open(PATHS.kmeans_model, 'rb'))
 
     def __init__(self, obj, k=4):
         self.logger = logging.getLogger('classify.CustomRead')
