@@ -185,6 +185,7 @@ def check_step(func):
             result = func(*args, **kwargs)
             # print time spent
             logger.info(f"Step {check_step.step_nb} END, {process_time() - start_time:.3f}s, function {func.__name__}")
+            check_step.timings.append(process_time())  # log time for each step
 
         # Step counter
         check_step.step_nb += 1
@@ -192,6 +193,7 @@ def check_step(func):
     return wrapper
 
 
+check_step.timings    = []
 check_step.step_nb    = 0         # For decorator to know which steps has been done
 check_step.early_stop = -1        # Last step to run, later steps are not ran. Only display arguments
 check_step.can_skip   = "111110"  # By default skip step that has been started, except fot kraken2 build (hard to check)
@@ -469,13 +471,14 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     parameters = f"{k}mer_s{window}"
     folder_intermediate_files = osp.join(folder_output, parameters, "read_binning_tmp")
     # Parameters
-    check_step.early_stop = early_stop
-    check_step.can_skip = skip_existing
     main.folder_database= folder_database
     main.omit_folders   = omit_folders
     main.k              = k
     main.w              = window
     main.cores          = cores
+    check_step.early_stop = early_stop
+    check_step.can_skip = skip_existing
+    check_step.timings.append(process_time())  # log time spent
 
     #    INTERMEDIATE files
     # get kmer distribution for each window of each genome, parallel folder with same structure
@@ -505,7 +508,16 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
 
     # End
-    logger.warning(f"Script ended successfully.")
+    times = check_step.timings
+    for i in range(len(times)-1):
+        delay = times[i+1] - times[i]
+        m, s = divmod(delay, 60)
+        h, m = divmod(m, 60)
+        logger.info(f"STEP {i} - {h:d} hours, {m:02d} minutes, {s:02d} seconds")
+
+    m, s = divmod(times[-1], 60)
+    h, m = divmod(m, 60)
+    logger.warning(f"Script ended successfully, after {h:d} hours, {m:02d} minutes, {s:02d} seconds.")
 
 
 main.folder_database = ""
