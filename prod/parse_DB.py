@@ -528,27 +528,28 @@ main.cores           = 0
 
 
 if __name__ == '__main__':
+    # Option to display default values, metavar='' to remove ugly capitalized option's names
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019.')
     parser.add_argument('path_output_files', type=is_valid_directory,
                         help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
 
-    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy')
-    parser.add_argument('-k', '--kmer', default=4, type=int, help='Size of the kmers. Usual value : 4')
-    parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes')
-    parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into')
-    parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
+    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy', metavar='')
+    parser.add_argument('-k', '--kmer',   default=4, type=int, help='Size of the kmers', metavar='')
+    parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes', metavar='')
+    parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into', metavar='')
+    parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads', metavar='')
 
-    parser.add_argument('-e', '--early', default=len(check_step.can_skip)-1, type=int,
+    parser.add_argument('-e', '--early', default=len(check_step.can_skip)-1, type=int, metavar='',
                         help='Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)')
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families',
-                        default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"))
-    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
+                        default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"), metavar='')
+    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true', metavar='')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, skip files/folders that already exist. Write 110000 to skip steps 0 and 1. "
                              "To recount all kmers, and stop after combining the kmer dataframes, write -s 011111, "
-                             "add option -f, and option -e 0.")
+                             "add option -f, and option -e 0.", metavar='')
     args = parser.parse_args()
 
     # Set the skip variable for the decorator of each step
