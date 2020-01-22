@@ -24,6 +24,7 @@ Reads Binning Project
 """
 
 import argparse
+import shutil
 import subprocess
 from copy import deepcopy
 from itertools import islice
@@ -121,11 +122,14 @@ class Genome:
         logger.debug(f"saved kmer count to {path_kmers}")
 
 
-def create_n_folders(path, n):
+def create_n_folders(path, n, delete_existing=False):
     """ Create the sub-folders of bins from 0/ to n/ """
     logger.info(f"creates {n} folder under {path}")
     for i in range(n):
-        create_path(osp.join(path, str(i)), with_filename=False)
+        new_path = osp.join(path, str(i))
+        if delete_existing and osp.isdir(new_path):
+            shutil.rmtree(new_path)
+        create_path(new_path, with_filename=False)
 
 
 def scale_df_by_length(df, kmer_cols, k, w):
@@ -358,7 +362,8 @@ pll_copy_segments_to_bin.path_db_bins = ""
 @check_step
 def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1):
     """ Write .fna files from the binning for kraken build """
-    create_n_folders(path_db_bins, clusters)
+    logger.info(f"deleting existing sub-folders to avoid duplicates by append to existing files at: {path_db_bins}")
+    create_n_folders(path_db_bins, clusters, delete_existing=True)
 
     # Load bin assignment of each segment
     df = pd.read_pickle(path_bins_assignments)
@@ -410,8 +415,11 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
     logger.info(f"kraken2 build its hash tables, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
-        # todo: create link to kraken2 taxonomy, check behaviour
-        os.symlink(path_taxonomy, osp.join(path_bins_hash, bin_id, "taxonomy"))
+        taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
+        if osp.islink(taxon_in_cluster):
+            logger.debug(f"removing existing link at {taxon_in_cluster}")
+            os.unlink(taxon_in_cluster)
+        os.symlink(path_taxonomy, taxon_in_cluster)
 
         cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
         res = subprocess.call(cmd)
