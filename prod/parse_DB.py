@@ -4,15 +4,22 @@
 Script to divide a Database of genomes (RefSeq), split them into segments and
 cluster them into bins according to their k-mer frequency.
 Needs a lot of disk space, and RAM according to the largest genome to process.
+*** STEPS ***
+0 -> Scan the given RefSeq, count kmer frequencies per segment for each genome
+1 -> Combine these counts into a single file (RAM intensive)
+2 -> Scale the values by the length of segments and combination of kmers,
+     and apply a clustering algorithm (KMean, mini batch KMeans)
+     to find the cluster association of each segment
+3 -> Copy these segments of genomes into bins (DISK intensive)
+4 -> kraken2-build --add-to-library
+5 -> kraken2-build --build
 
-For 17GB file of combined kmer counts, combining dataframes took up to 55GB,
-loading the file up to 35GB.
-KMeans crashed because it reached the 60GB RAM.
-Using AWS R4.2XLarge instance
+For 17GB file of combined kmer counts, combining counts took up to 55GB,
+loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
+Using AWS R4.2XLarge instance with 60GB RAM
 
 ** kmer counts DataFrames are under this format:
 taxon	category	start	end	name	description	fna_path	AAAA .... TTTT
-
 ** cluster/bin assignments trade the nucleotides columns to a "cluster" column
 
 #############################################################################
@@ -154,12 +161,15 @@ def check_step(func):
         to_check = args[1]  # Output path for file or folder, will check if the output already exists
 
         # First check if skip has been allowed,
-        if check_step.can_skip[check_step.step_nb] == "1" and \
-                (osp.isfile(to_check)                               # and there's already a file
-                 or (osp.isdir(to_check) and os.listdir(to_check)   # or there's a folder, not empty
-                     and "**check_step NO FOLDER CHECK**" not in func.__doc__)):  # exception for kraken2_build_hash()
+        if check_step.step_nb > check_step.early_stop:
+            logger.info(f"Step {check_step.step_nb} EARLY STOP, no run for {func.__name__}({signature}.")
+            result = None
+
+        elif check_step.can_skip[check_step.step_nb] == "1" and \
+                (osp.isfile(to_check)                                 # and there's already a file
+                 or (osp.isdir(to_check) and os.listdir(to_check))):  # or there's a folder, not empty
             logger.info(f"Step {check_step.step_nb} SKIPPING, function {func.__name__}({signature}, "
-                        f"Output has already been generated : {to_check}")
+                        f"Output has already been generated.")
             result = None
 
         else:
@@ -177,8 +187,9 @@ def check_step(func):
     return wrapper
 
 
-check_step.step_nb = 0
-check_step.can_skip = "111111"
+check_step.step_nb    = 0         # For decorator to know which steps has been done
+check_step.early_stop = -1        # Last step to run, later steps are not ran. Only display arguments
+check_step.can_skip   = "111110"  # By default skip step that has been started, except fot kraken2 build (hard to check)
 
 
 def parallel_kmer_counting(fastq, ):
@@ -193,13 +204,11 @@ def parallel_kmer_counting(fastq, ):
     genome.count_kmers_to_df(fastq.path_target)
 
 
-# parallel_kmer_counting.k = 4
-# parallel_kmer_counting.segments = 10000
 parallel_kmer_counting.force_recount = True
 
 
 @check_step
-def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=30, force_recount=False):
+def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False):
     """ Scan through RefSeq, split genomes into segments, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
@@ -412,7 +421,7 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
         Skip skipping by checking if folder exists: **check_step NO FOLDER CHECK** (DON'T REMOVE)
     """
     assert osp.isdir(path_taxonomy), logger.error(f"Path to taxonomy doesn't seem to be a directory: {path_taxonomy}")
-    logger.info(f"kraken2 build its hash tables, {n_clusters} clusters.... ")
+    logger.info(f"kraken2 build its hash tables, {n_clusters} clusters, will take lots of time.... ")
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
         taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
@@ -422,13 +431,15 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
         os.symlink(path_taxonomy, taxon_in_cluster)
 
         cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
+        logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
         res = subprocess.call(cmd)
         logger.debug(res)
 
 
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="11111",
-         force_recount=False, early_stop=-1, omit_folders=("plant", "vertebrate"), path_taxonomy=""):
+         force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
+         path_taxonomy=""):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -439,6 +450,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     parameters = f"{k}mer_s{window}"
     folder_intermediate_files = osp.join(folder_output, parameters, "read_binning_tmp")
     # Parameters
+    check_step.early_stop = early_stop
     check_step.can_skip = skip_existing
     main.omit_folders   = omit_folders
     main.k              = k
@@ -448,22 +460,22 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     #    INTERMEDIATE files
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_{k}mer_s{window}")
-    scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, stop=early_stop, force_recount=force_recount)
+    scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, force_recount=force_recount)
 
     # combine all kmer distributions into one single file
-    ommitted = "" if len(omit_folders) == 0 else "_omitted_" + "_".join(omit_folders)
-    path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{ommitted}.{k}mer_s{window}.pd")
+    omitted = "" if len(omit_folders) == 0 else "_omitted_" + "_".join(omit_folders)
+    path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.{k}mer_s{window}.pd")
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_to_bins = osp.join(folder_intermediate_files, f"_genomes_bins{ommitted}.{k}mer_s{window}.pd")
+    path_segments_to_bins = osp.join(folder_intermediate_files, f"_genomes_bins{omitted}.{k}mer_s{window}.pd")
     path_models           = osp.join(folder_intermediate_files, "models")
     define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
 
     #    FINAL files (used by classifiers)
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_refseq_binned = osp.join(folder_output, parameters, f"RefSeq_binned")
-    split_genomes_to_bins(path_segments_to_bins, path_refseq_binned, n_clusters, stop=early_stop)
+    split_genomes_to_bins(path_segments_to_bins, path_refseq_binned, n_clusters)
 
     # Run kraken2-build add libray
     path_bins_hash = osp.join(folder_output, parameters, "kraken2_hash")  # Separate hash tables by classifier
@@ -488,21 +500,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019.')
-    # todo: issue with is_valid_directory()....
     parser.add_argument('path_output_files', type=is_valid_directory,
                         help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
+
+    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy')
     parser.add_argument('-k', '--kmer', default=4, type=int, help='Size of the kmers. Usual value : 4')
     parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes')
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into')
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
-    parser.add_argument('-x', '--debug', default=-1, type=int, help='For debug purpose')
-    parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
-    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy')
+
+    parser.add_argument('-e', '--early', default=len(check_step.can_skip)-1, type=int,
+                        help='Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)')
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families',
                         default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"))
+    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
-                        help="By default, don't redo files that already exist. "
-                             "Write 11011 to force redo the 2rd step, 0-indexed. "
+                        help="By default, don't redo files/folders that already exist. "
+                             "Write 110000 to skip steps 0 and 1. "
                              "To continue counting kmers, write 01111. To recount all kmers, also add option -f")
     args = parser.parse_args()
 
@@ -517,7 +531,7 @@ if __name__ == '__main__':
     try:
         main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
              k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
-             force_recount=args.force, early_stop=args.debug,
+             force_recount=args.force, early_stop=args.early,
              omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy)
     except KeyboardInterrupt:
         logger.error("User interrupted")
