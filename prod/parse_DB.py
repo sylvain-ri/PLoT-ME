@@ -142,13 +142,15 @@ def create_n_folders(path, n, delete_existing=False):
         create_path(new_path, with_filename=False)
 
 
-def scale_df_by_length(df, kmer_cols, k, w):
-    """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
-    logger.info(f"Scaling the dataframe, converting to float32")
-    ratio = 4**k / (w - k + 1)
-    for col in tqdm(kmer_cols):
-        df[col] = pd.to_numeric(df[col], downcast='float')
-        df[col] *= ratio
+def add_file_with_parameters(folder, add_description=""):
+    """ Add a file in the folder to remind which parameters were used, which folder were omitted """
+    path = osp.join(folder, "parameters_RefSeq_binning.txt")
+    with open(path, 'w') as f:
+        f.write(f"Files created by {__file__} \n"
+                f"From RefSeq located at: {main.folder_database} \n"
+                f"k={main.k}, w={main.w} (segments size), \n"
+                f"folders *containing* these strings have been omitted: " + ", ".join(main.omit_folders) + ". \n"
+                f"{add_description}")
 
 
 # Decorator for all these steps
@@ -160,25 +162,25 @@ def check_step(func):
         # Check arguments for debugging
         args_repr = [repr(a) for a in args]
         kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
-        signature = ", ".join(args_repr + kwargs_repr)
+        signature = ",\t".join(args_repr + kwargs_repr)
         to_check = args[1]  # Output path for file or folder, will check if the output already exists
 
         # First check if skip has been allowed,
         if check_step.step_nb > check_step.early_stop:
-            logger.info(f"Step {check_step.step_nb} EARLY STOP, no run for {func.__name__}({signature}.")
+            logger.info(f"Step {check_step.step_nb} EARLY STOP, no run for \t{func.__name__}({signature})")
             result = None
 
         elif check_step.can_skip[check_step.step_nb] == "1" and \
                 (osp.isfile(to_check)                                 # and there's already a file
                  or (osp.isdir(to_check) and os.listdir(to_check))):  # or there's a folder, not empty
-            logger.info(f"Step {check_step.step_nb} SKIPPING, function {func.__name__}({signature}, "
+            logger.info(f"Step {check_step.step_nb} SKIPPING, function \t{func.__name__}({signature}, "
                         f"Output has already been generated.")
             result = None
 
         else:
             # Time measurement
             start_time = process_time()
-            logger.info(f"Step {check_step.step_nb} START, function {func.__name__}({signature})")
+            logger.info(f"Step {check_step.step_nb} START, function \t{func.__name__}({signature})")
             create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
             result = func(*args, **kwargs)
             # print time spent
@@ -223,8 +225,6 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
 
     # Set constants to avoid arguments passing
-    # parallel_kmer_counting.k = k
-    # parallel_kmer_counting.segments = segments
     parallel_kmer_counting.force_recount = force_recount
     # Count in parallel. islice() to take a part of an iterable
     with Pool(main.cores) as pool:
@@ -270,6 +270,15 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     # Save output file
     df.to_pickle(path_df)
     logger.info(f"Combined file of all kmer counts save at: {path_df}")
+
+
+def scale_df_by_length(df, kmer_cols, k, w):
+    """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
+    logger.info(f"Scaling the dataframe, converting to float32")
+    ratio = 4**k / (w - k + 1)
+    for col in tqdm(kmer_cols):
+        df[col] = pd.to_numeric(df[col], downcast='float')
+        df[col] *= ratio
 
 
 @check_step
@@ -458,6 +467,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     # Parameters
     check_step.early_stop = early_stop
     check_step.can_skip = skip_existing
+    main.folder_database= folder_database
     main.omit_folders   = omit_folders
     main.k              = k
     main.w              = window
@@ -494,10 +504,11 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     logger.warning(f"Script ended successfully.")
 
 
-main.omit_folders = ""
-main.k            = 0
-main.w            = 0
-main.cores        = 0
+main.folder_database = ""
+main.omit_folders    = ""
+main.k               = 0
+main.w               = 0
+main.cores           = 0
 
 
 if __name__ == '__main__':
