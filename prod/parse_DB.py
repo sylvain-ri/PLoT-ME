@@ -510,12 +510,12 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     # End
     times = check_step.timings
     for i in range(len(times)-1):
-        delay = times[i+1] - times[i]
+        delay = int(times[i+1] - times[i])
         m, s = divmod(delay, 60)
         h, m = divmod(m, 60)
         logger.info(f"STEP {i} - {h:d} hours, {m:02d} minutes, {s:02d} seconds")
 
-    m, s = divmod(times[-1], 60)
+    m, s = divmod(int(times[-1]), 60)
     h, m = divmod(m, 60)
     logger.warning(f"Script ended successfully, after {h:d} hours, {m:02d} minutes, {s:02d} seconds.")
 
