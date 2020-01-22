@@ -404,6 +404,7 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
     """ launch kraken build on each bin
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
+    # todo: the check step won't work because same folder
     logger.info(f"kraken2 build its hash tables, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
@@ -477,6 +478,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019.')
+    # todo: issue with is_valid_directory()....
     parser.add_argument('path_output_files', type=is_valid_directory,
                         help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
     parser.add_argument('-k', '--kmer', default=4, type=int, help='Size of the kmers. Usual value : 4')
