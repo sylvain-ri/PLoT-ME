@@ -382,7 +382,7 @@ pll_copy_segments_to_bin.path_db_bins = ""
 
 @check_step
 def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1):
-    """ Write .fna files from the binning for kraken build """
+    """ Write .fna files from the clustering into n bins """
     logger.info(f"deleting existing sub-folders to avoid duplicates by append to existing files at: {path_db_bins}")
     create_n_folders(path_db_bins, clusters, delete_existing=True)
 
@@ -397,6 +397,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
 
     # Copy in parallel
     pll_copy_segments_to_bin.path_db_bins = path_db_bins
+    add_file_with_parameters(path_db_bins, add_description=f"cluster number = {clusters}")
 
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
     with Pool(min(2, main.cores)) as pool:  # file copy don't need many cores (main.cores)
@@ -411,6 +412,7 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
     """ launch kraken2-build add-to-library
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
+    add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
     create_n_folders(path_bins_hash, n_clusters)
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
@@ -433,6 +435,8 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
         Skip skipping by checking if folder exists: **check_step NO FOLDER CHECK** (DON'T REMOVE)
     """
     assert osp.isdir(path_taxonomy), logger.error(f"Path to taxonomy doesn't seem to be a directory: {path_taxonomy}")
+    add_file_with_parameters(path_bins_hash, add_description=f"cluster = {n_clusters} \ntaxonomy = {path_taxonomy}")
+
     logger.info(f"kraken2 build its hash tables, {n_clusters} clusters, will take lots of time.... ")
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
