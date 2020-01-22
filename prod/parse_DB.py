@@ -22,6 +22,9 @@ Using AWS R4.2XLarge instance with 60GB RAM
 taxon	category	start	end	name	description	fna_path	AAAA .... TTTT
 ** cluster/bin assignments trade the nucleotides columns to a "cluster" column
 
+Once the bins created, tmp files (kmer counts) can be removed (read_binning_tmp/),
+as well as classifier's tmp files (for kraken2: kraken2-build --clean)
+
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
@@ -435,6 +438,9 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
         res = subprocess.call(cmd)
         logger.debug(res)
 
+    logger.info(f"Kraken2 finished building hash tables. You can clean the intermediate files with: "
+                f"kraken2-build --clean {path_bins_hash}/<bin number>")
+
 
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="11111",
@@ -485,8 +491,6 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
 
     # End
-    logger.warning(f"Kraken2 finished building hash tables. You can clean the intermediate files in "
-                   f"{folder_intermediate_files} and with: kraken2-build --clean {path_bins_hash}/<bin number>")
     logger.warning(f"Script ended successfully.")
 
 
