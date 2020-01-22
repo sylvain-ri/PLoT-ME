@@ -560,7 +560,7 @@ if __name__ == '__main__':
         args.skip_existing = "0" + args.skip_existing[1:]
 
     logger.warning("**** Starting script ****")
-    logger.info(f"Script {__file__} called with " + ", ".join(args))
+    logger.info(f"Script {__file__} called with {args}")
     try:
         main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
              k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
