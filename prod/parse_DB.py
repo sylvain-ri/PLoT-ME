@@ -147,12 +147,13 @@ def check_step(func):
         args_repr = [repr(a) for a in args]
         kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
         signature = ", ".join(args_repr + kwargs_repr)
+        to_check = args[1]  # Output path for file or folder, will check if the output already exists
 
-        # If step already done, skip it
-        to_check = args[1]
+        # First check if skip has been allowed,
         if check_step.can_skip[check_step.step_nb] == "1" and \
-                (osp.isfile(to_check) or                           # there's already a file or
-                 (osp.isdir(to_check) and os.listdir(to_check))):  # there's a folder, and not empty
+                (osp.isfile(to_check)                               # and there's already a file
+                 or (osp.isdir(to_check) and os.listdir(to_check)   # or there's a folder, not empty
+                     and "**check_step NO FOLDER CHECK**" not in func.__doc__)):  # exception for kraken2_build_hash()
             logger.info(f"Step {check_step.step_nb} SKIPPING, function {func.__name__}({signature}, "
                         f"Output has already been generated : {to_check}")
             result = None
@@ -403,8 +404,9 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
 def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
     """ launch kraken build on each bin
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
+        Skip skipping by checking if folder exists: **check_step NO FOLDER CHECK** (DON'T REMOVE)
     """
-    # todo: the check step won't work because same folder
+    assert osp.isdir(path_taxonomy), logger.error(f"Path to taxonomy doesn't seem to be a directory: {path_taxonomy}")
     logger.info(f"kraken2 build its hash tables, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
@@ -487,7 +489,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
     parser.add_argument('-x', '--debug', default=-1, type=int, help='For debug purpose')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
-    parser.add_argument('-t', '--taxonomy', default="", type=is_valid_directory, help='path to the taxonomy')
+    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy')
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families',
                         default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"))
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
