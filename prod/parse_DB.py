@@ -173,7 +173,7 @@ def check_step(func):
 
 
 check_step.step_nb = 0
-check_step.can_skip = "11111"
+check_step.can_skip = "111111"
 
 
 def parallel_kmer_counting(fastq, ):
@@ -380,36 +380,44 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
 
 
 @check_step
-def kraken_build(path_refseq_binned, path_bins_hash, n_clusters):
-    """ launch kraken build on each bin
+def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
+    """ launch kraken2-build add-to-library
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
     create_n_folders(path_bins_hash, n_clusters)
 
-    # Add to library
+    logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
         cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
                "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
                "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
-        logger.info(f"kraken2 add_to_library, bin {cluster}.... (cmd=" + " ".join(cmd) + ")")
         res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
         logger.debug(res)
         # with Pool(min(4, main.cores)) as pool:  # file copy don't need many cores (main.cores)
         #     list_files = os.listdir(osp.join(path_refseq_binned, bin_id)
         #     results = list(tqdm(pool.imap(kraken2_build_lib, list_files), total=len(list_files)))
 
-        # todo: create link to kraken2 taxonomy
+
+@check_step
+def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
+    """ launch kraken build on each bin
+        https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
+    """
+    logger.info(f"kraken2 build its hash tables, {n_clusters} clusters.... ")
+    for cluster in tqdm(range(n_clusters)):
+        bin_id = f"{cluster}/"
+        # todo: create link to kraken2 taxonomy, check behaviour
+        os.symlink(path_taxonomy, osp.join(path_bins_hash, bin_id, "taxonomy"))
 
         cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
-        logger.info(f"kraken2 build, bin {cluster}, cmd: " + " ".join(cmd))
         res = subprocess.call(cmd)
         logger.debug(res)
 
 
 #   **************************************************    MAIN   **************************************************   #
-def main(folder_database, folder_output, n_clusters, k, window, cores,
-         skip_existing="11111", force_recount=False, early_stop=-1, omit_folders=("plant", "vertebrate")):
+def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="11111",
+         force_recount=False, early_stop=-1, omit_folders=("plant", "vertebrate"), path_taxonomy=""):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -426,6 +434,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores,
     main.w              = window
     main.cores          = cores
 
+    #    INTERMEDIATE files
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_{k}mer_s{window}")
     scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, stop=early_stop, force_recount=force_recount)
@@ -440,18 +449,23 @@ def main(folder_database, folder_output, n_clusters, k, window, cores,
     path_models           = osp.join(folder_intermediate_files, "models")
     define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
 
+    #    FINAL files (used by classifiers)
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_refseq_binned = osp.join(folder_output, parameters, f"RefSeq_binned")
     split_genomes_to_bins(path_segments_to_bins, path_refseq_binned, n_clusters, stop=early_stop)
 
-    # Run kraken2-build into database folder
+    # Run kraken2-build add libray
     path_bins_hash = osp.join(folder_output, parameters, "kraken2_hash")  # Separate hash tables by classifier
-    kraken_build(path_refseq_binned, path_bins_hash, n_clusters)
+    kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters)
+
+    # Run kraken2-build make hash tables
+    kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
 
     # End
     logger.warning(f"Kraken2 finished building hash tables. You can clean the intermediate files in "
                    f"{folder_intermediate_files} and with: kraken2-build --clean {path_bins_hash}/<bin number>")
     logger.warning(f"Script ended successfully.")
+
 
 main.omit_folders = ""
 main.k            = 0
@@ -471,6 +485,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads')
     parser.add_argument('-x', '--debug', default=-1, type=int, help='For debug purpose')
     parser.add_argument('-f', '--force', help='Force recount kmers', action='store_true')
+    parser.add_argument('-t', '--taxonomy', default="", type=is_valid_directory, help='path to the taxonomy')
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families',
                         default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"))
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
@@ -491,7 +506,7 @@ if __name__ == '__main__':
         main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
              k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
              force_recount=args.force, early_stop=args.debug,
-             omit_folders=tuple(args.omit))
+             omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
