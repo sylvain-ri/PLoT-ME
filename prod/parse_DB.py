@@ -543,7 +543,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-e', '--early', default=len(check_step.can_skip)-1, type=int, metavar='',
                         help='Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)')
-    parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families',
+    parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
                         default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"), metavar='')
     parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
@@ -560,6 +560,7 @@ if __name__ == '__main__':
         args.skip_existing = "0" + args.skip_existing[1:]
 
     logger.warning("**** Starting script ****")
+    logger.info(f"Script {__file__} called with " + ", ".join(args))
     try:
         main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
              k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
