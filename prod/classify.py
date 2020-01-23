@@ -16,6 +16,7 @@ import argparse
 import logging
 from multiprocessing import cpu_count
 import os
+from multiprocessing.pool import Pool
 from os import path as osp
 import pickle
 import subprocess
@@ -42,13 +43,14 @@ class ReadToBin(SeqRecord.SeqRecord):
     FASTQ_PATH = None
     BASE_PATH = None
     MODEL = None
+    CORES = cpu_count()
     outputs = {}
 
     def __init__(self, obj):
         # wrap the object
         self._wrapped_obj = obj
         # Additional attributes
-        self.bin = None
+        self.cluster = None
         self._kmer_count = None
         self.scaled = None
         self.path_out = None
@@ -67,18 +69,18 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def scale(self):
         logger.debug("scaling the read by it's length and k-mer")
-        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
+        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count, dtype=int).reshape(-1, 4**self.K),
                                          None, k=self.K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
         logger.debug('finding bins for each read')
-        self.bin = self.MODEL.predict(self.scaled.values())[0]
-        self.description = f"bin_id={self.bin}|{self.description}"
-        self.path_out = f"{self.BASE_PATH}.bin-{self.bin}.fastq"
+        self.cluster = self.MODEL.predict(self.scaled.values())[0]
+        self.description = f"bin_id={self.cluster}|{self.description}"
+        self.path_out = f"{self.BASE_PATH}.bin-{self.cluster}.fastq"
         # Save all output files
-        ReadToBin.outputs[self.bin] = self.path_out
-        return self.bin
+        ReadToBin.outputs[self.cluster] = self.path_out
+        return self.cluster
 
     def to_fastq(self):
         assert self.path_out is not None, AttributeError("Path of the fastq file must first be defined")
@@ -92,7 +94,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         logger.debug(f"got path_model={path_model}, setting k={k}")
         cls.K = int(k)
         cls.KMER = kmers_dic(cls.K)
-        with open(path_model, 'b') as f:
+        with open(path_model, 'rb') as f:
             cls.MODEL = pickle.load(f)
 
     @classmethod
@@ -105,16 +107,23 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
-        counter = 0
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta")):
-            custom_read = ReadToBin(record)
-            custom_read.kmer_count()
-            custom_read.scale()
-            custom_read.find_bin()
-            custom_read.to_fastq()
-            counter += 1
-        logger.info(f"{counter} reads binned into bins: " + ", ".join(cls.outputs.keys()))
+        logger.info(f"Binning all the read (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
+        with Pool(cls.CORES) as pool:
+            results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
+        # for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta")):
+        #     counter += 1
+        logger.info(cls.outputs)
+        logger.info(f"{len(results)} reads binned into bins: " + ", ".join(cls.outputs.keys()))
         return cls.outputs
+
+
+def pll_binning(record):
+    """ Parallel processing of read binning """
+    custom_read = ReadToBin(record)
+    # custom_read.kmer_count
+    custom_read.scale()
+    custom_read.find_bin()
+    custom_read.to_fastq()
 
 
 # #############################################################################
@@ -154,6 +163,7 @@ class MockCommunity:
             NotImplementedError("This classifier hasn't been implemented")
 
     def classify(self):
+        self.logger.info(f"Classifying reads with {self.db_type} setting")
         if "bins" in self.db_type:
             for bin_id in tqdm(self.path_binned_fastq.keys()):
                 self.classifier(self.path_binned_fastq[bin_id], osp.join(self.db_path, f"{bin_id}"), arg=f"bin-{bin_id}")
@@ -187,7 +197,8 @@ class MockCommunity:
 
 # #############################################################################
 # Defaults and main method
-path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq"]
+path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Genomes/"
+                   "2019-12-19_20-WindowReads_EColi_Test/2019-12-19_20-WindowReads_10-EColiTest.fastq"]
 
 
 def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
