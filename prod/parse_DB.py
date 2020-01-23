@@ -142,6 +142,17 @@ def create_n_folders(path, n, delete_existing=False):
         create_path(new_path, with_filename=False)
 
 
+def time_to_h_m_s(start, end, fstring=True):
+    assert start < end, ArithmeticError(f"The start time is later than the end time: {start} > {end}")
+    delay = int(end - start)
+    m, s = divmod(delay, 60)
+    h, m = divmod(m, 60)
+    if fstring:
+        return f"{h:d} hours, {m:02d} minutes, {s:02d} seconds"
+    else:
+        return h, m, s
+
+
 def add_file_with_parameters(folder, add_description=""):
     """ Add a file in the folder to remind which parameters were used, which folder were omitted """
     path = osp.join(folder, "parameters_RefSeq_binning.txt")
@@ -184,7 +195,8 @@ def check_step(func):
             create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
             result = func(*args, **kwargs)
             # print time spent
-            logger.info(f"Step {check_step.step_nb} END, {perf_counter() - start_time:.3f}s, function {func.__name__}")
+            logger.info(f"Step {check_step.step_nb} END, {time_to_h_m_s(start_time, perf_counter())}, "
+                        f"function {func.__name__}")
             check_step.timings.append(perf_counter())  # log time for each step
 
         # Step counter
@@ -520,14 +532,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     # End
     times = check_step.timings
     for i in range(len(times)-1):
-        delay = int(times[i+1] - times[i])
-        m, s = divmod(delay, 60)
-        h, m = divmod(m, 60)
-        logger.info(f"timing for STEP {i} - {h:d} hours, {m:02d} minutes, {s:02d} seconds")
+        logger.info(f"timing for STEP {i} - {time_to_h_m_s(times[i], times[i+1])}")
 
-    m, s = divmod(int(perf_counter() - times[0]), 60)
-    h, m = divmod(m, 60)
-    logger.warning(f"Script ended successfully, after {h:d} hours, {m:02d} minutes, {s:02d} seconds.")
+    logger.warning(f"Script ended successfully, total time of {time_to_h_m_s(times[0], perf_counter())}.")
 
 
 main.folder_database = ""
