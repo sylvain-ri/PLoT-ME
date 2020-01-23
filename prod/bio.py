@@ -13,7 +13,7 @@ import traceback
 # todo: check if this logger works
 import ete3.ncbi_taxonomy
 
-from tools import PATHS, init_logger
+from tools import init_logger
 
 logger = init_logger("bio")
 
@@ -98,79 +98,6 @@ def get_list_rank(taxids, desired_rank="species"):
         res.append(name)
     return res
 
-
-# #############################################################################
-class Read(SeqRecord.SeqRecord):
-    """ General Read. Wrapping SeqIO.Record """
-    KMER4 = kmers_dic(4)
-    FASTQ_PATH = None
-    BASE_PATH = None
-
-    # Load the models to be able to apply them on each read
-    # LDA = pickle.load(open(PATHS.lda_model, 'rb'))
-    # KMEANS = pickle.load(open(PATHS.kmeans_model, 'rb'))
-
-    def __init__(self, obj, k=4):
-        self.logger = logging.getLogger('classify.CustomRead')
-        self.logger.debug('Creating new instance')
-        # wrap the object
-        self._wrapped_obj = obj
-        # Additional attributes
-        self.k = k
-        self.bin = None
-        self._kmer_count = None
-        self.lda_feat = []
-        self.path_out = None
-
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return getattr(self, attr)
-        return getattr(self._wrapped_obj, attr)
-
-    @property
-    def kmer_count(self, ignore_N=True):
-        """ common method """
-        if self._kmer_count is None:
-            self._kmer_count = seq_count_kmer(self.seq, self.KMER4.copy(), self.k, ignore_N=ignore_N)
-        return self._kmer_count
-
-    def lda_reduce(self):
-        self.logger.info('reducing dimension of kmer frequency to lda representation')
-        self.lda_feat = self.LDA.transform(np.fromiter(
-            self.kmer_count.values(), dtype=int).reshape(-1, 256))  # Put into 2D one row
-
-    def find_bin(self):
-        self.logger.info('finding bins for each read')
-        self.bin = self.KMEANS.predict(self.lda_feat)[0]
-        self.description = f"{self.description}, bin_id={self.bin}"
-        self.path_out = f"{self.BASE_PATH}.bin-{self.bin}.fastq"
-        return self.bin
-
-    def to_fastq(self):
-        assert self.FASTQ_PATH is not None, AttributeError("Path of the fastq file must first be defined")
-        with open(self.path_out, "a") as f:
-            SeqIO.write(self, f, "fasta")
-
-    @classmethod
-    def set_fastq_path(cls, path_fastq):
-        assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
-        cls.FASTQ_PATH = path_fastq
-        cls.BASE_PATH = osp.splitext(path_fastq)[0]
-
-    @classmethod
-    def bin_reads(cls, fastq_file):
-        """ Bin all reads from provide file """
-        counter = 0
-        cls.set_fastq_path(fastq_file)
-
-        for record in tqdm(SeqIO.parse(fastq_file, "fasta")):
-            custom_read = Read(record)
-            custom_read.count_kmer()
-            custom_read.lda_reduce()
-            custom_read.find_bin()
-            custom_read.to_fastq()
-            counter += 1
-        print(counter)
 
 
 
