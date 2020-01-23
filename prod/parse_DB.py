@@ -525,7 +525,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         h, m = divmod(m, 60)
         logger.info(f"timing for STEP {i} - {h:d} hours, {m:02d} minutes, {s:02d} seconds")
 
-    m, s = divmod(int(times[-1]), 60)
+    m, s = divmod(int(perf_counter() - times[0]), 60)
     h, m = divmod(m, 60)
     logger.warning(f"Script ended successfully, after {h:d} hours, {m:02d} minutes, {s:02d} seconds.")
 
