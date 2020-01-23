@@ -27,7 +27,7 @@ from Bio import SeqRecord, SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, init_logger, scale_df_by_length
+from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file
 from bio import kmers_dic, seq_count_kmer
 
 
