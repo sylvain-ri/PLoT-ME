@@ -87,7 +87,8 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     @classmethod
     def set_model(cls, path_model):
-        k = path_model.split("mer_")[0][-1:]
+        # /home/ubuntu/data/Segmentation/4mer_s10000/clustered_by_minikm_4mer_s10000/model_miniKM_4mer_s10000.pkl
+        k = path_model.split("/model_")[1].split("mer_")[0].split("_")[1]
         logger.debug(f"got path_model={path_model}, setting k={k}")
         cls.K = int(k)
         cls.KMER = kmers_dic(cls.K)
@@ -204,7 +205,6 @@ def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
     # Set the folder with hash tables
     path_to_hash = osp.join(path_database, f"{classifier}_hash")
 
-    logger.info("let's classify reads!")
     for file in tqdm(list_fastq):
         # Binning
         if "bins" in db_type:
