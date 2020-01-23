@@ -69,13 +69,13 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def scale(self):
         logger.debug("scaling the read by it's length and k-mer")
-        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count, dtype=int).reshape(-1, 4**self.K),
+        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
                                          None, k=self.K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
         logger.debug('finding bins for each read')
-        self.cluster = self.MODEL.predict(self.scaled.values())[0]
+        self.cluster = self.MODEL.predict(self.scaled)[0]
         self.description = f"bin_id={self.cluster}|{self.description}"
         self.path_out = f"{self.BASE_PATH}.bin-{self.cluster}.fastq"
         # Save all output files
