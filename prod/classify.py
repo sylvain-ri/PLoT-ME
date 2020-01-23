@@ -41,8 +41,10 @@ class ReadToBin(SeqRecord.SeqRecord):
     K = 4
     KMER = kmers_dic(K)
     FASTQ_PATH = None
-    BASE_PATH = None
+    FASTQ_BIN_FOLDER = None
+    FILEBASE = ""
     MODEL = None
+    PARAM = ""
     CORES = cpu_count()
     outputs = {}
 
@@ -77,7 +79,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         logger.debug('finding bins for each read')
         self.cluster = int(self.MODEL.predict(self.scaled)[0])
         self.description = f"bin_id={self.cluster}|{self.description}"
-        self.path_out = f"{self.BASE_PATH}.bin-{self.cluster}.fastq"
+        self.path_out = f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster}.fastq"
         # Save all output files
         ReadToBin.outputs[self.cluster] = self.path_out
         return self.cluster
@@ -88,7 +90,14 @@ class ReadToBin(SeqRecord.SeqRecord):
             SeqIO.write(self, f, "fasta")
 
     @classmethod
-    def set_model(cls, path_model):
+    def set_fastq_model_and_param(cls, path_fastq, path_model, param):
+        assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
+        cls.PARAM = param
+        cls.FASTQ_PATH = path_fastq
+        folder, file_base = osp.split(osp.splitext(path_fastq)[0])
+        cls.FASTQ_BIN_FOLDER = osp.join(folder, param)
+        cls.FILEBASE = file_base
+        logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
         # /home/ubuntu/data/Segmentation/4mer_s10000/clustered_by_minikm_4mer_s10000/model_miniKM_4mer_s10000.pkl
         k = path_model.split("/model_")[1].split("mer_")[0].split("_")[1]
         logger.debug(f"got path_model={path_model}, setting k={k}")
@@ -96,13 +105,6 @@ class ReadToBin(SeqRecord.SeqRecord):
         cls.KMER = kmers_dic(cls.K)
         with open(path_model, 'rb') as f:
             cls.MODEL = pickle.load(f)
-
-    @classmethod
-    def set_fastq_path(cls, path_fastq):
-        assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
-        cls.FASTQ_PATH = path_fastq
-        cls.BASE_PATH = osp.splitext(path_fastq)[0]
-        logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.BASE_PATH}")
 
     @classmethod
     def bin_reads(cls):
@@ -235,8 +237,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
     for file in tqdm(list_fastq):
         # Binning
         if "bins" in db_type:
-            ReadToBin.set_fastq_path(file)
-            ReadToBin.set_model(path_model)
+            ReadToBin.set_fastq_model_and_param(file, path_model, param)
             fastq_binned = ReadToBin.bin_reads()
         else:
             fastq_binned = {}
