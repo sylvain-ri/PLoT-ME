@@ -56,7 +56,7 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path
+from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length
 from bio import kmers_dic, ncbi, seq_count_kmer
 
 
@@ -286,16 +286,6 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     logger.info(f"Combined file of all kmer counts save at: {path_df}")
 
 
-def scale_df_by_length(df, kmer_cols, k, w):
-    """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
-    logger.info(f"Scaling the dataframe, converting to float32")
-    ratio = 4**k / (w - k + 1)
-    for col in tqdm(kmer_cols):
-        df[col] = pd.to_numeric(df[col], downcast='float')
-        # df[col] *= ratio
-        df.loc[:, col] *= ratio
-
-
 @check_step
 def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
@@ -486,58 +476,69 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         folder_database : RefSeq root folder
         folder_output   : empty root folder to store kmer counts
     """
-    # Common folder name keeping parameters
-    parameters = f"{k}mer_s{window}"
-    folder_intermediate_files = osp.join(folder_output, parameters, "kmer_counts")
-    # Parameters
-    main.folder_database= folder_database
-    main.omit_folders   = omit_folders
-    main.k              = k
-    main.w              = window
-    main.cores          = cores
-    # If force recount of the kmer, disable the skip of the step
-    if force_recount:
-        skip_existing = "0" + skip_existing[1:]
-    check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
-    check_step.early_stop = early_stop
-    check_step.timings.append(perf_counter())  # log time spent
+    print("\n*********************************************************************************************************")
+    logger.info("**** Starting script **** \n ")
+    logger.info(f"Script {__file__} called with {args}")
+    try:
+        # Common folder name keeping parameters
+        parameters = f"{k}mer_s{window}"
+        folder_intermediate_files = osp.join(folder_output, parameters, "kmer_counts")
+        # Parameters
+        main.folder_database= folder_database
+        main.omit_folders   = omit_folders
+        main.k              = k
+        main.w              = window
+        main.cores          = cores
+        # If force recount of the kmer, disable the skip of the step
+        if force_recount:
+            skip_existing = "0" + skip_existing[1:]
+        check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
+        check_step.early_stop = early_stop
+        check_step.timings.append(perf_counter())  # log time spent
 
-    #    KMER COUNTING
-    # get kmer distribution for each window of each genome, parallel folder with same structure
-    path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_{k}mer_s{window}")
-    scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, force_recount=force_recount)
+        #    KMER COUNTING
+        # get kmer distribution for each window of each genome, parallel folder with same structure
+        path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_{k}mer_s{window}")
+        scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, force_recount=force_recount)
 
-    # combine all kmer distributions into one single file
-    omitted = "" if len(omit_folders) == 0 else "_omitted_" + "_".join(omit_folders)
-    path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.{k}mer_s{window}.pd")
-    combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
+        # combine all kmer distributions into one single file
+        omitted = "" if len(omit_folders) == 0 else "_omitted_" + "_".join(omit_folders)
+        path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.{k}mer_s{window}.pd")
+        combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
-    #    CLUSTERING
-    # From kmer distributions, use clustering to set the bins per segment
-    folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{ml_model}_{main.k}mer_s{main.w}")
-    path_model = osp.join(folder_by_model, f"model_{ml_model}_{main.k}mer_s{main.w}.pkl")
-    path_segments_clustering = osp.join(folder_by_model, f"segments_clustered{omitted}.{main.k}mer_s{main.w}.pd")
-    clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
+        #    CLUSTERING
+        # From kmer distributions, use clustering to set the bins per segment
+        folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{ml_model}_{main.k}mer_s{main.w}")
+        path_model = osp.join(folder_by_model, f"model_{ml_model}_{main.k}mer_s{main.w}.pkl")
+        path_segments_clustering = osp.join(folder_by_model, f"segments_clustered{omitted}.{main.k}mer_s{main.w}.pd")
+        clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
 
-    #    CREATING THE DATABASES
-    # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
-    path_refseq_binned = osp.join(folder_by_model, f"RefSeq_binned")
-    split_genomes_to_bins(path_segments_clustering, path_refseq_binned, n_clusters)
+        #    CREATING THE DATABASES
+        # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
+        path_refseq_binned = osp.join(folder_by_model, f"RefSeq_binned")
+        split_genomes_to_bins(path_segments_clustering, path_refseq_binned, n_clusters)
 
-    # Run kraken2-build add libray
-    path_bins_hash = osp.join(folder_by_model, "kraken2_hash")  # Separate hash tables by classifier
-    kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters)
+        # Run kraken2-build add libray
+        path_bins_hash = osp.join(folder_by_model, "kraken2_hash")  # Separate hash tables by classifier
+        kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters)
 
-    # Run kraken2-build make hash tables
-    kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
+        # Run kraken2-build make hash tables
+        kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
 
-    # End
-    times = check_step.timings
-    for i in range(len(times)-1):
-        logger.info(f"timing for STEP {i} - {time_to_h_m_s(times[i], times[i+1])}")
+    except KeyboardInterrupt:
+        logger.error("User interrupted")
+        logger.error(traceback.format_exc())
+    except Exception as e:
+        logger.exception(e)
 
-    logger.warning(f"Script ended successfully, total time of {time_to_h_m_s(times[0], perf_counter())}.")
-    print()
+    finally:
+        # End
+        times = check_step.timings
+        for i in range(len(times)-1):
+            logger.info(f"timing for STEP {i} - {time_to_h_m_s(times[i], times[i+1])}")
+        logger.info(f"Script ended, total time of {time_to_h_m_s(times[0], perf_counter())}.")
+        print()
+
 
 
 main.folder_database = ""
@@ -574,19 +575,10 @@ if __name__ == '__main__':
                              "add option -f, and option -e 0.", metavar='')
     args = parser.parse_args()
 
-    print("\n*********************************************************************************************************")
-    logger.info("**** Starting script **** \n ")
-    logger.info(f"Script {__file__} called with {args}")
-    try:
-        main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
-             k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
-             force_recount=args.force, early_stop=args.early, omit_folders=tuple(args.omit),
-             path_taxonomy=args.taxonomy, ml_model=args.ml_model)
-    except KeyboardInterrupt:
-        logger.error("User interrupted")
-        logger.error(traceback.format_exc())
-    except Exception as e:
-        logger.exception(e)
+    main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
+         k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
+         force_recount=args.force, early_stop=args.early, omit_folders=tuple(args.omit),
+         path_taxonomy=args.taxonomy, ml_model=args.ml_model)
 
 
 
