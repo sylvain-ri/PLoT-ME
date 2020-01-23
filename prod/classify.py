@@ -214,7 +214,7 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
                    "2019-12-19_20-WindowReads_EColi_Test/2019-12-19_20-WindowReads_10-EColiTest.fastq"]
 
 
-def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
+def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
     """ Should load a file, do all the processing """
     logger.info("let's classify reads!")
 
@@ -248,6 +248,9 @@ def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
         fastq_classifier.classify()
 
 
+bin_classify.classifiers = ('kraken2',)
+
+
 def test_classification():
     """ Should have a toy data set that i can bin, classify, and check the results """
     # todo: toy data set to check if it works
@@ -256,23 +259,23 @@ def test_classification():
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('output_folder',         help='Folder for output reports', type=is_valid_directory)
-    parser.add_argument('database',              help='Folder with the hash table for the classifier, name '
-                                                      '"clustered_by_<param>" with sub-folders "RefSeq/<bins> '
-                                                      'and "model_<name>.pkl" ')
-    parser.add_argument('-c', '--classifier',    help='choose which metagenomics classifier to use', metavar='',
-                                                 choices=PATHS.classifiers, default=PATHS.classifiers[0])
-    parser.add_argument('-t', '--db_type',          help='Choose to use the standard full database or the segmented one',
-                                                 default='bins', choices=('full', 'bins',) , metavar='')
-    parser.add_argument('-i', '--input_fastq',   help='List of input files in fastq format, space separated.',
-                                                 default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
+    parser.add_argument('output_folder',      help='Folder for output reports', type=is_valid_directory)
+    parser.add_argument('database',           help='Folder with the hash table for the classifier, name '
+                                                   '"clustered_by_<param>" with sub-folders "RefSeq/<bins> '
+                                                   'and "model_<name>.pkl" ')
+    parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
+                                              choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
+    parser.add_argument('-t', '--db_type',    help='Choose to use the standard full database or the segmented one',
+                                              default='bins', choices=('full', 'bins',) , metavar='')
+    parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
+                                              default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
 
     args = parser.parse_args()
     logger.info(f'script called with following arguments: {args.input_fastq}, {args.output_folder}, {args.classifier}')
 
-    classify_reads(args.input_fastq, args.output_folder, args.database,
-                   classifier=args.classifier, db_type=args.db_type)
+    bin_classify(args.input_fastq, args.output_folder, args.database,
+                 classifier=args.classifier, db_type=args.db_type)
 
 
 
