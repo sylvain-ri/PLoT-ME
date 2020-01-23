@@ -292,7 +292,8 @@ def scale_df_by_length(df, kmer_cols, k, w):
     ratio = 4**k / (w - k + 1)
     for col in tqdm(kmer_cols):
         df[col] = pd.to_numeric(df[col], downcast='float')
-        df[col] *= ratio
+        # df[col] *= ratio
+        df.loc[:, col] *= ratio
 
 
 @check_step
