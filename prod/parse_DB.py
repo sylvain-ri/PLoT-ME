@@ -516,7 +516,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     # From kmer distributions, use clustering to set the bins per segment
     folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{ml_model}_{main.k}mer_s{main.w}")
     path_model = osp.join(folder_by_model, f"model_{ml_model}_{main.k}mer_s{main.w}.pkl")
-    path_segments_clustering = osp.join(folder_by_model, f"segments_clustered{main.omit_folders}.{main.k}mer_s{main.w}.pd")
+    path_segments_clustering = osp.join(folder_by_model, f"segments_clustered{omitted}.{main.k}mer_s{main.w}.pd")
     clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
 
     #    CREATING THE DATABASES
