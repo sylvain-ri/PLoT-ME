@@ -298,6 +298,7 @@ def scale_df_by_length(df, kmer_cols, k, w):
 @check_step
 def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
+    assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
     logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
     k = main.k
     w = main.w
@@ -535,6 +536,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         logger.info(f"timing for STEP {i} - {time_to_h_m_s(times[i], times[i+1])}")
 
     logger.warning(f"Script ended successfully, total time of {time_to_h_m_s(times[0], perf_counter())}.")
+    print()
 
 
 main.folder_database = ""
@@ -554,7 +556,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy', metavar='')
     parser.add_argument('-m', '--ml_model', choices=clustering_segments.models, type=str, metavar='',
-                        help='name of the model to use for clustering')
+                        help='name of the model to use for clustering', default=clustering_segments.models[0])
     parser.add_argument('-k', '--kmer',   default=4, type=int, help='Size of the kmers', metavar='')
     parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes', metavar='')
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into', metavar='')
