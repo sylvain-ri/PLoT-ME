@@ -131,7 +131,7 @@ class MockCommunity:
         
         self.classifier_name = classifier_name
         self.db_path         = db_path    # location of the hash table for the classifier
-        self.db_type         = db_type  # Either full or bins: 2015-standard / 2015-bins10
+        self.db_type         = db_type    # Either full or bins
         self.bin_nb          = bin_nb
         self.folder_out      = f"{self.folder_report}/{self.file_name}"
         if not os.path.isdir(self.folder_out):
@@ -184,7 +184,7 @@ class MockCommunity:
 
 # #############################################################################
 # Defaults and main method
-path_fastq_comm = ["/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq"]
+path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq"]
 
 
 def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
@@ -230,7 +230,7 @@ if __name__ == '__main__':
     parser.add_argument('output_folder',         help='Folder for output reports', type=is_valid_directory)
     parser.add_argument('database',              help='Folder with the hash table for the classifier, name '
                                                       '"clustered_by_<param>" with sub-folders "RefSeq/<bins> '
-                                                      'and "model_<name>.pkl" ', metavar='')
+                                                      'and "model_<name>.pkl" ')
     parser.add_argument('-c', '--classifier',    help='choose which metagenomics classifier to use', metavar='',
                                                  choices=PATHS.classifiers, default=PATHS.classifiers[0])
     parser.add_argument('-t', '--db_type',          help='Choose to use the standard full database or the segmented one',
