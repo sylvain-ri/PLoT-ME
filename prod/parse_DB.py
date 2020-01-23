@@ -525,6 +525,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         # Run kraken2-build make hash tables
         kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
 
+        # Run kraken2 on the full RefSeq, without binning, for reference
+        # todo: Build the full database from RefSeq
+
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
