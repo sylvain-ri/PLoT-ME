@@ -284,7 +284,7 @@ def scale_df_by_length(df, kmer_cols, k, w):
 
 
 @check_step
-def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters):
+def clustering_segments(path_kmer_counts, path_models, n_clusters, model_name="minikm"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
     k = main.k
@@ -304,31 +304,39 @@ def define_cluster_bins(path_kmer_counts, output, path_models, n_clusters):
 
     # ## 2 ## Could add PCA
 
+    # Paths
+    ml_folder = osp.join(path_models, f"clustered_by_{model_name}_{k}mer_s{w}")
+    path_model = osp.join(ml_folder, f"model_{model_name}_{k}mer_s{w}.pkl")
+    create_path(path_model)
+
     # Model learning
-    if df_mem < 5*10**9:
-        logger.warning(f"df takes {df_mem/10**9:.2f} GB, choosing KMeans")
-        name = "KMeans"
+    logger.info(f"Data takes {df_mem/10**9:.2f} GB. Training {model_name}...")
+    if model_name == "kmeans":
         ml_model = KMeans(n_clusters=n_clusters, n_jobs=main.cores, random_state=3)
-    else:
-        logger.warning(f"df takes {df_mem/10**9:.2f} GB, choosing Mini Batch KMeans")
-        name = "miniKM"
+    elif model_name == "minikm":
         ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
+    else:
+        logger.error(f"No model defined for {model_name}.")
+        raise NotImplementedError
 
     ml_model.fit(df[cols_kmers])
 
     # Model saving
-    path_model = osp.join(path_models, f"{name}_{k}mer_s{w}.pkl")
-    create_path(path_model)
     with open(path_model, 'wb') as f:
         pickle.dump(ml_model, f)
-    logger.info(f"{name} model saved for k={k} s={w} at {path_model}")
+    logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}")
 
     # ## 3 ##
     predicted = ml_model.predict(df[cols_kmers])
     df["cluster"] = predicted
 
-    df[list(cols_spe) + ["cluster"]].to_pickle(output)
-    logger.info(f"Defined {n_clusters} clusters, assignments here: {output} with ML model {name}.")
+    output_pred = osp.join(ml_folder, f"segments_cluster{main.omit_folders}.{main.k}mer_s{main.w}.pd")
+    df[list(cols_spe) + ["cluster"]].to_pickle(output_pred)
+    logger.info(f"Defined {n_clusters} clusters, assignments here: {output_pred} with ML model {model_name}.")
+    return ml_folder, output_pred
+
+
+clustering_segments.models = ("minikm", "kmeans")
 
 
 def pll_copy_segments_to_bin(df):
@@ -460,7 +468,7 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="11111",
          force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
-         path_taxonomy=""):
+         path_taxonomy="", ml_model=clustering_segments.models[0]):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -469,15 +477,18 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     """
     # Common folder name keeping parameters
     parameters = f"{k}mer_s{window}"
-    folder_intermediate_files = osp.join(folder_output, parameters, "read_binning_tmp")
+    folder_intermediate_files = osp.join(folder_output, parameters, "kmer_counts")
     # Parameters
     main.folder_database= folder_database
     main.omit_folders   = omit_folders
     main.k              = k
     main.w              = window
     main.cores          = cores
+    # If force recount of the kmer, disable the skip of the step
+    if force_recount:
+        skip_existing = "0" + skip_existing[1:]
+    check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
     check_step.early_stop = early_stop
-    check_step.can_skip = skip_existing
     check_step.timings.append(process_time())  # log time spent
 
     #    INTERMEDIATE files
@@ -491,17 +502,17 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
     # From kmer distributions, use clustering to set the bins per segment
-    path_segments_to_bins = osp.join(folder_intermediate_files, f"_genomes_bins{omitted}.{k}mer_s{window}.pd")
-    path_models           = osp.join(folder_intermediate_files, "models")
-    define_cluster_bins(path_stacked_kmer_counts, path_segments_to_bins, path_models, n_clusters)
+    path_models           = osp.join(folder_output, parameters)
+    folder_by_model, path_segments_clustering = clustering_segments(
+        path_stacked_kmer_counts, path_models, n_clusters, ml_model)
 
     #    FINAL files (used by classifiers)
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
-    path_refseq_binned = osp.join(folder_output, parameters, f"RefSeq_binned")
-    split_genomes_to_bins(path_segments_to_bins, path_refseq_binned, n_clusters)
+    path_refseq_binned = osp.join(folder_by_model, f"RefSeq_binned")
+    split_genomes_to_bins(path_segments_clustering, path_refseq_binned, n_clusters)
 
     # Run kraken2-build add libray
-    path_bins_hash = osp.join(folder_output, parameters, "kraken2_hash")  # Separate hash tables by classifier
+    path_bins_hash = osp.join(folder_by_model, "kraken2_hash")  # Separate hash tables by classifier
     kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters)
 
     # Run kraken2-build make hash tables
@@ -536,6 +547,8 @@ if __name__ == '__main__':
                         help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
 
     parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy', metavar='')
+    parser.add_argument('-m', '--ml_model', choices=clustering_segments.models, type=str, metavar='',
+                        help='name of the model to use for clustering')
     parser.add_argument('-k', '--kmer',   default=4, type=int, help='Size of the kmers', metavar='')
     parser.add_argument('-w', '--window', default=10000, type=int, help='Size of each segments/windows of the genomes', metavar='')
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into', metavar='')
@@ -552,20 +565,14 @@ if __name__ == '__main__':
                              "add option -f, and option -e 0.", metavar='')
     args = parser.parse_args()
 
-    # Set the skip variable for the decorator of each step
-    check_step.can_skip = args.skip_existing
-
-    # If force recount of the kmer, disable the skip of the step
-    if args.force:
-        args.skip_existing = "0" + args.skip_existing[1:]
-
-    logger.warning("**** Starting script ****")
+    print("\n*********************************************************************************************************")
+    logger.info("**** Starting script **** \n ")
     logger.info(f"Script {__file__} called with {args}")
     try:
         main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
              k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
-             force_recount=args.force, early_stop=args.early,
-             omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy)
+             force_recount=args.force, early_stop=args.early, omit_folders=tuple(args.omit),
+             path_taxonomy=args.taxonomy, ml_model=args.ml_model)
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())

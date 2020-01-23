@@ -17,10 +17,11 @@ import logging
 import multiprocessing
 import os
 import os.path as osp
+import pickle
 import subprocess
 
 # todo: add timing record
-from tqdm import tqdm_notebook as tqdm
+from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, init_logger
@@ -39,7 +40,7 @@ if False:
 class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
-    def __init__(self, path_original_fastq, db_choice, folder_report, bin_nb=10, classifier="kraken2",
+    def __init__(self, path_original_fastq, db_choice, folder_report, model, bin_nb=10, classifier="kraken2",
                  cores=multiprocessing.cpu_count(), dry_run=True, verbose=False):
         self.logger = logging.getLogger('classify.FastQClassification')
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
@@ -118,21 +119,53 @@ class MockCommunity:
 
 # #############################################################################
 # Defaults and main method
-path_fastq_comm = "/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq"
+path_fastq_comm = ["/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq"]
 
 
-def classify_reads(path_fastq, path_report, classifier, db):
+def classify_reads(list_fastq, path_report, classifier, param_folder, db):
     """ Should load a file, do all the processing """
     logger.info("let's classify reads!")
-    fastq_classifier = MockCommunity(
-        path_original_fastq=path_fastq, db_choice=db, folder_report=path_report, 
-        bin_nb=10, classifier=classifier)
+
+    # Find the model
+    path_model = ""
+    for file in os.scandir(param_folder):
+        if file.name.startswith("model_") and file.name.endswith(".pkl"):
+            path_model = file.path
+            break
+    assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {param_folder}... {path_model}")
+
+    # Set the folder with hash tables
+    kraken2_hash = osp.join(param_folder, "kraken2_hash")
+
+    with open(path_model, 'b') as f:
+        model = pickle.load(f)
+
+    # Binning
+    counter = 0
+    read_to_bin = []
+    CustomRead.set_fastq_path(path_fastq_comm)
+
+    for record in tqdm(SeqIO.parse(path_fastq_comm, "fasta")):
+        custom_read = CustomRead(record)
+        custom_read.count_kmer()
+        custom_read.lda_reduce()
+        custom_read.find_bin()
+        custom_read.to_fastq()
+
+        counter += 1
+
+
+    # Mock comm object
+    for path_fastq in list_fastq:
+        fastq_classifier = MockCommunity(
+            path_original_fastq=path_fastq, db_choice=db, folder_report=path_report, model=model,
+            bin_nb=10, classifier=classifier)
     
-    fastq_classifier.dry_run=False
-    fastq_classifier.db_choice = "2015-standard"
-    fastq_classifier.classify()
-    fastq_classifier.db_choice = "2015-10bins"
-    fastq_classifier.classify()
+        fastq_classifier.dry_run=False
+        fastq_classifier.db_choice = "2015-standard"
+        fastq_classifier.classify()
+        fastq_classifier.db_choice = "2015-10bins"
+        fastq_classifier.classify()
     
     logger.error('Classification not implemented yet')
 
@@ -144,19 +177,22 @@ def test_classification():
 
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-i', '--input_fastq',   help='Input file in fastq format', type=is_valid_file, 
-                                                 default=path_fastq_comm)
-    parser.add_argument('-o', '--output_folder', help='Folder for output reports', type=is_valid_directory,
-                                                 default=folder_today(PATHS.folder_reports))
-    parser.add_argument('-c', '--classifier',    help='choose kraken2 or centrifuge', 
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('output_folder',         help='Folder for output reports', type=is_valid_directory)
+    parser.add_argument('-c', '--classifier',    help='choose which metagenomics classifier to use', metavar='',
                                                  choices=PATHS.classifiers, default=PATHS.classifiers[0])
-    parser.add_argument('-d', '--database',      default='standard', help='which reference to use', choices=('standard', 'mini', ))
-    parser.add_argument('-t', '--threads',       default="10",       help='Number of threads')
-    
+    parser.add_argument('-m', '--model_folder',  help='Folder "clustered_by_<param>" with sub-folders "RefSeq/<bins> '
+                                                      'and "model_<name>.pkl" ', metavar='',)
+    parser.add_argument('-d', '--database',      help='which reference to use',
+                                                 default='standard', metavar='', choices=('standard', 'mini', ))
+    parser.add_argument('-t', '--threads',       help='Number of threads', default="10", metavar='', )
+    parser.add_argument('-i', '--input_fastq',   help='List of input files in fastq format, space separated.',
+                                                 default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='',)
+
     args = parser.parse_args()
     logger.info(f'script called with following arguments: {args.input_fastq}, {args.output_folder}, {args.classifier}')
 
-    classify_reads(args.input_fastq, args.output_folder, classifier=args.classifier, db=args.database)
+    classify_reads(args.input_fastq, args.output_folder, classifier=args.classifier, param_folder=args.model_folder,
+                   db=args.database)
 
 
