@@ -508,9 +508,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         #    CLUSTERING
         # From kmer distributions, use clustering to set the bins per segment
-        folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{ml_model}_{main.k}mer_s{main.w}")
+        folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{ml_model}_{main.k}mer_s{main.w}{omitted}")
         path_model = osp.join(folder_by_model, f"model_{ml_model}_{main.k}mer_s{main.w}.pkl")
-        path_segments_clustering = osp.join(folder_by_model, f"segments_clustered{omitted}.{main.k}mer_s{main.w}.pd")
+        path_segments_clustering = osp.join(folder_by_model, f"segments_clustered.{main.k}mer_s{main.w}.pd")
         clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
 
         #    CREATING THE DATABASES
@@ -570,7 +570,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--early', default=len(check_step.can_skip)-1, type=int, metavar='',
                         help='Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)')
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
-                        default=("plant", "invertebrate", "vertebrate_mammalian", "vertebrate_other"), metavar='')
+                        default=("plant", "vertebrate"), metavar='')
     parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, skip files/folders that already exist. Write 110000 to skip steps 0 and 1. "
