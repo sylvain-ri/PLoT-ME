@@ -1,28 +1,19 @@
 #!/usr/bin/env python3
-# #############################################################################
-# Sylvain @ GIS / Biopolis / Singapore
-# Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
-# Started on 2019-12-11
-# Reads Binning Project
-#
-# #############################################################################
-#
-#
-# common resources for biology related functions and Classes
-#
-import logging
-import numpy as np
-import os.path as osp
-import pickle
+"""
+#############################################################################
+Sylvain @ GIS / Biopolis / Singapore
+Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
+Started on 2019-12-11
+Reads Binning Project
+#############################################################################
+common resources for biology related functions and Classes
+"""
 import traceback
 
 # todo: check if this logger works
-from Bio import SeqRecord, SeqIO
 import ete3.ncbi_taxonomy
-from tqdm import tqdm
 
 from tools import PATHS, init_logger
-
 
 logger = init_logger("bio")
 

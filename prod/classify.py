@@ -16,26 +16,102 @@ import argparse
 import logging
 from multiprocessing import cpu_count
 import os
-import os.path as osp
+from os import path as osp
 import pickle
 import subprocess
 
 # todo: add timing record
-from Bio import SeqIO
+
+import numpy as np
+from Bio import SeqRecord, SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, init_logger
-from bio import ReadToBin
+from tools import PATHS, init_logger, scale_df_by_length
+from bio import kmers_dic, seq_count_kmer
 
 
 logger = init_logger('classify')
 
 
-# For display / ipynb only
-if False:
-    plt.rcParams['figure.figsize'] = 13, 8
-    pd.options.display.float_format = '{:,.2f}'.format
+# #############################################################################
+class ReadToBin(SeqRecord.SeqRecord):
+    """ General Read. Wrapping SeqIO.Record """
+    K = 4
+    KMER = kmers_dic(K)
+    FASTQ_PATH = None
+    BASE_PATH = None
+    MODEL = None
+    outputs = {}
+
+    def __init__(self, obj):
+        # wrap the object
+        self._wrapped_obj = obj
+        # Additional attributes
+        self.bin = None
+        self._kmer_count = None
+        self.scaled = None
+        self.path_out = None
+
+    def __getattr__(self, attr):
+        if attr in self.__dict__:
+            return getattr(self, attr)
+        return getattr(self._wrapped_obj, attr)
+
+    @property
+    def kmer_count(self, ignore_N=True):
+        """ common method """
+        if self._kmer_count is None:
+            self._kmer_count = seq_count_kmer(self.seq, self.KMER.copy(), self.K, ignore_N=ignore_N)
+        return self._kmer_count
+
+    def scale(self):
+        logger.debug("scaling the read by it's length and k-mer")
+        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
+                                         None, k=self.K, w=len(self.seq), single_row=True)  # Put into 2D one row
+        return self.scaled
+
+    def find_bin(self):
+        logger.debug('finding bins for each read')
+        self.bin = self.MODEL.predict(self.scaled.values())[0]
+        self.description = f"bin_id={self.bin}|{self.description}"
+        self.path_out = f"{self.BASE_PATH}.bin-{self.bin}.fastq"
+        # Save all output files
+        ReadToBin.outputs[self.bin] = self.path_out
+        return self.bin
+
+    def to_fastq(self):
+        assert self.path_out is not None, AttributeError("Path of the fastq file must first be defined")
+        with open(self.path_out, "a") as f:
+            SeqIO.write(self, f, "fasta")
+
+    @classmethod
+    def set_model(cls, path_model):
+        k = path_model.split("mer_")[0][-2:]
+        cls.K = int(k)
+        cls.KMER = kmers_dic(cls.K)
+        with open(path_model, 'b') as f:
+            cls.MODEL = pickle.load(f)
+
+    @classmethod
+    def set_fastq_path(cls, path_fastq):
+        assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
+        cls.FASTQ_PATH = path_fastq
+        cls.BASE_PATH = osp.splitext(path_fastq)[0]
+
+    @classmethod
+    def bin_reads(cls):
+        """ Bin all reads from provide file """
+        counter = 0
+        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta")):
+            custom_read = ReadToBin(record)
+            custom_read.kmer_count()
+            custom_read.scale()
+            custom_read.find_bin()
+            custom_read.to_fastq()
+            counter += 1
+        logger.info(f"{counter} reads binned")
+        return cls.outputs
 
 
 # #############################################################################
@@ -44,7 +120,7 @@ class MockCommunity:
     
     def __init__(self, path_original_fastq, db_path, db_type, folder_report, path_binned_fastq={}, bin_nb=10,
                  classifier_name="kraken2", cores=cpu_count(), dry_run=False, verbose=False):
-        self.logger = logging.getLogger('classify.FastQClassification')
+        self.logger = logging.getLogger('classify.MockCommunity')
 
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
         self.path_original_fastq    = path_original_fastq
@@ -168,5 +244,7 @@ if __name__ == '__main__':
 
     classify_reads(args.input_fastq, args.output_folder, args.database,
                    classifier=args.classifier, db_type=args.db_type)
+
+
 
 
