@@ -186,7 +186,7 @@ class MockCommunity:
         hash_file = osp.join(path_hash, "hash.k2d")
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
         self.logger.info(f'with kraken2. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
-        self.logger.info(f'output is {self.path_out}.{arg}.kraken2.out/report')
+        self.logger.info(f'output is {self.path_out}.{arg}.kraken2.out')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
             "--db", path_hash,
