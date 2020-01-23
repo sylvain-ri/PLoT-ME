@@ -21,10 +21,12 @@ import pickle
 import subprocess
 
 # todo: add timing record
+from Bio import SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, init_logger
+from bio import ReadToBin
 
 
 logger = init_logger('classify')
@@ -40,71 +42,58 @@ if False:
 class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
-    def __init__(self, path_original_fastq, db_choice, folder_report, model, bin_nb=10, classifier="kraken2",
-                 cores=multiprocessing.cpu_count(), dry_run=True, verbose=False):
+    def __init__(self, path_original_fastq, db_path, db_type, folder_report, path_binned_fastq={}, bin_nb=10,
+                 classifier_name="kraken2", cores=cpu_count(), dry_run=False, verbose=False):
         self.logger = logging.getLogger('classify.FastQClassification')
+
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
-        
         self.path_original_fastq    = path_original_fastq
+
         self.folder, self.file_name = osp.split(osp.splitext(self.path_original_fastq)[0])
-        self.path_binned_fastq      = []              # [(<bin i>, <path_file>), ]
+        self.path_binned_fastq      = path_binned_fastq              # {<bin i>: <path_file>}
         self.folder_report          = folder_report
         
-        self.classifier    = classifier
-        self.db_choice     = db_choice  # Either full or bins: 2015-standard / 2015-bins10
-        self.bin_nb        = bin_nb
-        self.folder_out    = f"{self.folder_report}/{self.file_name}"
+        self.classifier_name = classifier_name
+        self.db_path         = db_path    # location of the hash table for the classifier
+        self.db_type         = db_type  # Either full or bins: 2015-standard / 2015-bins10
+        self.bin_nb          = bin_nb
+        self.folder_out      = f"{self.folder_report}/{self.file_name}"
         if not os.path.isdir(self.folder_out):
             os.makedirs(self.folder_out)
-        self.path_out      = f"{self.folder_out}/{self.db_choice}"
+        self.path_out        = f"{self.folder_out}/{self.db_type}"
         
         self.cores         = cores
         self.dry_run       = dry_run
         self.verbose       = verbose
         self.cmd           = None
 
-    def find_binned_files(self):
-        for i in range(self.bin_nb):
-            path_bin_i = f"{self.folder}/{self.file_name}.bin-{i}.fastq"
-            if osp.isfile(path_bin_i): 
-                self.path_binned_fastq.append((i, path_bin_i))
-    
+    @property
+    def classifier(self):
+        if self.classifier_name == "kraken2":
+            return self.kraken2
+        else:
+            NotImplementedError("This classifier hasn't been implemented")
+
     def classify(self):
-        if self.classifier == "kraken2":
-            if "bins" in self.db_choice:
-                self.find_binned_files()
-                for i, file in tqdm(self.path_binned_fastq):
-                    print(f"bin {i} db loading... {file}")
-                    self.kraken2_bins(i, file)
-            else:
-                print("standard full db loading...")
-                self.kraken2_standard()
+        if "bins" in self.db_type:
+            for bin_id in tqdm(self.path_binned_fastq.keys()):
+                self.classifier(self.path_binned_fastq[bin_id], osp.join(self.db_path, f"{bin_id}"), arg=f"bin-{bin_id}")
+        elif "full" in self.db_type:
+            self.classifier(self.path_original_fastq, osp.join(self.db_path, "full"), arg="full")
+        else:
+            NotImplementedError("The database choice is either full or bins")
                 
-    def kraken2_standard(self):
-        self.logger.info('start to classify reads with kraken2 standard DB')
+    def kraken2(self, file, path_hash, arg="unknown"):
+        self.logger.info('start to classify reads with kraken2')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
-            "--db", f"{PATHS.kraken2_DB[self.db_choice]}",
-            self.path_original_fastq, 
-            "--output", f"{self.path_out}.full.kraken2.out",
-            "--report", f"{self.path_out}.full.kraken2.report",
+            "--db", path_hash,
+            file,
+            "--output", f"{self.path_out}.{arg}.kraken2.out",
+            "--report", f"{self.path_out}.{arg}.kraken2.report",
         ]
-        if self.verbose: print(" ".join(self.cmd))
-        if not self.dry_run:            
-            results = subprocess.check_output(self.cmd)
-            if self.verbose: print(results)
-                
-    def kraken2_bins(self, i, file):
-        self.logger.info('start to classify reads with kraken2 10 bins DB')
-        self.cmd = [
-            "kraken2", "--threads", f"{self.cores}",
-            "--db", f"{PATHS.kraken2_DB[self.db_choice]}/{i}",
-            file, 
-            "--output", f"{self.path_out}.bin-{i}.kraken2.out",
-            "--report", f"{self.path_out}.bin-{i}.kraken2.report",
-        ]
-        if self.verbose: print(" ".join(self.cmd))
-        if not self.dry_run:            
+        self.logger.info(" ".join(self.cmd))
+        if not self.dry_run:
             results = subprocess.check_output(self.cmd)
             if self.verbose: print(results)
             
@@ -114,7 +103,7 @@ class MockCommunity:
     
     def __repr__(self):
         return f"Fastq file located at <{self.path_original_fastq}>, ready to be classified with " \
-               f"{self.classifier} with the DB <{self.db_choice}>"
+               f"{self.classifier_name} with the DB <{self.db_type}> located at {self.db_path}"
         
 
 # #############################################################################
@@ -137,37 +126,21 @@ def classify_reads(list_fastq, path_report, classifier, param_folder, db):
     # Set the folder with hash tables
     kraken2_hash = osp.join(param_folder, "kraken2_hash")
 
-    with open(path_model, 'b') as f:
-        model = pickle.load(f)
+    logger.info("let's classify reads!")
+    for file in tqdm(list_fastq):
+        # Binning
+        if "bins" in db_type:
+            ReadToBin.set_fastq_path(file)
+            ReadToBin.set_model(path_model)
+            fastq_binned = ReadToBin.bin_reads()
+        else:
+            fastq_binned = {}
 
-    # Binning
-    counter = 0
-    read_to_bin = []
-    CustomRead.set_fastq_path(path_fastq_comm)
-
-    for record in tqdm(SeqIO.parse(path_fastq_comm, "fasta")):
-        custom_read = CustomRead(record)
-        custom_read.count_kmer()
-        custom_read.lda_reduce()
-        custom_read.find_bin()
-        custom_read.to_fastq()
-
-        counter += 1
-
-
-    # Mock comm object
-    for path_fastq in list_fastq:
         fastq_classifier = MockCommunity(
-            path_original_fastq=path_fastq, db_choice=db, folder_report=path_report, model=model,
-            bin_nb=10, classifier=classifier)
-    
-        fastq_classifier.dry_run=False
-        fastq_classifier.db_choice = "2015-standard"
+            path_original_fastq=file, db_path=path_to_hash, db_type=db_type,
+            folder_report=path_report, path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier)
+
         fastq_classifier.classify()
-        fastq_classifier.db_choice = "2015-10bins"
-        fastq_classifier.classify()
-    
-    logger.error('Classification not implemented yet')
 
 
 def test_classification():
