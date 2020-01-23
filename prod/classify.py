@@ -108,6 +108,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     def bin_reads(cls):
         """ Bin all reads from provide file """
         logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
+        # todo: try to parallelize it
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
