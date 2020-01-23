@@ -11,7 +11,7 @@ Reads Binning Project
 #############################################################################
 """
 
-from datetime import date
+from datetime import datetime
 import os
 import os.path as osp
 import pandas as pd
@@ -30,23 +30,24 @@ class ProjectPaths:
     def __init__(self):
         self.home = str(Path.home())
         self.data = f"{self.home}/Data"
-        self.LOGS = f"{self.home}/logs/{date.today()}.log"
+        n = datetime.now()
+        self.LOGS = f"{self.home}/logs/{n:%Y}-{n:%m}-{n:%d}_{n:%H}-{n:%M}.log"
 
-        self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
-        self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
-        self.RefSeq_4mer_freq = f"{self.RefSeq_kmer_freq}/4mer"
+        # self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
+        # self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
+        # self.RefSeq_4mer_freq = f"{self.RefSeq_kmer_freq}/4mer"
 
-        self.classifiers = ('kraken2', )
-        self.classifier_DB = f"{self.home}/database/kraken2"
-        self.kraken2_DB = {
-            "2015-10bins"  : f"{self.classifier_DB}/2015-10bins",
-            "2015-standard": f"{self.classifier_DB}/2015-standard",
-        }
+        # self.classifiers = ('kraken2', )
+        # self.classifier_DB = f"{self.home}/database/kraken2"
+        # self.kraken2_DB = {
+        #     "2015-10bins"  : f"{self.classifier_DB}/2015-10bins",
+        #     "2015-standard": f"{self.classifier_DB}/2015-standard",
+        # }
         self.folder_reports = f"{self.data}/Reports"
         
-        self.models = f"{self.data}/kmer_freq/4mer/V4"
-        self.lda_model = f"{self.models}/LDA/lda_model_20_int.pd"
-        self.kmeans_model = f"{self.models}/clustering/10_kmeans_2019-05-09_04-08.pkl"
+        # self.models = f"{self.data}/kmer_freq/4mer/V4"
+        # self.lda_model = f"{self.models}/LDA/lda_model_20_int.pd"
+        # self.kmeans_model = f"{self.models}/clustering/10_kmeans_2019-05-09_04-08.pkl"
 
 
 PATHS = ProjectPaths()
