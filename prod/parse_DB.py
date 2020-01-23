@@ -284,7 +284,7 @@ def scale_df_by_length(df, kmer_cols, k, w):
 
 
 @check_step
-def clustering_segments(path_kmer_counts, path_models, n_clusters, model_name="minikm"):
+def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
     k = main.k
@@ -305,8 +305,6 @@ def clustering_segments(path_kmer_counts, path_models, n_clusters, model_name="m
     # ## 2 ## Could add PCA
 
     # Paths
-    ml_folder = osp.join(path_models, f"clustered_by_{model_name}_{k}mer_s{w}")
-    path_model = osp.join(ml_folder, f"model_{model_name}_{k}mer_s{w}.pkl")
     create_path(path_model)
 
     # Model learning
@@ -330,10 +328,9 @@ def clustering_segments(path_kmer_counts, path_models, n_clusters, model_name="m
     predicted = ml_model.predict(df[cols_kmers])
     df["cluster"] = predicted
 
-    output_pred = osp.join(ml_folder, f"segments_cluster{main.omit_folders}.{main.k}mer_s{main.w}.pd")
     df[list(cols_spe) + ["cluster"]].to_pickle(output_pred)
     logger.info(f"Defined {n_clusters} clusters, assignments here: {output_pred} with ML model {model_name}.")
-    return ml_folder, output_pred
+    return
 
 
 clustering_segments.models = ("minikm", "kmeans")
@@ -491,7 +488,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     check_step.early_stop = early_stop
     check_step.timings.append(perf_counter())  # log time spent
 
-    #    INTERMEDIATE files
+    #    KMER COUNTING
     # get kmer distribution for each window of each genome, parallel folder with same structure
     path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_{k}mer_s{window}")
     scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, force_recount=force_recount)
@@ -501,12 +498,14 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.{k}mer_s{window}.pd")
     combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
+    #    CLUSTERING
     # From kmer distributions, use clustering to set the bins per segment
-    path_models           = osp.join(folder_output, parameters)
-    folder_by_model, path_segments_clustering = clustering_segments(
-        path_stacked_kmer_counts, path_models, n_clusters, ml_model)
+    folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{ml_model}_{main.k}mer_s{main.w}")
+    path_model = osp.join(folder_by_model, f"model_{ml_model}_{main.k}mer_s{main.w}.pkl")
+    path_segments_clustering = osp.join(folder_by_model, f"segments_clustered{main.omit_folders}.{main.k}mer_s{main.w}.pd")
+    clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
 
-    #    FINAL files (used by classifiers)
+    #    CREATING THE DATABASES
     # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
     path_refseq_binned = osp.join(folder_by_model, f"RefSeq_binned")
     split_genomes_to_bins(path_segments_clustering, path_refseq_binned, n_clusters)
