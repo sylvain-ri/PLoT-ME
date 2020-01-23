@@ -14,7 +14,7 @@ Reads Binning Project
 
 import argparse
 import logging
-import multiprocessing
+from multiprocessing import cpu_count
 import os
 import os.path as osp
 import pickle
@@ -62,10 +62,10 @@ class MockCommunity:
             os.makedirs(self.folder_out)
         self.path_out        = f"{self.folder_out}/{self.db_type}"
         
-        self.cores         = cores
-        self.dry_run       = dry_run
-        self.verbose       = verbose
-        self.cmd           = None
+        self.cores           = cores
+        self.dry_run         = dry_run
+        self.verbose         = verbose
+        self.cmd             = None
 
     @property
     def classifier(self):
@@ -99,7 +99,7 @@ class MockCommunity:
             
     def kraken2_report_merging(self):
         self.logger.info('Merging kraken2 reports')
-        raise NotImplementedError
+        raise NotImplementedError()
     
     def __repr__(self):
         return f"Fastq file located at <{self.path_original_fastq}>, ready to be classified with " \
@@ -111,20 +111,20 @@ class MockCommunity:
 path_fastq_comm = ["/home/ubuntu/Data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq"]
 
 
-def classify_reads(list_fastq, path_report, classifier, param_folder, db):
+def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
     """ Should load a file, do all the processing """
     logger.info("let's classify reads!")
 
     # Find the model
     path_model = ""
-    for file in os.scandir(param_folder):
+    for file in os.scandir(path_database):
         if file.name.startswith("model_") and file.name.endswith(".pkl"):
             path_model = file.path
             break
-    assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {param_folder}... {path_model}")
+    assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
 
     # Set the folder with hash tables
-    kraken2_hash = osp.join(param_folder, "kraken2_hash")
+    path_to_hash = osp.join(path_database, f"{classifier}_hash")
 
     logger.info("let's classify reads!")
     for file in tqdm(list_fastq):
@@ -152,20 +152,21 @@ def test_classification():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('output_folder',         help='Folder for output reports', type=is_valid_directory)
+    parser.add_argument('database',              help='Folder with the hash table for the classifier, name '
+                                                      '"clustered_by_<param>" with sub-folders "RefSeq/<bins> '
+                                                      'and "model_<name>.pkl" ', metavar='')
     parser.add_argument('-c', '--classifier',    help='choose which metagenomics classifier to use', metavar='',
                                                  choices=PATHS.classifiers, default=PATHS.classifiers[0])
-    parser.add_argument('-m', '--model_folder',  help='Folder "clustered_by_<param>" with sub-folders "RefSeq/<bins> '
-                                                      'and "model_<name>.pkl" ', metavar='',)
-    parser.add_argument('-d', '--database',      help='which reference to use',
-                                                 default='standard', metavar='', choices=('standard', 'mini', ))
-    parser.add_argument('-t', '--threads',       help='Number of threads', default="10", metavar='', )
+    parser.add_argument('-t', '--db_type',          help='Choose to use the standard full database or the segmented one',
+                                                 default='bins', choices=('full', 'bins',) , metavar='')
     parser.add_argument('-i', '--input_fastq',   help='List of input files in fastq format, space separated.',
-                                                 default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='',)
+                                                 default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
+    # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
 
     args = parser.parse_args()
     logger.info(f'script called with following arguments: {args.input_fastq}, {args.output_folder}, {args.classifier}')
 
-    classify_reads(args.input_fastq, args.output_folder, classifier=args.classifier, param_folder=args.model_folder,
-                   db=args.database)
+    classify_reads(args.input_fastq, args.output_folder, args.database,
+                   classifier=args.classifier, db_type=args.db_type)
 
 
