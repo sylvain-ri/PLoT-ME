@@ -120,7 +120,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             custom_read.find_bin()
             custom_read.to_fastq()
         logger.info(cls.outputs)
-        logger.info(f"{counter} reads binned into bins: " + ", ".join(cls.outputs.keys()))
+        logger.info(f"{counter} reads binned into bins: " + str(cls.outputs.keys()))
         return cls.outputs
 
 
