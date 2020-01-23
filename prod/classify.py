@@ -107,12 +107,15 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
-        logger.info(f"Binning all the read (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
+        logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
         counter = 0
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta")):
+        total = 0
+        for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta"))):
+            pass
+        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total):
             counter += 1
             custom_read = ReadToBin(record)
             # custom_read.kmer_count
@@ -180,7 +183,8 @@ class MockCommunity:
             NotImplementedError("The database choice is either full or bins")
                 
     def kraken2(self, file, path_hash, arg="unknown"):
-        self.logger.info('start to classify reads with kraken2')
+        self.logger.info(f'start to classify reads with kraken2, '
+                         f'hash table is {osp.getsize(path_hash)/10**9:.3f}GB ({path_hash})')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
             "--db", path_hash,
