@@ -75,7 +75,7 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def find_bin(self):
         logger.debug('finding bins for each read')
-        self.cluster = self.MODEL.predict(self.scaled)[0]
+        self.cluster = int(self.MODEL.predict(self.scaled)[0])
         self.description = f"bin_id={self.cluster}|{self.description}"
         self.path_out = f"{self.BASE_PATH}.bin-{self.cluster}.fastq"
         # Save all output files
@@ -122,8 +122,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             custom_read.scale()
             custom_read.find_bin()
             custom_read.to_fastq()
-        logger.info(cls.outputs)
-        logger.info(f"{counter} reads binned into bins: " + str(cls.outputs.keys()))
+        logger.info(f"{counter} reads binned into bins: " + ", ".join(cls.outputs.keys()))
         return cls.outputs
 
 
@@ -183,8 +182,10 @@ class MockCommunity:
             NotImplementedError("The database choice is either full or bins")
                 
     def kraken2(self, file, path_hash, arg="unknown"):
-        self.logger.info(f'start to classify reads with kraken2, '
-                         f'hash table is {osp.getsize(path_hash)/10**9:.3f}GB ({path_hash})')
+        hash_file = osp.join(path_hash, "hash.k2d")
+        self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
+        self.logger.info(f'with kraken2. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
+        self.logger.info(f'output is {self.path_out}.{arg}.kraken2.out/report')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
             "--db", path_hash,
@@ -192,10 +193,10 @@ class MockCommunity:
             "--output", f"{self.path_out}.{arg}.kraken2.out",
             "--report", f"{self.path_out}.{arg}.kraken2.report",
         ]
-        self.logger.info(" ".join(self.cmd))
+        self.logger.debug(" ".join(self.cmd))
         if not self.dry_run:
             results = subprocess.check_output(self.cmd)
-            if self.verbose: print(results)
+            self.logger.debug(results)
             
     def kraken2_report_merging(self):
         self.logger.info('Merging kraken2 reports')
