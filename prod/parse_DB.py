@@ -44,7 +44,7 @@ import os.path as osp
 import pandas as pd
 import pickle
 import re
-from time import time, process_time
+from time import time, perf_counter
 import traceback
 
 from Bio import SeqIO
@@ -179,13 +179,13 @@ def check_step(func):
 
         else:
             # Time measurement
-            start_time = process_time()
+            start_time = perf_counter()
             logger.info(f"Step {check_step.step_nb} START, function \t{func.__name__}({signature})")
             create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
             result = func(*args, **kwargs)
             # print time spent
-            logger.info(f"Step {check_step.step_nb} END, {process_time() - start_time:.3f}s, function {func.__name__}")
-            check_step.timings.append(process_time())  # log time for each step
+            logger.info(f"Step {check_step.step_nb} END, {perf_counter() - start_time:.3f}s, function {func.__name__}")
+            check_step.timings.append(perf_counter())  # log time for each step
 
         # Step counter
         check_step.step_nb += 1
@@ -489,7 +489,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         skip_existing = "0" + skip_existing[1:]
     check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
     check_step.early_stop = early_stop
-    check_step.timings.append(process_time())  # log time spent
+    check_step.timings.append(perf_counter())  # log time spent
 
     #    INTERMEDIATE files
     # get kmer distribution for each window of each genome, parallel folder with same structure
@@ -524,7 +524,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         delay = int(times[i+1] - times[i])
         m, s = divmod(delay, 60)
         h, m = divmod(m, 60)
-        logger.info(f"STEP {i} - {h:d} hours, {m:02d} minutes, {s:02d} seconds")
+        logger.info(f"timing for STEP {i} - {h:d} hours, {m:02d} minutes, {s:02d} seconds")
 
     m, s = divmod(int(times[-1]), 60)
     h, m = divmod(m, 60)

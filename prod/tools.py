@@ -197,7 +197,6 @@ class ScanFolder:
 
         n = 0
         if with_tqdm:
-            logger.info(f"counting matching files in {cls.folder_root}")
             if cls.count_files is None:
                 cls.count_root_files()
             logger.info(f"Yielding the {cls.count_files} files found in folder {cls.folder_root}")
@@ -208,7 +207,7 @@ class ScanFolder:
             for obj in cls.walk_dir(log=False):
                 n += 1
                 yield obj
-        logger.info(f"{n} have been processed")
+        logger.debug(f"{n} have been processed")
 
     @classmethod
     def walk_dir(cls, log=True):
@@ -227,6 +226,7 @@ class ScanFolder:
 
     @classmethod
     def count_root_files(cls):
+        logger.debug(f"counting matching files in {cls.folder_root}")
         file_count = 0
         for _ in tqdm(cls.walk_dir()):
             file_count += 1
