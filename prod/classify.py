@@ -87,7 +87,8 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     @classmethod
     def set_model(cls, path_model):
-        k = path_model.split("mer_")[0][-2:]
+        k = path_model.split("mer_")[0][-1:]
+        logger.debug(f"got path_model={path_model}, setting k={k}")
         cls.K = int(k)
         cls.KMER = kmers_dic(cls.K)
         with open(path_model, 'b') as f:
@@ -98,6 +99,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
         cls.FASTQ_PATH = path_fastq
         cls.BASE_PATH = osp.splitext(path_fastq)[0]
+        logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.BASE_PATH}")
 
     @classmethod
     def bin_reads(cls):
@@ -110,7 +112,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             custom_read.find_bin()
             custom_read.to_fastq()
             counter += 1
-        logger.info(f"{counter} reads binned")
+        logger.info(f"{counter} reads binned into bins: " + ", ".join(cls.outputs.keys()))
         return cls.outputs
 
 
