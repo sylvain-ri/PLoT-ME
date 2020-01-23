@@ -14,6 +14,7 @@ Reads Binning Project
 from datetime import date
 import os
 import os.path as osp
+import pandas as pd
 from pathlib import Path
 import logging
 
@@ -116,6 +117,20 @@ def folder_today(path):
 
 def div_z(n, d):
     return n / d if d else 0
+
+
+def scale_df_by_length(data, kmer_cols, k, w, single_row=False):
+    """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
+    ratio = 4**k / (w - k + 1)
+    if single_row:
+        return data * ratio
+    else:
+        logger.info(f"Scaling the dataframe, converting to float32")
+        for col in tqdm(kmer_cols):
+            data[col] = pd.to_numeric(data[col], downcast='float')
+            # data[col] *= ratio
+            data.loc[:, col] *= ratio
+            # data[col] = data[col].apply(lambda x: x*ratio)
 
 
 class ScanFolder:
