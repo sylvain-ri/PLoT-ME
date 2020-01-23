@@ -197,10 +197,10 @@ def check_step(func):
             # print time spent
             logger.info(f"Step {check_step.step_nb} END, {time_to_h_m_s(start_time, perf_counter())}, "
                         f"function {func.__name__}")
-            check_step.timings.append(perf_counter())  # log time for each step
 
         # Step counter
         check_step.step_nb += 1
+        check_step.timings.append(perf_counter())  # log time for each step
         return result
     return wrapper
 
