@@ -141,7 +141,7 @@ class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
     def __init__(self, path_original_fastq, db_path, db_type, folder_report, path_binned_fastq={}, bin_nb=10,
-                 classifier_name="kraken2", cores=cpu_count(), dry_run=False, verbose=False):
+                 classifier_name="kraken2", param="", cores=cpu_count(), dry_run=False, verbose=False):
         self.logger = logging.getLogger('classify.MockCommunity')
 
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
@@ -158,7 +158,7 @@ class MockCommunity:
         self.folder_out      = f"{self.folder_report}/{self.file_name}"
         if not os.path.isdir(self.folder_out):
             os.makedirs(self.folder_out)
-        self.path_out        = f"{self.folder_out}/{self.db_type}"
+        self.path_out        = f"{self.folder_out}/{param}.{self.db_type}"
         
         self.cores           = cores
         self.dry_run         = dry_run
@@ -227,6 +227,9 @@ def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
     assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
 
     # Set the folder with hash tables
+    param = osp.basename(path_database)
+    if param == "": param = osp.basename(path_database[:-1])
+    logger.info(f"Assuming parameters are: {param}")
     path_to_hash = osp.join(path_database, f"{classifier}_hash")
 
     for file in tqdm(list_fastq):
@@ -239,8 +242,8 @@ def classify_reads(list_fastq, path_report, path_database, classifier, db_type):
             fastq_binned = {}
 
         fastq_classifier = MockCommunity(
-            path_original_fastq=file, db_path=path_to_hash, db_type=db_type,
-            folder_report=path_report, path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier)
+            path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
+            path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param)
 
         fastq_classifier.classify()
 
