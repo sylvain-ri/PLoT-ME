@@ -14,6 +14,7 @@ Reads Binning Project
 from datetime import datetime
 import os
 import os.path as osp
+import numpy as np
 import pandas as pd
 from pathlib import Path
 import logging
@@ -123,6 +124,7 @@ def div_z(n, d):
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
     ratio = 4**k / (w - k + 1)
+    ratio = np.float32(ratio)
     if single_row:
         return data * ratio
     else:
@@ -130,8 +132,8 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False):
         for col in tqdm(kmer_cols):
             data[col] = pd.to_numeric(data[col], downcast='float')
             # data[col] *= ratio
-            data.loc[:, col] *= ratio
-            # data[col] = data[col].apply(lambda x: x*ratio)
+            # data.loc[:, col] *= ratio
+            data[col] = data[col].apply(lambda x: x*ratio)
 
 
 class ScanFolder:
