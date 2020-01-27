@@ -28,7 +28,7 @@ from Bio import SeqRecord, SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file
+from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path
 from bio import kmers_dic, seq_count_kmer
 
 
@@ -86,6 +86,7 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def to_fastq(self):
         assert self.path_out is not None, AttributeError("Path of the fastq file must first be defined")
+        create_path(self.path_out)
         with open(self.path_out, "a") as f:
             SeqIO.write(self, f, "fasta")
 
