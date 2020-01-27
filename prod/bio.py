@@ -24,7 +24,7 @@ nucleotides = "ACGT"
 
 
 def kmers_dic(n, choice=nucleotides):
-    return {a:0 for a in combinaisons(choice, n)}
+    return {a: 0 for a in combinaisons(choice, n)}
 
 
 def combinaisons(combi, n, instances=nucleotides):
