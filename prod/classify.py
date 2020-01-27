@@ -38,7 +38,7 @@ logger = init_logger('classify')
 # #############################################################################
 class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
-    K = 4
+    K = 0
     KMER = kmers_dic(K)
     FASTQ_PATH = None
     FASTQ_BIN_FOLDER = None
