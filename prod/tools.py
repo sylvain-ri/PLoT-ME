@@ -121,6 +121,17 @@ def div_z(n, d):
     return n / d if d else 0
 
 
+def time_to_h_m_s(start, end, fstring=True):
+    assert start < end, ArithmeticError(f"The start time is later than the end time: {start} > {end}")
+    delay = int(end - start)
+    m, s = divmod(delay, 60)
+    h, m = divmod(m, 60)
+    if fstring:
+        return f"{h:d} hours, {m:02d} minutes, {s:02d} seconds"
+    else:
+        return h, m, s
+
+
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
     ratio = 4**k / (w - k + 1)

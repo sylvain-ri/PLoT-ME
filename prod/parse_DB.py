@@ -51,12 +51,12 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 from sklearn.cluster import KMeans, MiniBatchKMeans
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA
 
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length
+from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, time_to_h_m_s
 from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
@@ -125,15 +125,15 @@ class Genome:
             kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k)
             for_csv.append((taxon, cat, start, end, segment.name, segment.description, self.path_fna,
                             *kmer_count.values() ))
-        kmer_keys = list(self.kmer_count_zeros.keys())
+        # kmer_keys = list(self.kmer_count_zeros.keys())
         df = pd.DataFrame(for_csv, columns=["taxon", "category", "start", "end", "name", "description", "fna_path"]
-                                           + kmer_keys)
+                                           + self.col_kmers)
         df.taxon       = df.taxon.astype('category')
         df.category    = df.category.astype('category')
         df.name        = df.name.astype('category')
         df.fna_path    = df.fna_path.astype('category')
         for col in self.col_kmers:
-            df[col] = df[col].astype("int16")
+            df[col] = df[col].astype("uint16")
         df.to_pickle(path_kmers)
         logger.debug(f"saved kmer count to {path_kmers}")
 
@@ -152,17 +152,6 @@ def create_n_folders(path, n, delete_existing=False):
         if delete_existing and osp.isdir(new_path):
             shutil.rmtree(new_path)
         create_path(new_path, with_filename=False)
-
-
-def time_to_h_m_s(start, end, fstring=True):
-    assert start < end, ArithmeticError(f"The start time is later than the end time: {start} > {end}")
-    delay = int(end - start)
-    m, s = divmod(delay, 60)
-    h, m = divmod(m, 60)
-    if fstring:
-        return f"{h:d} hours, {m:02d} minutes, {s:02d} seconds"
-    else:
-        return h, m, s
 
 
 def add_file_with_parameters(folder, add_description=""):
@@ -300,6 +289,23 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
 
 
 @check_step
+def append_genome_kmer_counts(folder_kmers, path_df):
+    """ Combine single dataframes into one. Might need high memory """
+    logger.info(f"Appending all kmer frequencies from {folder_kmers} into a single file {path_df}")
+    added = 0
+    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{main.k}mer_count.pd", ),
+                                       ext_check="", ext_create="", skip_folders=main.omit_folders)
+    # Append all the df. Don't write the index. Write the header only for the first frame
+    for file in ScanFolder.tqdm_scan():
+        if added == 0:
+            pd.read_pickle(file.path_abs).to_csv(path_df, mode='w', index=False, header=True)
+        else:
+            pd.read_pickle(file.path_abs).to_csv(path_df, mode='a', index=False, header=False)
+        added += 1
+    logger.info(f"Combined file of {added} {main.k}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
+
+
+@check_step
 def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
@@ -307,7 +313,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     k = main.k
     w = main.w
 
-    df = pd.read_pickle(path_kmer_counts)
+    df = pd.read_csv(path_kmer_counts)
     cols_kmers = df.columns[-256:]
     cols_spe = df.columns[:-256]
 
@@ -517,8 +523,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         # combine all kmer distributions into one single file
         omitted = "" if len(omit_folders) == 0 else "_omitted_" + "_".join(omit_folders)
-        path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.{k}mer_s{window}.pd")
-        combine_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
+        path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.{k}mer_s{window}.csv")
+        append_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
         #    CLUSTERING
         # From kmer distributions, use clustering to set the bins per segment
@@ -555,7 +561,6 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             logger.info(f"timing for STEP {i} - {time_to_h_m_s(times[i], times[i+1])}")
         logger.info(f"Script ended, total time of {time_to_h_m_s(times[0], perf_counter())}.")
         print()
-
 
 
 main.folder_database = ""
