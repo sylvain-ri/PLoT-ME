@@ -318,7 +318,10 @@ append_genome_kmer_counts.total_rows = None
 
 @check_step
 def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
-    """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
+    """ Given a database of segments of genomes in fastq files, split it in n clusters/bins
+        Doing per chunks : https://scikit-learn.org/stable/auto_examples/cluster/plot_dict_face_patches.html
+        Pandas read_csv() : https://honingds.com/blog/pandas-read_csv/#ftoc-pandas-read_csv-usecols
+    """
     assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
     logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
     k = main.k
