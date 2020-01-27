@@ -57,24 +57,28 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length
-from bio import kmers_dic, ncbi, seq_count_kmer
+from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
 logger = init_logger('parse_DB')
 
 
 class Genome:
-    """ Genome from RefSeq. Methods to split it into plasmid/genome and into segments """
+    """ Genome from RefSeq. Methods to split it into plasmid/genome and into segments
+        SET K BEFORE ANY INSTANCE IS CREATED, with set_k_kmers()
+    """
     categories = ["plasmid", "chloroplast", "scaffold", "contig",
                   "chromosome", "complete genome", "whole genome shotgun sequence", ]
-    kmer_count_zeros = kmers_dic(4)
+    K = 0
+    col_kmers = []
+    kmer_count_zeros = {}
 
-    def __init__(self, fna_file, taxon, window_size, k=4):
+    def __init__(self, fna_file, taxon, window_size, k=-1):
         logger.log(0, "Created genome object")
         self.path_fna    = fna_file
         self.taxon       = taxon
         self.window_size = window_size
-        self.k           = k
+        self.k           = Genome.K if k < 0 else k
         # records is a dict of SeqRecord
         self.records = {cat: [] for cat in self.categories}
         # self.splits  = {cat: [] for cat in self.categories}
@@ -128,8 +132,16 @@ class Genome:
         df.category    = df.category.astype('category')
         df.name        = df.name.astype('category')
         df.fna_path    = df.fna_path.astype('category')
+        for col in self.col_kmers:
+            df[col] = df[col].astype("int16")
         df.to_pickle(path_kmers)
         logger.debug(f"saved kmer count to {path_kmers}")
+
+    @classmethod
+    def set_k_kmers(cls, k):
+        cls.K = k
+        cls.col_kmers = combinaisons(nucleotides, k)
+        cls.kmer_count_zeros = kmers_dic(k)
 
 
 def create_n_folders(path, n, delete_existing=False):
@@ -241,6 +253,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
     # Set constants to avoid arguments passing
     parallel_kmer_counting.force_recount = force_recount
     # Count in parallel. islice() to take a part of an iterable
+    Genome.set_k_kmers(main.k)
     with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
                                                                      stop if stop>0 else None)),
@@ -283,7 +296,7 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     df.fna_path    = df.fna_path.astype('category')
     # Save output file
     df.to_pickle(path_df)
-    logger.info(f"Combined file of all kmer counts save at: {path_df}")
+    logger.info(f"Combined file of all kmer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at: {path_df}")
 
 
 @check_step
@@ -411,6 +424,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     add_file_with_parameters(path_db_bins, add_description=f"cluster number = {clusters}")
 
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
+    Genome.set_k_kmers(main.k)
     with Pool(min(2, main.cores)) as pool:  # file copy don't need many cores (main.cores)
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
                             total=len(df_per_fna)))
