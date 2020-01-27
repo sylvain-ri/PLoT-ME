@@ -141,10 +141,11 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False):
     else:
         logger.info(f"Scaling the dataframe, converting to float32")
         for col in tqdm(kmer_cols):
-            data[col] = pd.to_numeric(data[col], downcast='float')
+            # data[col] = pd.to_numeric(data[col], downcast='float')
             # data[col] *= ratio
             # data.loc[:, col] *= ratio
             data[col] = data[col].apply(lambda x: x*ratio)
+        return data
 
 
 class ScanFolder:

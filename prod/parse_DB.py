@@ -293,16 +293,27 @@ def append_genome_kmer_counts(folder_kmers, path_df):
     """ Combine single dataframes into one. Might need high memory """
     logger.info(f"Appending all kmer frequencies from {folder_kmers} into a single file {path_df}")
     added = 0
+    rows = 0
     ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{main.k}mer_count.pd", ),
                                        ext_check="", ext_create="", skip_folders=main.omit_folders)
     # Append all the df. Don't write the index. Write the header only for the first frame
     for file in ScanFolder.tqdm_scan():
         if added == 0:
-            pd.read_pickle(file.path_abs).to_csv(path_df, mode='w', index=False, header=True)
+            df = pd.read_pickle(file.path_abs)
+            rows += df.shape[0]
+            df.to_csv(path_df, mode='w', index=False, header=True)
         else:
-            pd.read_pickle(file.path_abs).to_csv(path_df, mode='a', index=False, header=False)
+            df = pd.read_pickle(file.path_abs)
+            rows += df.shape[0]
+            df.to_csv(path_df, mode='a', index=False, header=False)
         added += 1
-    logger.info(f"Combined file of {added} {main.k}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
+
+    append_genome_kmer_counts.total_rows = rows
+    logger.info(f"Combined file of {added} {main.k}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB, {rows} rows)"
+                f" save at {path_df}")
+
+
+append_genome_kmer_counts.total_rows = None
 
 
 @check_step
@@ -312,18 +323,30 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
     k = main.k
     w = main.w
+    cols_kmers = Genome.col_kmers
+    batch_size = 1000
 
-    df = pd.read_csv(path_kmer_counts)
-    cols_kmers = df.columns[-256:]
-    cols_spe = df.columns[:-256]
+    d_types = {
+        "taxon": "uint64",
+        "category": "category",
+        "start": "uint64",
+        "end": "uint64",
+        "name": "category",
+        "description": "str",
+        "fna_path": "category",
+    }
+    cols_spe = list(d_types.keys())
+    for col in cols_kmers:
+        d_types[col] = "float32"
+
+    # cols_kmers = df.columns[-256:]
+    # cols_spe = df.columns[:-256]
 
     # ## 1 ## Scaling by length and kmers
-    df_mem = df.memory_usage(deep=False).sum()
-    logger.info(f"Model loaded, scaling the values to the length of the segments. "
-                f"DataFrame size: {df_mem/10**9:.2f} GB.")
+    logger.info(f"Model set, scaling the values to the length of the segments and feeding the data by chunks of "
+                f"{batch_size} as the file is large: {osp.getsize(path_kmer_counts)/10**9:.2f} GB.")
 
     # todo: save intermediate data
-    scale_df_by_length(df, cols_kmers, k, w)
 
     # ## 2 ## Could add PCA
 
@@ -331,16 +354,25 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     create_path(path_model)
 
     # Model learning
-    logger.info(f"Data takes {df_mem/10**9:.2f} GB. Training {model_name}...")
+    # logger.info(f"Data takes {df_mem/10**9:.2f} GB. Training {model_name}...")
     if model_name == "kmeans":
+        NotImplementedError()
         ml_model = KMeans(n_clusters=n_clusters, n_jobs=main.cores, random_state=3)
     elif model_name == "minikm":
-        ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
+        ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=batch_size, max_iter=100)
     else:
         logger.error(f"No model defined for {model_name}.")
         raise NotImplementedError
 
-    ml_model.fit(df[cols_kmers])
+    # Don't read all columns
+    df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, usecols=cols_kmers)
+    for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
+        chunk = batch.get_chunk(batch_size)
+        chunk = scale_df_by_length(chunk, cols_kmers, k, w)
+        ml_model.partial_fit(chunk)
+
+    # ONE SHOOT
+    # ml_model.fit(df[cols_kmers])
 
     # Model saving
     with open(path_model, 'wb') as f:
@@ -348,10 +380,22 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}")
 
     # ## 3 ##
-    predicted = ml_model.predict(df[cols_kmers])
-    df["cluster"] = predicted
+    # Don't read all columns
+    added = 0
+    cols_pred = cols_spe + ["cluster"]
+    df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, )
+    for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
+        chunk = batch.get_chunk(batch_size)
+        chunk = scale_df_by_length(chunk[cols_kmers], cols_kmers, k, w)
+        predicted = ml_model.predict(chunk[cols_kmers])
+        chunk["cluster"] = predicted
 
-    df[list(cols_spe) + ["cluster"]].to_pickle(output_pred)
+        if added == 0:
+            chunk[cols_pred].to_csv(output_pred, mode='w', index=False, header=True)
+        else:
+            chunk[cols_pred].to_csv(output_pred, mode='a', index=False, header=False)
+        added += 1
+
     logger.info(f"Defined {n_clusters} clusters, assignments here: {output_pred} with ML model {model_name}.")
     return
 
