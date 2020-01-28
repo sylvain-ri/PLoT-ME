@@ -546,6 +546,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
         check_step.early_stop = early_stop
         check_step.timings.append(perf_counter())  # log time spent
+        # Check that taxonomy wasn't forgotten
+        if '0' in check_step.can_skip[5:] and check_step.early_stop >= 5:
+            assert osp.isdir(path_taxonomy), NotADirectoryError
 
         #    KMER COUNTING
         # get kmer distribution for each window of each genome, parallel folder with same structure
