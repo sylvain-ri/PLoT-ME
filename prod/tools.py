@@ -11,6 +11,7 @@ Reads Binning Project
 #############################################################################
 """
 import argparse
+import shutil
 from datetime import datetime
 import os
 import os.path as osp
@@ -107,6 +108,15 @@ def create_path(path, with_filename=True):
     if not osp.isdir(folder):
         logger.log(5, f"created folder {folder}")
         os.makedirs(folder)
+
+
+def delete_folder_if_exists(path_dir):
+    if osp.isdir(path_dir):
+        logger.warning(f"Folder exists, DELETE IT ? (need to delete to redo a clean install): {path_dir}")
+        user_in = input("y/[n]").lower()
+        logger.debug(f"user entered: {user_in}")
+        if 'y' in user_in:
+            shutil.rmtree(path_dir)
 
 
 def folder_today(path):

@@ -58,7 +58,7 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
-    time_to_h_m_s, ArgumentParserWithDefaults
+    time_to_h_m_s, ArgumentParserWithDefaults, delete_folder_if_exists
 from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
@@ -445,6 +445,7 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
     add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
+    delete_folder_if_exists(path_bins_hash)
     create_n_folders(path_bins_hash, n_clusters)
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
@@ -455,9 +456,6 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
                "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
         res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
         logger.debug(res)
-        # with Pool(min(4, main.cores)) as pool:  # file copy don't need many cores (main.cores)
-        #     list_files = os.listdir(osp.join(path_refseq_binned, bin_id)
-        #     results = list(tqdm(pool.imap(kraken2_build_lib, list_files), total=len(list_files)))
 
 
 @check_step
@@ -491,7 +489,9 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
 def kraken2_full(path_refseq, path_output, taxonomy):
     """ Build the hash table with the same genomes, but in one bin, for comparison """
     add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
+    delete_folder_if_exists(path_output)
 
+    logger.warning(f"DO NOT INTERRUPT this process, you will have restart from scratches.")
     # Add genomes to
     for folder in os.scandir(path_refseq):
         if not osp.isdir(folder.path):
