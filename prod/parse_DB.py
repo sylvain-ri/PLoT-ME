@@ -180,15 +180,16 @@ def check_step(func):
         to_check = args[1]  # Output path for file or folder, will check if the output already exists
 
         # First check if skip has been allowed,
-        if check_step.step_nb > check_step.early_stop:
-            logger.info(f"Step {check_step.step_nb} EARLY STOP, no run for \t{func.__name__}({signature})")
-            result = None
-
-        elif check_step.can_skip[check_step.step_nb] == "1" and \
+        if check_step.can_skip[check_step.step_nb] == "1" and \
                 (osp.isfile(to_check)                                 # and there's already a file
                  or (osp.isdir(to_check) and os.listdir(to_check))):  # or there's a folder, not empty
             logger.info(f"Step {check_step.step_nb} SKIPPING, function \t{func.__name__}({signature}, "
                         f"Output has already been generated.")
+            result = None
+
+        # If limiting steps to run, stop it
+        elif check_step.step_nb > check_step.early_stop:
+            logger.info(f"Step {check_step.step_nb} EARLY STOP, no run for \t{func.__name__}({signature})")
             result = None
 
         else:
