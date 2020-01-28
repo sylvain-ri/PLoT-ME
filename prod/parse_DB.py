@@ -209,7 +209,7 @@ def check_step(func):
 check_step.timings    = []
 check_step.step_nb    = 0         # For decorator to know which steps has been done
 check_step.early_stop = -1        # Last step to run, later steps are not ran. Only display arguments
-check_step.can_skip   = "111110"  # By default skip step that has been started, except fot kraken2 build (hard to check)
+check_step.can_skip   = "1111101" # By default skip step that has been started, except fot kraken2 build (hard to check)
 
 
 def parallel_kmer_counting(fastq, ):
@@ -486,6 +486,32 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
                 f"kraken2-build --clean {path_bins_hash}/<bin number>")
 
 
+@check_step
+def kraken2_full_build(path_refseq, path_output, taxonomy, omitted):
+    """ Build the hash table with the same genomes, but in one bin, for comparison """
+    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
+
+    # Add genomes to library
+    logger.info(f"kraken2 add_to_library, reference database in single bin.... ")
+    cmd = ["find", path_refseq, "-name", "'*.fna'", "-print0", "|",
+           "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+           "kraken2-build", "--add-to-library", "{}", "--db", path_output]
+    res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+    logger.debug(res)
+
+    # Build hash table
+    taxon_link = osp.join(path_output, "taxonomy")
+    if osp.islink(taxon_link):
+        logger.debug(f"removing existing link at {taxon_link}")
+        os.unlink(taxon_link)
+    os.symlink(taxonomy, taxon_link)
+    cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_output]
+    logger.info(f"Launching CMD to build KRAKEN2 Hash, will take lots of time and memory: " + " ".join(cmd))
+    # logger.info(f"kraken2 build its hash tables, will take lots of time and memory.... ")
+    res = subprocess.call(cmd)
+    logger.debug(res)
+
+
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="11111",
          force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
@@ -547,6 +573,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         # Run kraken2 on the full RefSeq, without binning, for reference
         # todo: Build the full database from RefSeq
+        path_full_hash = osp.join(folder_output, f"kraken2_full{omitted}")
+        kraken2_full_build(folder_database, path_full_hash, path_taxonomy, omitted)
 
     except KeyboardInterrupt:
         logger.error("User interrupted")
@@ -586,8 +614,9 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into', metavar='')
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads', metavar='')
 
-    parser.add_argument('-e', '--early', default=len(check_step.can_skip)-1, type=int, metavar='',
-                        help='Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)')
+    parser.add_argument('-e', '--early', default=len(check_step.can_skip)-2, type=int, metavar='',
+                        help="Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN) "
+                             "By default doesn't build the full DB hash, stop before the last step")
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
                         default=("plant", "vertebrate"), metavar='')
     parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
