@@ -500,7 +500,7 @@ def kraken2_full(path_refseq, path_output, taxonomy):
             logger.info(f"skipping {folder.name}")
             continue
         else:
-            cmd = ["find", path_refseq, "-name", "'*.fna'", "-print0", "|",
+            cmd = ["find", folder.path, "-name", "'*.fna'", "-print0", "|",
                    "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
                    "kraken2-build", "--add-to-library", "{}", "--db", path_output]
             logger.info(f"kraken2 add_to_library.... " + " ".join(cmd))
