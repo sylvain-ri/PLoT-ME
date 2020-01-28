@@ -367,8 +367,6 @@ def pll_copy_segments_to_bin(df):
         Input is only ONE .fna file, which has to be split into segments, but these might be recombined
         if their bin association are consecutive.
     """
-    # todo: call the Genome methods, split into segments, recombine consecutive segments,
-    #  write the file with taxo to the appropriate bin
     taxon = df.taxon.iloc[0]
     genome_path = df.fna_path.iloc[0]
     logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
@@ -390,7 +388,7 @@ def pll_copy_segments_to_bin(df):
 
         path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id), f"{taxon}.fna")
 
-        descr = description.replace(" ", "_")  # To avoid issues with bash
+        descr = description.replace(" ", "_").replace(" ", "_")  # To avoid issues with bash. Space and non-breaking space
         descr_splits = descr.split("|")
         description_new = "|".join(descr_splits[:3] + [f"s:{start}-e:{end-1}"] + descr_splits[4:])
 
@@ -575,7 +573,6 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
 
         # Run kraken2 on the full RefSeq, without binning, for reference
-        # todo: Build the full database from RefSeq
         path_full_hash = osp.join(folder_output, f"kraken2_full{omitted}")
         kraken2_full(folder_database, path_full_hash, path_taxonomy)
 
