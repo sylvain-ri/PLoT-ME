@@ -492,17 +492,20 @@ def kraken2_full(path_refseq, path_output, taxonomy):
     """ Build the hash table with the same genomes, but in one bin, for comparison """
     add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
 
-    # Add genomes to library
-    cmd = ["find", path_refseq, "-name", "'*.fna'", ]
-    # ignore the omitted folders
-    for ignore in main.omit_folders:
-        cmd += ["!", "-path", f"*{ignore}*", ]
-    cmd += ["-print0", "|",
-            "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
-            "kraken2-build", "--add-to-library", "{}", "--db", path_output]
-    logger.info(f"kraken2 add_to_library.... " + " ".join(cmd))
-    res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-    logger.debug(res)
+    # Add genomes to
+    for folder in os.scandir(path_refseq):
+        if not folder.isdir():
+            continue
+        if any([to_omit in folder.name for to_omit in main.omit_folders]):
+            logger.info(f"skipping {folder.name}")
+            continue
+        else:
+            cmd = ["find", path_refseq, "-name", "'*.fna'", "-print0", "|",
+                   "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+                   "kraken2-build", "--add-to-library", "{}", "--db", path_output]
+            logger.info(f"kraken2 add_to_library.... " + " ".join(cmd))
+            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+            logger.debug(res)
 
     # Build hash table
     taxon_link = osp.join(path_output, "taxonomy")
