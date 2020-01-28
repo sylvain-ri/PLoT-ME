@@ -101,12 +101,15 @@ class ReadToBin(SeqRecord.SeqRecord):
         cls.FILEBASE = file_base
         logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
         # /home/ubuntu/data/Segmentation/4mer_s10000/clustered_by_minikm_4mer_s10000/model_miniKM_4mer_s10000.pkl
-        k = path_model.split("/model_")[1].split("mer_")[0].split("_")[1]
-        logger.debug(f"got path_model={path_model}, setting k={k}")
-        cls.K = int(k)
-        cls.KMER = kmers_dic(cls.K)
-        with open(path_model, 'rb') as f:
-            cls.MODEL = pickle.load(f)
+        if path_model == "full":
+            cls.K = 0
+        else:
+            k = path_model.split("/model_")[1].split("mer_")[0].split("_")[1]
+            logger.debug(f"got path_model={path_model}, setting k={k}")
+            cls.K = int(k)
+            cls.KMER = kmers_dic(cls.K)
+            with open(path_model, 'rb') as f:
+                cls.MODEL = pickle.load(f)
 
     @classmethod
     def bin_reads(cls):
@@ -223,12 +226,15 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
     logger.info("let's classify reads!")
 
     # Find the model
-    path_model = ""
-    for file in os.scandir(path_database):
-        if file.name.startswith("model_") and file.name.endswith(".pkl"):
-            path_model = file.path
-            break
-    assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
+    if db_type == "bins":
+        path_model = ""
+        for file in os.scandir(path_database):
+            if file.name.startswith("model_") and file.name.endswith(".pkl"):
+                path_model = file.path
+                break
+        assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
+    else:
+        path_model = "full"
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
