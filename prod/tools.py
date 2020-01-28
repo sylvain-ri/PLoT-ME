@@ -10,7 +10,7 @@ Started on 2019-12-11
 Reads Binning Project
 #############################################################################
 """
-
+import argparse
 from datetime import datetime
 import os
 import os.path as osp
@@ -130,6 +130,25 @@ def time_to_h_m_s(start, end, fstring=True):
         return f"{h:d} hours, {m:02d} minutes, {s:02d} seconds"
     else:
         return h, m, s
+
+
+class ArgumentParserWithDefaults(argparse.ArgumentParser):
+    """ Customized Argparser to get both formatted docstring and defaults arguments
+        https://stackoverflow.com/a/52025430/4767645 """
+    def add_argument(self, *args, help=None, default=None, **kwargs):
+        if help is not None:
+            kwargs['help'] = help
+        if default not in (None, '') and args[0] != '-h':
+            kwargs['default'] = default
+            if help is not None:
+                if default in (None, ''):
+                    pass  # No default value to add
+                if isinstance(default, list) or isinstance(default, tuple):
+                    formatted = " ".join(default)
+                    kwargs['help'] += f' ({type(default).__name__} - default: "{formatted})"'
+                else:
+                    kwargs['help'] += f' ({type(default).__name__} - default: {default} )'
+        super().add_argument(*args, **kwargs)
 
 
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False):

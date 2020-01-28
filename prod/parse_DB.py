@@ -13,6 +13,7 @@ Needs a lot of disk space, and RAM according to the largest genome to process.
 3 -> Copy these segments of genomes into bins (DISK intensive)
 4 -> kraken2-build --add-to-library
 5 -> kraken2-build --build
+6 -> Building the hash for the full refseq, for comparison bins vs full
 
 For 17GB file of combined kmer counts, combining counts took up to 55GB,
 loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
@@ -44,7 +45,7 @@ import os.path as osp
 import pandas as pd
 import pickle
 import re
-from time import time, perf_counter
+from time import perf_counter
 import traceback
 
 from Bio import SeqIO
@@ -56,7 +57,8 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, time_to_h_m_s
+from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
+    time_to_h_m_s, ArgumentParserWithDefaults
 from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
@@ -178,15 +180,16 @@ def check_step(func):
         to_check = args[1]  # Output path for file or folder, will check if the output already exists
 
         # First check if skip has been allowed,
-        if check_step.step_nb > check_step.early_stop:
-            logger.info(f"Step {check_step.step_nb} EARLY STOP, no run for \t{func.__name__}({signature})")
-            result = None
-
-        elif check_step.can_skip[check_step.step_nb] == "1" and \
+        if check_step.can_skip[check_step.step_nb] == "1" and \
                 (osp.isfile(to_check)                                 # and there's already a file
                  or (osp.isdir(to_check) and os.listdir(to_check))):  # or there's a folder, not empty
             logger.info(f"Step {check_step.step_nb} SKIPPING, function \t{func.__name__}({signature}, "
                         f"Output has already been generated.")
+            result = None
+
+        # If limiting steps to run, stop it
+        elif check_step.step_nb > check_step.early_stop:
+            logger.info(f"Step {check_step.step_nb} EARLY STOP, no run for \t{func.__name__}({signature})")
             result = None
 
         else:
@@ -209,7 +212,7 @@ def check_step(func):
 check_step.timings    = []
 check_step.step_nb    = 0         # For decorator to know which steps has been done
 check_step.early_stop = -1        # Last step to run, later steps are not ran. Only display arguments
-check_step.can_skip   = "111110"  # By default skip step that has been started, except fot kraken2 build (hard to check)
+check_step.can_skip   = "1111101" # By default skip step that has been started, except fot kraken2 build (hard to check)
 
 
 def parallel_kmer_counting(fastq, ):
@@ -411,8 +414,6 @@ def pll_copy_segments_to_bin(df):
         Input is only ONE .fna file, which has to be split into segments, but these might be recombined
         if their bin association are consecutive.
     """
-    # todo: call the Genome methods, split into segments, recombine consecutive segments,
-    #  write the file with taxo to the appropriate bin
     taxon = df.taxon.iloc[0]
     genome_path = df.fna_path.iloc[0]
     logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
@@ -434,7 +435,7 @@ def pll_copy_segments_to_bin(df):
 
         path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id), f"{taxon}.fna")
 
-        descr = description.replace(" ", "_")  # To avoid issues with bash
+        descr = description.replace(" ", "_").replace(" ", "_")  # To avoid issues with bash. Space and non-breaking space
         descr_splits = descr.split("|")
         description_new = "|".join(descr_splits[:3] + [f"s:{start}-e:{end-1}"] + descr_splits[4:])
 
@@ -533,6 +534,36 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
                 f"kraken2-build --clean {path_bins_hash}/<bin number>")
 
 
+@check_step
+def kraken2_full(path_refseq, path_output, taxonomy):
+    """ Build the hash table with the same genomes, but in one bin, for comparison """
+    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
+
+    # Add genomes to library
+    cmd = ["find", path_refseq, "-name", "'*.fna'", ]
+    # ignore the omitted folders
+    for ignore in main.omit_folders:
+        cmd += ["!", "-path", f"*{ignore}*", ]
+    cmd += ["-print0", "|",
+            "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+            "kraken2-build", "--add-to-library", "{}", "--db", path_output]
+    logger.info(f"kraken2 add_to_library.... " + " ".join(cmd))
+    res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+    logger.debug(res)
+
+    # Build hash table
+    taxon_link = osp.join(path_output, "taxonomy")
+    if osp.islink(taxon_link):
+        logger.debug(f"removing existing link at {taxon_link}")
+        os.unlink(taxon_link)
+    os.symlink(taxonomy, taxon_link)
+    cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_output]
+    logger.info(f"Launching CMD to build KRAKEN2 Hash, will take lots of time and memory: " + " ".join(cmd))
+    # logger.info(f"kraken2 build its hash tables, will take lots of time and memory.... ")
+    res = subprocess.call(cmd)
+    logger.debug(res)
+
+
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="11111",
          force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
@@ -593,7 +624,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
 
         # Run kraken2 on the full RefSeq, without binning, for reference
-        # todo: Build the full database from RefSeq
+        path_full_hash = osp.join(folder_output, f"kraken2_full{omitted}")
+        kraken2_full(folder_database, path_full_hash, path_taxonomy)
 
     except KeyboardInterrupt:
         logger.error("User interrupted")
@@ -619,7 +651,7 @@ main.cores           = 0
 
 if __name__ == '__main__':
     # Option to display default values, metavar='' to remove ugly capitalized option's names
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019.')
     parser.add_argument('path_output_files', type=is_valid_directory,
@@ -633,15 +665,16 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into', metavar='')
     parser.add_argument('-c', '--cores', default=cpu_count(), type=int, help='Number of threads', metavar='')
 
-    parser.add_argument('-e', '--early', default=len(check_step.can_skip)-1, type=int, metavar='',
-                        help='Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)')
+    parser.add_argument('-e', '--early', default=len(check_step.can_skip)-2, type=int, metavar='',
+                        help="Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN) "
+                             "By default doesn't build the full DB hash, stop before the last step")
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
                         default=("plant", "vertebrate"), metavar='')
-    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
+    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
-                        help="By default, skip files/folders that already exist. Write 110000 to skip steps 0 and 1. "
-                             "To recount all kmers, and stop after combining the kmer dataframes, write -s 011111, "
-                             "add option -f, and option -e 0.", metavar='')
+                        help="By default, skip files/folders that already exist. Write 1100000 to skip steps 0 and 1. "
+                             "To recount all kmers, and stop after combining the kmer dataframes, "
+                             "add option -f and option -e 0.", metavar='')
     args = parser.parse_args()
 
     main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,

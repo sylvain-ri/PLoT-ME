@@ -33,7 +33,8 @@ from Bio import SeqRecord, SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file
+from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
+    ArgumentParserWithDefaults
 from bio import kmers_dic, seq_count_kmer
 
 
@@ -44,7 +45,7 @@ logger = init_logger('classify')
 class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
     K = 0
-    KMER = kmers_dic(K)
+    KMER = {}  # kmers_dic(K)
     FASTQ_PATH = None
     FASTQ_BIN_FOLDER = None
     FILEBASE = ""
@@ -91,6 +92,7 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def to_fastq(self):
         assert self.path_out is not None, AttributeError("Path of the fastq file must first be defined")
+        create_path(self.path_out)
         with open(self.path_out, "a") as f:
             SeqIO.write(self, f, "fasta")
 
@@ -115,7 +117,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     def bin_reads(cls):
         """ Bin all reads from provide file """
         logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
-        # todo: try to parallelize it
+        # todo: try to parallelize it, careful of file writing concurrency
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
@@ -267,7 +269,7 @@ def test_classification():
 
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('output_folder',      help='Folder for output reports', type=is_valid_directory)
     parser.add_argument('database',           help='Folder with the hash table for the classifier, name '
                                                    '"clustered_by_<param>" with sub-folders "RefSeq/<bins> '
