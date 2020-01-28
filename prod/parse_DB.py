@@ -494,7 +494,7 @@ def kraken2_full(path_refseq, path_output, taxonomy):
 
     # Add genomes to
     for folder in os.scandir(path_refseq):
-        if not folder.isdir():
+        if not osp.isdir(folder.path):
             continue
         if any([to_omit in folder.name for to_omit in main.omit_folders]):
             logger.info(f"skipping {folder.name}")
