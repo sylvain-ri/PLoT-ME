@@ -165,7 +165,7 @@ class MockCommunity:
         self.folder_out      = f"{self.folder_report}/{self.file_name}"
         if not os.path.isdir(self.folder_out):
             os.makedirs(self.folder_out)
-        self.path_out        = f"{self.folder_out}/{param}.{self.db_type}"
+        self.path_out        = osp.join(self.folder_out, f"{param}.{self.db_type}")
         
         self.cores           = cores
         self.dry_run         = dry_run
@@ -193,13 +193,14 @@ class MockCommunity:
         hash_file = osp.join(path_hash, "hash.k2d")
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
         self.logger.info(f'with kraken2. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
-        self.logger.info(f'output is {self.path_out}.{arg}.kraken2.out')
+        formatted_out = f"{self.path_out}.{arg}.kraken2" if self.db_type == "bins" else f"{self.path_out}.kraken2"
+        self.logger.info(f'output is {formatted_out}.out')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
             "--db", path_hash,
             file,
-            "--output", f"{self.path_out}.{arg}.kraken2.out",
-            "--report", f"{self.path_out}.{arg}.kraken2.report",
+            "--output", f"{formatted_out}.out",
+            "--report", f"{formatted_out}.report",
         ]
         self.logger.debug(" ".join(self.cmd))
         if not self.dry_run:
