@@ -13,6 +13,7 @@ Needs a lot of disk space, and RAM according to the largest genome to process.
 3 -> Copy these segments of genomes into bins (DISK intensive)
 4 -> kraken2-build --add-to-library
 5 -> kraken2-build --build
+6 -> Building the hash for the full refseq, for comparison bins vs full
 
 For 17GB file of combined kmer counts, combining counts took up to 55GB,
 loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
@@ -44,7 +45,7 @@ import os.path as osp
 import pandas as pd
 import pickle
 import re
-from time import time, perf_counter
+from time import perf_counter
 import traceback
 
 from Bio import SeqIO
@@ -56,7 +57,8 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, time_to_h_m_s
+from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
+    time_to_h_m_s, ArgumentParserWithDefaults
 from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
@@ -600,7 +602,7 @@ main.cores           = 0
 
 if __name__ == '__main__':
     # Option to display default values, metavar='' to remove ugly capitalized option's names
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019.')
     parser.add_argument('path_output_files', type=is_valid_directory,
@@ -619,11 +621,11 @@ if __name__ == '__main__':
                              "By default doesn't build the full DB hash, stop before the last step")
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
                         default=("plant", "vertebrate"), metavar='')
-    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0)', action='store_true')
+    parser.add_argument('-f', '--force', help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
-                        help="By default, skip files/folders that already exist. Write 110000 to skip steps 0 and 1. "
-                             "To recount all kmers, and stop after combining the kmer dataframes, write -s 011111, "
-                             "add option -f, and option -e 0.", metavar='')
+                        help="By default, skip files/folders that already exist. Write 1100000 to skip steps 0 and 1. "
+                             "To recount all kmers, and stop after combining the kmer dataframes, "
+                             "add option -f and option -e 0.", metavar='')
     args = parser.parse_args()
 
     main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,

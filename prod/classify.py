@@ -28,7 +28,8 @@ from Bio import SeqRecord, SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path
+from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
+    ArgumentParserWithDefaults
 from bio import kmers_dic, seq_count_kmer
 
 
@@ -260,7 +261,7 @@ def test_classification():
 
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('output_folder',      help='Folder for output reports', type=is_valid_directory)
     parser.add_argument('database',           help='Folder with the hash table for the classifier, name '
                                                    '"clustered_by_<param>" with sub-folders "RefSeq/<bins> '
