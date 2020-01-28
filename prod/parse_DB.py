@@ -487,15 +487,15 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters):
 
 
 @check_step
-def kraken2_full_build(path_refseq, path_output, taxonomy, omitted):
+def kraken2_full(path_refseq, path_output, taxonomy):
     """ Build the hash table with the same genomes, but in one bin, for comparison """
     add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
 
     # Add genomes to library
-    logger.info(f"kraken2 add_to_library, reference database in single bin.... ")
     cmd = ["find", path_refseq, "-name", "'*.fna'", "-print0", "|",
            "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
            "kraken2-build", "--add-to-library", "{}", "--db", path_output]
+    logger.info(f"kraken2 add_to_library.... " + " ".join(cmd))
     res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
     logger.debug(res)
 
@@ -574,7 +574,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         # Run kraken2 on the full RefSeq, without binning, for reference
         # todo: Build the full database from RefSeq
         path_full_hash = osp.join(folder_output, f"kraken2_full{omitted}")
-        kraken2_full_build(folder_database, path_full_hash, path_taxonomy, omitted)
+        kraken2_full(folder_database, path_full_hash, path_taxonomy)
 
     except KeyboardInterrupt:
         logger.error("User interrupted")
@@ -600,7 +600,7 @@ main.cores           = 0
 
 if __name__ == '__main__':
     # Option to display default values, metavar='' to remove ugly capitalized option's names
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019.')
     parser.add_argument('path_output_files', type=is_valid_directory,
