@@ -373,6 +373,8 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     # Don't read all columns
     df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, usecols=cols_kmers)
     for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
+        # todo: loop x times over the CSV, and take 1/10 of the chunk each time
+        #  would allow the ML algo to learn from a bit everywhere
         chunk = batch.get_chunk(batch_size)
         chunk = scale_df_by_length(chunk, cols_kmers, k, w)
         ml_model.partial_fit(chunk)
@@ -593,6 +595,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
         check_step.early_stop = early_stop
         check_step.timings.append(perf_counter())  # log time spent
+        # Check that taxonomy wasn't forgotten
+        if '0' in check_step.can_skip[5:] and check_step.early_stop >= 5:
+            assert osp.isdir(path_taxonomy), NotADirectoryError
 
         #    KMER COUNTING
         # get kmer distribution for each window of each genome, parallel folder with same structure
