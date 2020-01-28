@@ -185,7 +185,7 @@ class MockCommunity:
             for bin_id in tqdm(self.path_binned_fastq.keys()):
                 self.classifier(self.path_binned_fastq[bin_id], osp.join(self.db_path, f"{bin_id}"), arg=f"bin-{bin_id}")
         elif "full" in self.db_type:
-            self.classifier(self.path_original_fastq, osp.join(self.db_path, "full"), arg="full")
+            self.classifier(self.path_original_fastq, self.db_path, arg="full")
         else:
             NotImplementedError("The database choice is either full or bins")
                 
@@ -233,14 +233,15 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
                 path_model = file.path
                 break
         assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
+        path_to_hash = osp.join(path_database, f"{classifier}_hash")
     else:
         path_model = "full"
+        path_to_hash = path_database
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
     if param == "": param = osp.basename(path_database[:-1])
     logger.info(f"Assuming parameters are: {param}")
-    path_to_hash = osp.join(path_database, f"{classifier}_hash")
 
     for file in tqdm(list_fastq):
         # Binning
