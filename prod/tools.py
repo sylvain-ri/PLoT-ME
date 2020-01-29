@@ -15,6 +15,9 @@ import shutil
 from datetime import datetime
 import os
 import os.path as osp
+from multiprocessing import cpu_count
+from multiprocessing.pool import Pool
+
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -23,6 +26,7 @@ import logging
 # import sys
 # print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
 # print(sys.argv[0])
+from pandarallel import pandarallel
 from tqdm import tqdm
 
 
@@ -162,8 +166,13 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
         super().add_argument(*args, **kwargs)
 
 
-def scale_df_by_length(data, kmer_cols, k, w, single_row=False):
+def pll_scaling():
+    pass
+
+
+def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count()):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
+    pandarallel.initialize()
     ratio = 4**k / (w - k + 1)
     ratio = np.float32(ratio)
     if single_row:
@@ -174,7 +183,11 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False):
             data[col] = pd.to_numeric(data[col], downcast='float')
             # data[col] *= ratio
             # data.loc[:, col] *= ratio
-            data[col] = data[col].apply(lambda x: x*ratio)
+            data[col] = data[col].parallel_apply(lambda x: x*ratio)
+
+        # with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
+        #     results = list(tqdm(pool.imap(pll_scaling, data),
+        #                         total=len(df_per_fna)))
 
 
 class ScanFolder:
