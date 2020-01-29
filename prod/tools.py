@@ -188,14 +188,15 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count(
         with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
             results = list(tqdm(pool.imap(pll_scaling, (data.loc[:, col] for col in kmer_cols)),
                                 total=len(kmer_cols)))
+
+        for i, col in tqdm(enumerate(kmer_cols), total=len(kmer_cols)):
+            data.loc[:, col] = results[i]
+
         logger.debug(f"{data}")
         logger.debug(f"results len{len(results)}, {results[0]}")
         logger.debug(f"dataframe has been scaled {data.shape}")
-        logger.debug(f"{results}")
         logger.debug(f"{results[0]}")
         logger.debug(f"{type(results[0])}")
-        logger.debug(f"{len(results[0])}")
-        logger.debug(f"{results[0].shape}")
 
         # for col in tqdm(kmer_cols):
         #     data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
