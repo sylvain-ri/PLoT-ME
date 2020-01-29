@@ -276,7 +276,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
     if param == "": param = osp.basename(path_database[:-1])
     logger.info(f"Assuming parameters are: {param}")
 
-    for file in tqdm(list_fastq):
+    for i, file in enumerate(list_fastq):
+        logger.info(f"Opening fastq file ({i}/{len(list_fastq)}) {osp.basename(file)}")
         # Binning
         if "bins" in db_type:
             ReadToBin.set_fastq_model_and_param(file, path_model, param)
