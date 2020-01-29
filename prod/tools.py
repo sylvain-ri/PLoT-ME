@@ -183,19 +183,19 @@ pll_scaling.ratio = 0
 
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count()):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
-    pandarallel.initialize()
     ratio = 4**k / (w - k + 1)
     ratio = np.float32(ratio)
     if single_row:
         return data * ratio
     else:
         logger.info(f"Scaling the dataframe {data.shape}, converting to float32")
-        for col in tqdm(kmer_cols):
-            data[col] = pd.to_numeric(data[col], downcast='float')
-            # data[col] *= ratio
-            # data.loc[:, col] *= ratio
-            data[col] = data[col].parallel_apply(lambda x: x*ratio)
-
+        # pandarallel.initialize()
+        # for col in tqdm(kmer_cols):
+        #     data[col] = pd.to_numeric(data[col], downcast='float')
+        #     # data[col] *= ratio
+        #     # data.loc[:, col] *= ratio
+        #     data[col] = data[col].parallel_apply(lambda x: x*ratio)
+        kmer_cols = kmer_cols[:12]
         pll_scaling.ratio = ratio
         with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
             results = list(tqdm(pool.imap(pll_scaling, (data[col] for col in kmer_cols)),

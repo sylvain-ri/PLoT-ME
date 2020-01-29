@@ -22,6 +22,7 @@ import pickle
 import subprocess
 
 # todo: add timing record
+from time import perf_counter
 
 import numpy as np
 from Bio import SeqRecord, SeqIO
@@ -29,11 +30,42 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
-    ArgumentParserWithDefaults
+    ArgumentParserWithDefaults, time_to_h_m_s
 from bio import kmers_dic, seq_count_kmer
 
 
 logger = init_logger('classify')
+
+
+# Decorator for all these steps
+def check_step(func):
+    """ Decorator to print steps and check if results have already been computed
+        Need the second argument to be the output file/folder: it will check if the file exists / folder isn't empty
+    """
+    def wrapper(*args, **kwargs):
+        # Check arguments for debugging
+        args_repr = [repr(a) for a in args]
+        kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
+        signature = ",\t".join(args_repr + kwargs_repr)
+        to_check = args[1]  # Output path for file or folder, will check if the output already exists
+
+        # Time measurement
+        start_time = perf_counter()
+        logger.info(f"Step {check_step.step_nb} START, function \t{func.__name__}({signature})")
+        create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
+        result = func(*args, **kwargs)
+        # print time spent
+        logger.info(f"Step {check_step.step_nb} END, {time_to_h_m_s(start_time, perf_counter())}, "
+                    f"function {func.__name__}")
+
+        # Step counter
+        check_step.step_nb += 1
+        check_step.timings.append(perf_counter())  # log time for each step
+        return result
+    return wrapper
+
+
+check_step.timings
 
 
 # #############################################################################
