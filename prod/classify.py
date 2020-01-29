@@ -100,6 +100,10 @@ class ReadToBin(SeqRecord.SeqRecord):
             self._kmer_count = seq_count_kmer(self.seq, self.KMER.copy(), self.K, ignore_N=ignore_N)
         return self._kmer_count
 
+    @property
+    def path_out(self, cluster=None):
+        return f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster if cluster is None else cluster}.fastq"
+
     def scale(self):
         logger.debug("scaling the read by it's length and k-mer")
         self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
@@ -110,7 +114,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         logger.debug('finding bins for each read')
         self.cluster = int(self.MODEL.predict(self.scaled)[0])
         self.description = f"bin_id={self.cluster}|{self.description}"
-        self.path_out = f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster}.fastq"
+        # self.path_out = f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster}.fastq"
         # Save all output files
         ReadToBin.outputs[self.cluster] = self.path_out
         return self.cluster
@@ -140,6 +144,11 @@ class ReadToBin(SeqRecord.SeqRecord):
             cls.KMER = kmers_dic(cls.K)
             with open(path_model, 'rb') as f:
                 cls.MODEL = pickle.load(f)
+
+    @classmethod
+    def removes_existing_binned_fastq(cls):
+        # TODO: remove existing binned fastq, otherwise append all the time
+        pass
 
     @classmethod
     def bin_reads(cls):
