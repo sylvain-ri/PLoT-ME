@@ -26,7 +26,6 @@ import logging
 # import sys
 # print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
 # print(sys.argv[0])
-from pandarallel import pandarallel
 from tqdm import tqdm
 
 
@@ -169,13 +168,7 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
 def pll_scaling(serie):
     serie = pd.to_numeric(serie, downcast='float')
     serie *= pll_scaling.ratio
-    return serie
-
-
-def pll_scaling_apply(serie):
-    serie = pd.to_numeric(serie, downcast='float')
-    serie = serie.apply(lambda x: x*pll_scaling.ratio)
-    return serie
+    # return serie
 
 
 pll_scaling.ratio = 0
@@ -189,27 +182,21 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count(
         return data * ratio
     else:
         logger.info(f"Scaling the dataframe {data.shape}, converting to float32")
-        # pandarallel.initialize()
-        # for col in tqdm(kmer_cols):
-        #     data[col] = pd.to_numeric(data[col], downcast='float')
-        #     # data[col] *= ratio
-        #     # data.loc[:, col] *= ratio
-        #     data[col] = data[col].parallel_apply(lambda x: x*ratio)
-        kmer_cols = kmer_cols[:12]
+        logger.debug(f"{data}")
+
         pll_scaling.ratio = ratio
-        with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
-            results = list(tqdm(pool.imap(pll_scaling, (data[col] for col in kmer_cols)),
-                                total=len(kmer_cols)))
-        with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
-            results = list(tqdm(pool.imap(pll_scaling_apply(), (data[col] for col in kmer_cols)),
-                                total=len(kmer_cols)))
         with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
             results = list(tqdm(pool.imap(pll_scaling, (data.loc[:, col] for col in kmer_cols)),
                                 total=len(kmer_cols)))
-        with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
-            results = list(tqdm(pool.imap(pll_scaling_apply(), (data.loc[:, col] for col in kmer_cols)),
-                                total=len(kmer_cols)))
+        logger.debug(f"{data}")
         logger.debug(f"results len{len(results)}, {results[0]}")
+        logger.debug(f"dataframe has been scaled {data.shape}")
+
+        for col in tqdm(kmer_cols):
+            data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
+            data.loc[:, col] *= ratio
+        logger.debug(f"{data}")
+        logger.debug(f"results, {results[0]}")
         logger.debug(f"dataframe has been scaled {data.shape}")
 
 
