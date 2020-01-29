@@ -190,7 +190,7 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count(
                                 total=len(kmer_cols)))
 
         for i, col in tqdm(enumerate(kmer_cols), total=len(kmer_cols)):
-            data.loc[:, col] = results[i]
+            data[col] = results[i]
 
         logger.debug(f"{data}")
         logger.debug(f"results len{len(results)}, {results[0]}")
