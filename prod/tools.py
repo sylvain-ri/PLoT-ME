@@ -61,6 +61,7 @@ def init_logger(logger_name='reads_binning', verbose=True):
     # create formatter for the handlers
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # create file handler which logs even debug messages
+    # todo: find better log name: name of the script attached to the date ?
     fh = logging.FileHandler(PATHS.LOGS)
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
