@@ -38,7 +38,7 @@ logger = init_logger('classify')
 
 
 # Decorator for all these steps
-def check_step(func):
+def timing(func):
     """ Decorator to print steps and check if results have already been computed
         Need the second argument to be the output file/folder: it will check if the file exists / folder isn't empty
     """
@@ -51,21 +51,19 @@ def check_step(func):
 
         # Time measurement
         start_time = perf_counter()
-        logger.info(f"Step {check_step.step_nb} START, function \t{func.__name__}({signature})")
+        logger.info(f"Step {func.__name__} START, function \t{func.__name__}({signature})")
         create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
         result = func(*args, **kwargs)
         # print time spent
-        logger.info(f"Step {check_step.step_nb} END, {time_to_h_m_s(start_time, perf_counter())}, "
-                    f"function {func.__name__}")
+        logger.info(f"Step {func.__name__} END, {time_to_h_m_s(start_time, perf_counter())}")
 
         # Step counter
-        check_step.step_nb += 1
-        check_step.timings.append(perf_counter())  # log time for each step
+        timing.records.append(perf_counter())  # log time for each step
         return result
     return wrapper
 
 
-check_step.timings
+timing.records = []
 
 
 # #############################################################################

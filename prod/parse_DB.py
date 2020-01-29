@@ -13,7 +13,7 @@ Needs a lot of disk space, and RAM according to the largest genome to process.
 3 -> Copy these segments of genomes into bins (DISK intensive)
 4 -> kraken2-build --add-to-library
 5 -> kraken2-build --build
-6 -> Building the hash for the full refseq, for comparison bins vs full
+f -> Building the hash for the full refseq, for comparison bins vs full
 
 For 17GB file of combined kmer counts, combining counts took up to 55GB,
 loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
