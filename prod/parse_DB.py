@@ -410,7 +410,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     # Split it per file to allow parallel processing
     logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
     df_per_fna = []
-    # todo: parallel ?
+    # todo: parallel ? groupby ?
     for file in tqdm(df.fna_path.unique()):
         df_per_fna.append(df[df.fna_path == file])
 
@@ -432,8 +432,8 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
     """ launch kraken2-build add-to-library
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
-    add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
     delete_folder_if_exists(path_bins_hash)
+    add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
     create_n_folders(path_bins_hash, n_clusters)
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
