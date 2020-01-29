@@ -251,20 +251,6 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
                                                                      stop if stop>0 else None)),
                             total=ScanFolder.count_root_files()))
 
-    # Traditional sequential run
-    # for i, fastq in enumerate(ScanFolder.tqdm_scan()):
-    #     if osp.isfile(fastq.path_target) and force_recount is False:
-    #         logger.debug(f"File already existing, skipping ({fastq.path_target})")
-    #         return
-    #     with open(fastq.path_check) as f:
-    #         taxon = int(f.read())
-    #     genome = Genome(fastq.path_abs, fastq.path_target, taxon, segments=segments, k=k)
-    #     genome.load_genome()
-    #     genome.count_kmers_to_df()
-    #     if i > stop >= 0:
-    #         logger.warning("Early stop of the scanning")
-    #         break
-
     logger.info(f"{len(results)} genomes have been scanned and kmer counted.")
 
 
@@ -324,7 +310,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     # ## 1 ## Scaling by length and kmers
     df_mem = df.memory_usage(deep=False).sum()
     logger.info(f"Model loaded, scaling the values to the length of the segments. "
-                f"DataFrame size: {df_mem/10**9:.2f} GB.")
+                f"DataFrame size: {df_mem/10**9:.2f} GB - shape: {df.shape}")
 
     # todo: save intermediate data
     scale_df_by_length(df, cols_kmers, k, w)
@@ -438,7 +424,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
                             total=len(df_per_fna)))
 
-    logger.info(f"got {len(results)} results...")
+    logger.info(f"split {len(results)} genomes...")
 
 
 @check_step
