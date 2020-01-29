@@ -152,7 +152,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         counter = 0
         total = 0
         for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta")), desc="Counting number of reads",
-                             leave=True, position=0, dynamic_ncols=True):
+                             leave=True, position=0):
             pass
         for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying read to bins",
                            leave=True, position=0, dynamic_ncols=True):
@@ -214,7 +214,7 @@ class MockCommunity:
     def classify(self):
         self.logger.info(f"Classifying reads with {self.db_type} setting")
         if "bins" in self.db_type:
-            for bin_id in tqdm(self.path_binned_fastq.keys()):
+            for bin_id in self.path_binned_fastq.keys():
                 self.classifier(self.path_binned_fastq[bin_id], osp.join(self.db_path, f"{bin_id}"), arg=f"bin-{bin_id}")
         elif "full" in self.db_type:
             self.classifier(self.path_original_fastq, self.db_path, arg="full")
@@ -224,7 +224,7 @@ class MockCommunity:
     def kraken2(self, file, path_hash, arg="unknown"):
         hash_file = osp.join(path_hash, "hash.k2d")
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
-        self.logger.info(f'with kraken2. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
+        self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
         formatted_out = f"{self.path_out}.{arg}.kraken2" if self.db_type == "bins" else f"{self.path_out}.kraken2"
         self.logger.info(f'output is {formatted_out}.out')
         self.cmd = [
