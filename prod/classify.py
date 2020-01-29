@@ -151,9 +151,11 @@ class ReadToBin(SeqRecord.SeqRecord):
         # counter = len(results)
         counter = 0
         total = 0
-        for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta"))):
+        for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta")), desc="Counting number of reads",
+                             leave=True, position=0, dynamic_ncols=True):
             pass
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total):
+        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying read to bins",
+                           leave=True, position=0, dynamic_ncols=True):
             counter += 1
             custom_read = ReadToBin(record)
             # custom_read.kmer_count
@@ -192,7 +194,7 @@ class MockCommunity:
         self.db_path         = db_path    # location of the hash table for the classifier
         self.db_type         = db_type    # Either full or bins
         self.bin_nb          = bin_nb
-        self.folder_out      = f"{self.folder_report}/{self.file_name}"
+        self.folder_out      = osp.join(self.folder_report, self.file_name)
         if not os.path.isdir(self.folder_out):
             os.makedirs(self.folder_out)
         self.path_out        = osp.join(self.folder_out, f"{param}.{self.db_type}")
