@@ -166,8 +166,19 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
         super().add_argument(*args, **kwargs)
 
 
-def pll_scaling():
-    pass
+def pll_scaling(serie):
+    serie = pd.to_numeric(serie, downcast='float')
+    serie *= pll_scaling.ratio
+    return serie
+
+
+def pll_scaling_apply(serie):
+    serie = pd.to_numeric(serie, downcast='float')
+    serie = serie.apply(lambda x: x*pll_scaling.ratio)
+    return serie
+
+
+pll_scaling.ratio = 0
 
 
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count()):
@@ -178,16 +189,28 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count(
     if single_row:
         return data * ratio
     else:
-        logger.info(f"Scaling the dataframe, converting to float32")
+        logger.info(f"Scaling the dataframe {data.shape}, converting to float32")
         for col in tqdm(kmer_cols):
             data[col] = pd.to_numeric(data[col], downcast='float')
             # data[col] *= ratio
             # data.loc[:, col] *= ratio
             data[col] = data[col].parallel_apply(lambda x: x*ratio)
 
-        # with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
-        #     results = list(tqdm(pool.imap(pll_scaling, data),
-        #                         total=len(df_per_fna)))
+        pll_scaling.ratio = ratio
+        with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
+            results = list(tqdm(pool.imap(pll_scaling, (data[col] for col in kmer_cols)),
+                                total=len(kmer_cols)))
+        with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
+            results = list(tqdm(pool.imap(pll_scaling_apply(), (data[col] for col in kmer_cols)),
+                                total=len(kmer_cols)))
+        with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
+            results = list(tqdm(pool.imap(pll_scaling, (data.loc[:, col] for col in kmer_cols)),
+                                total=len(kmer_cols)))
+        with Pool(cores) as pool:  # file copy don't need many cores (main.cores)
+            results = list(tqdm(pool.imap(pll_scaling_apply(), (data.loc[:, col] for col in kmer_cols)),
+                                total=len(kmer_cols)))
+        logger.debug(f"results len{len(results)}, {results[0]}")
+        logger.debug(f"dataframe has been scaled {data.shape}")
 
 
 class ScanFolder:

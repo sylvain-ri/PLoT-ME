@@ -424,6 +424,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     # Split it per file to allow parallel processing
     logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
     df_per_fna = []
+    # todo: parallel ?
     for file in tqdm(df.fna_path.unique()):
         df_per_fna.append(df[df.fna_path == file])
 
