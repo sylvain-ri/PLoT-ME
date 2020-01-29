@@ -589,8 +589,10 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     except KeyboardInterrupt:
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
+        check_step.timings.append(perf_counter())  # log time for the last step that has been interrupted
     except Exception as e:
         logger.exception(e)
+        check_step.timings.append(perf_counter())  # log time for the last step that has been interrupted
 
     finally:
         # End
