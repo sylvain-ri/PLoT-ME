@@ -168,7 +168,7 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
 def pll_scaling(serie):
     serie = pd.to_numeric(serie, downcast='float')
     serie *= pll_scaling.ratio
-    # return serie
+    return serie
 
 
 pll_scaling.ratio = 0
@@ -191,13 +191,18 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count(
         logger.debug(f"{data}")
         logger.debug(f"results len{len(results)}, {results[0]}")
         logger.debug(f"dataframe has been scaled {data.shape}")
+        logger.debug(f"{results}")
+        logger.debug(f"{results[0]}")
+        logger.debug(f"{type(results[0])}")
+        logger.debug(f"{len(results[0])}")
+        logger.debug(f"{results[0].shape}")
 
-        for col in tqdm(kmer_cols):
-            data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
-            data.loc[:, col] *= ratio
-        logger.debug(f"{data}")
-        logger.debug(f"results, {results[0]}")
-        logger.debug(f"dataframe has been scaled {data.shape}")
+        # for col in tqdm(kmer_cols):
+        #     data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
+        #     data.loc[:, col] *= ratio
+        # logger.debug(f"{data}")
+        # logger.debug(f"results, {results[0]}")
+        # logger.debug(f"dataframe has been scaled {data.shape}")
 
 
 class ScanFolder:
