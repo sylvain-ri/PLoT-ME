@@ -317,8 +317,8 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     w = main.w
 
     df = pd.read_csv(path_kmer_counts)
-    cols_kmers = df.columns[-256:]
-    cols_spe = df.columns[:-256]
+    cols_kmers = df.columns[-4**k:]
+    cols_spe = df.columns[:-4**k]
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
     # ## 1 ## Scaling by length and kmers
