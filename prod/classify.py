@@ -38,6 +38,7 @@ logger = init_logger('classify')
 
 
 # Decorator for all these steps
+# todo: find to which function to apply it to. How to track multiple files
 def timing(func):
     """ Decorator to print steps and check if results have already been computed
         Need the second argument to be the output file/folder: it will check if the file exists / folder isn't empty
@@ -47,23 +48,23 @@ def timing(func):
         args_repr = [repr(a) for a in args]
         kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
         signature = ",\t".join(args_repr + kwargs_repr)
-        to_check = args[1]  # Output path for file or folder, will check if the output already exists
 
         # Time measurement
         start_time = perf_counter()
-        logger.info(f"Step {func.__name__} START, function \t{func.__name__}({signature})")
-        create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
-        result = func(*args, **kwargs)
-        # print time spent
-        logger.info(f"Step {func.__name__} END, {time_to_h_m_s(start_time, perf_counter())}")
-
-        # Step counter
-        timing.records.append(perf_counter())  # log time for each step
+        try:
+            logger.debug(f"START, function \t{func.__name__}({signature})")
+            result = func(*args, **kwargs)
+            # print time spent
+            logger.debug(f"END, {time_to_h_m_s(start_time, perf_counter())}")
+        except:
+            result = None
+        finally:
+            timing.records.append({"func": func.__name__, "time": perf_counter()})  # log time for each step
         return result
     return wrapper
 
 
-timing.records = []
+timing.records = [{"func": "start", "time": perf_counter()}]
 
 
 # #############################################################################
@@ -153,25 +154,29 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
+        # todo: remove existing fastq bin files to avoid appending
+        logger.info(f"Removing existing fast bins")
+
         logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
-        # todo: try to parallelize it, careful of file writing concurrency
+        # todo: try to parallelize it, careful of file writing concurrency.
+        #  Dask ? process to load and count kmers, single one for appending read to fastq ?
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
         counter = 0
         total = 0
         for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta")), desc="Counting number of reads",
-                             leave=True, position=0):
+                             leave=True):
             pass
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying read to bins",
-                           leave=True, position=0, dynamic_ncols=True):
+        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying reads to bins",
+                           leave=True, dynamic_ncols=True):
             counter += 1
             custom_read = ReadToBin(record)
             # custom_read.kmer_count
             custom_read.scale()
             custom_read.find_bin()
             custom_read.to_fastq()
-        logger.info(f"{counter} reads binned into bins: " + ", ".join(map(str, cls.outputs.keys())))
+        logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
         return cls.outputs
 
 
@@ -299,6 +304,12 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
             path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param)
 
         fastq_classifier.classify()
+
+    times = timing.records
+    for i in range(len(times) - 1):
+        logger.info(f"timing for function {times[i]['func']} - {time_to_h_m_s(times[i]['time'], times[i + 1]['time'])}")
+    logger.info(f"Script ended, total time of {time_to_h_m_s(times[0]['time'], perf_counter())}.")
+    print()
 
 
 bin_classify.classifiers = ('kraken2',)

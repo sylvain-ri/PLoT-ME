@@ -153,7 +153,7 @@ def create_n_folders(path, n, delete_existing=False):
         new_path = osp.join(path, str(i))
         if delete_existing and osp.isdir(new_path):
             shutil.rmtree(new_path)
-        create_path(new_path, with_filename=False)
+        create_path(new_path)
 
 
 def add_file_with_parameters(folder, add_description=""):
@@ -196,7 +196,6 @@ def check_step(func):
             # Time measurement
             start_time = perf_counter()
             logger.info(f"Step {check_step.step_nb} START, function \t{func.__name__}({signature})")
-            create_path(to_check, with_filename=True if "." in osp.split(to_check)[1] else False)
             result = func(*args, **kwargs)
             # print time spent
             logger.info(f"Step {check_step.step_nb} END, {time_to_h_m_s(start_time, perf_counter())}, "
@@ -235,6 +234,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
     """ Scan through RefSeq, split genomes into segments, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
+    create_path(folder_kmers)
     # scanning folder Class set up:
     ScanFolder.set_folder_scan_options(scanning=scanning, target=folder_kmers,
                                        ext_find=(".fastq", ".fq", ".fna"), ext_check=".taxon",
@@ -298,9 +298,13 @@ def append_genome_kmer_counts(folder_kmers, path_df):
 def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
-    logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
+    # Paths
+    create_path(output_pred)
+    create_path(path_model)
     k = main.k
     w = main.w
+
+    logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
 
     df = pd.read_csv(path_kmer_counts)
     cols_kmers = df.columns[-4**k:]
@@ -316,9 +320,6 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     scale_df_by_length(df, cols_kmers, k, w)
 
     # ## 2 ## Could add PCA
-
-    # Paths
-    create_path(path_model)
 
     # Model learning
     logger.info(f"Data takes {df_mem/10**9:.2f} GB. Training {model_name}...")
@@ -429,12 +430,12 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
 
 @check_step
 def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
-    """ launch kraken2-build add-to-library
+    """ launch kraken2-build add-to-library. DELETE EXISTING FOLDER !!
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
     delete_folder_if_exists(path_bins_hash)
-    add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
     create_n_folders(path_bins_hash, n_clusters)
+    add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
@@ -478,6 +479,7 @@ def kraken2_full(path_refseq, path_output, taxonomy):
     """ Build the hash table with the same genomes, but in one bin, for comparison """
     add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
     delete_folder_if_exists(path_output)
+    create_path(path_output)
 
     logger.warning(f"DO NOT INTERRUPT this process, you will have restart from scratches.")
     # Add genomes to
@@ -643,9 +645,9 @@ if __name__ == '__main__':
 # Deprecated method
 def kmer_pkl_path(kmer_folder, fna_path, taxo_ext="gff"):
     """ Legacy method, might not use it anymore in the future
-        Return a file name based on the taxonomy id instead of the file name.
+        Return the taxonomy id from a description file of a genome.
         We retrieve the taxo id from the .gff file.
-        To avoid re-reading file, taxo id is stored into <bac>.taxon
+        To avoid re-reading file, taxo id is stored into <genome>.taxon
     """
     assert taxo_ext in ("gbk", "gff"), "Only extensions .gbk and .gff are implemented"
 

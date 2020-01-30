@@ -106,9 +106,9 @@ def is_valid_file(x):
         raise FileNotFoundError(f'The path is not a file : {x}')
 
 
-def create_path(path, with_filename=True):
+def create_path(path):
     """ Create the intermediate folders if not existing. """
-    folder = osp.split(path)[0] if with_filename else path
+    folder = osp.dirname(path) if "." in osp.basename(path) else path
     if not osp.isdir(folder):
         logger.log(5, f"created folder {folder}")
         os.makedirs(folder)
