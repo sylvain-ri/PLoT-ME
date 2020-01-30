@@ -152,17 +152,17 @@ class ReadToBin(SeqRecord.SeqRecord):
         counter = 0
         total = 0
         for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta")), desc="Counting number of reads",
-                             leave=True, position=0):
+                             leave=True):
             pass
         for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying read to bins",
-                           leave=True, position=0, dynamic_ncols=True):
+                           leave=True, dynamic_ncols=True):
             counter += 1
             custom_read = ReadToBin(record)
             # custom_read.kmer_count
             custom_read.scale()
             custom_read.find_bin()
             custom_read.to_fastq()
-        logger.info(f"{counter} reads binned into bins: " + ", ".join(map(str, cls.outputs.keys())))
+        logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
         return cls.outputs
 
 
