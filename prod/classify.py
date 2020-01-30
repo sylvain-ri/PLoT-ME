@@ -105,13 +105,13 @@ class ReadToBin(SeqRecord.SeqRecord):
         return f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster if cluster is None else cluster}.fastq"
 
     def scale(self):
-        logger.debug("scaling the read by it's length and k-mer")
+        logger.log(5, "scaling the read by it's length and k-mer")
         self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
                                          None, k=self.K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
-        logger.debug('finding bins for each read')
+        logger.log(5, 'finding bins for each read')
         self.cluster = int(self.MODEL.predict(self.scaled)[0])
         self.description = f"bin_id={self.cluster}|{self.description}"
         # self.path_out = f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster}.fastq"
