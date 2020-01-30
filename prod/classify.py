@@ -145,8 +145,12 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
+        # todo: remove existing fastq bin files to avoid appending
+        logger.info(f"Removing existing fast bins")
+
         logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
-        # todo: try to parallelize it, careful of file writing concurrency
+        # todo: try to parallelize it, careful of file writing concurrency.
+        #  Dask ? process to load and count kmers, single one for appending read to fastq ?
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
@@ -155,7 +159,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta")), desc="Counting number of reads",
                              leave=True):
             pass
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying read to bins",
+        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying reads to bins",
                            leave=True, dynamic_ncols=True):
             counter += 1
             custom_read = ReadToBin(record)
