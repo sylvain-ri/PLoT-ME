@@ -58,7 +58,7 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
-    time_to_h_m_s, ArgumentParserWithDefaults, delete_folder_if_exists
+    time_to_hms, ArgumentParserWithDefaults, delete_folder_if_exists
 from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
@@ -198,7 +198,7 @@ def check_step(func):
             logger.info(f"Step {check_step.step_nb} START, function \t{func.__name__}({signature})")
             result = func(*args, **kwargs)
             # print time spent
-            logger.info(f"Step {check_step.step_nb} END, {time_to_h_m_s(start_time, perf_counter())}, "
+            logger.info(f"Step {check_step.step_nb} END, {time_to_hms(start_time, perf_counter())}, "
                         f"function {func.__name__}")
 
         # Step counter
@@ -591,8 +591,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         # End
         times = check_step.timings
         for i in range(len(times)-1):
-            logger.info(f"timing for STEP {i} - {time_to_h_m_s(times[i], times[i+1])}")
-        logger.info(f"Script ended, total time of {time_to_h_m_s(times[0], perf_counter())}.")
+            logger.info(f"timing for STEP {i} - {time_to_hms(times[i], times[i+1])}")
+        logger.info(f"Script ended, total time of {time_to_hms(times[0], perf_counter())}.")
         print()
 
 
