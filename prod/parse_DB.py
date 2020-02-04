@@ -304,7 +304,8 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     k = main.k
     w = main.w
 
-    logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts...")
+    logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
+                f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
 
     df = pd.read_csv(path_kmer_counts)
     cols_kmers = df.columns[-4**k:]
