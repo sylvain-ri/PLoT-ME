@@ -13,16 +13,17 @@ Reads Binning Project
 """
 
 import argparse
+from datetime import datetime as dt
 import logging
 from multiprocessing import cpu_count
-import os
 from multiprocessing.pool import Pool
+import os
 from os import path as osp
 import pickle
-import subprocess
-
 # todo: add timing record
+import subprocess
 from time import perf_counter
+
 
 import numpy as np
 from Bio import SeqRecord, SeqIO
@@ -122,7 +123,6 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def to_fastq(self):
         assert self.path_out is not None, AttributeError("Path of the fastq file must first be defined")
-        create_path(self.path_out)
         with open(self.path_out, "a") as f:
             SeqIO.write(self, f, "fasta")
 
@@ -132,7 +132,15 @@ class ReadToBin(SeqRecord.SeqRecord):
         cls.PARAM = param
         cls.FASTQ_PATH = path_fastq
         folder, file_base = osp.split(osp.splitext(path_fastq)[0])
+        # output folder, will host one file for each bin
         cls.FASTQ_BIN_FOLDER = osp.join(folder, param)
+        if osp.isdir(cls.FASTQ_BIN_FOLDER):
+            last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
+            save_folder = f"{cls.FASTQ_BIN_FOLDER}_{last_modif:%Y-%m-%d_%H-%M}"
+            logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
+            os.rename(cls.FASTQ_BIN_FOLDER, save_folder)
+        create_path(cls.FASTQ_BIN_FOLDER)
+
         cls.FILEBASE = file_base
         logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
         # /home/ubuntu/data/Segmentation/4mer_s10000/clustered_by_minikm_4mer_s10000/model_miniKM_4mer_s10000.pkl
