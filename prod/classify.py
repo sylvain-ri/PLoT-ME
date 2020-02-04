@@ -290,7 +290,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
             t[key]["hashes"] = fastq_classifier.hash_files
 
 
-        except:
+        except Exception as e:
+            logger.exception(e)
             logger.warning(f"script crashed for file: {file}")
 
     for key in t.keys():
