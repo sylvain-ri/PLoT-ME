@@ -136,7 +136,7 @@ def div_z(n, d):
 
 
 def time_to_hms(start, end, fstring=True, short=False):
-    assert start < end, ArithmeticError(f"The start time is later than the end time: {start} > {end}")
+    assert start <= end, ArithmeticError(f"The start time is later than the end time: {start} > {end}")
     delay = int(end - start)
     m, s = divmod(delay, 60)
     h, m = divmod(m, 60)
