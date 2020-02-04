@@ -155,11 +155,6 @@ class ReadToBin(SeqRecord.SeqRecord):
                 cls.MODEL = pickle.load(f)
 
     @classmethod
-    def removes_existing_binned_fastq(cls):
-        # TODO: remove existing binned fastq, otherwise append all the time
-        pass
-
-    @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
         # todo: remove existing fastq bin files to avoid appending
