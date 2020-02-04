@@ -512,7 +512,7 @@ def kraken2_full(path_refseq, path_output, taxonomy):
 
 
 #   **************************************************    MAIN   **************************************************   #
-def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="11111",
+def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", ml_model=clustering_segments.models[0], full_DB=False):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
@@ -562,9 +562,10 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
             #    CLUSTERING
             # From kmer distributions, use clustering to set the bins per segment
-            folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{ml_model}_{main.k}mer_s{main.w}{omitted}")
-            path_model = osp.join(folder_by_model, f"model_{ml_model}_{main.k}mer_s{main.w}.pkl")
-            path_segments_clustering = osp.join(folder_by_model, f"segments_clustered.{main.k}mer_s{main.w}.pd")
+            string_param = f"{ml_model}_{n_clusters}bins_{main.k}mer_s{main.w}{omitted}"
+            folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{string_param}")
+            path_model = osp.join(folder_by_model, f"model_{string_param}.pkl")
+            path_segments_clustering = osp.join(folder_by_model, f"segments_clustered.{string_param}.pd")
             clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
 
             #    CREATING THE DATABASES
