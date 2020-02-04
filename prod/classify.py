@@ -242,7 +242,7 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
 
 
 def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
-                 cores=cpu_count(), f_record="~/classify_records.csv"):
+                 cores=cpu_count(), f_record="/home/ubuntu/classify_records.csv"):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -364,7 +364,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
-                                              default="~/classify_records.csv", type=str, metavar='')
+                                              default="/home/ubuntu/classify_records.csv", type=str, metavar='')
     # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
 
     args = parser.parse_args()
