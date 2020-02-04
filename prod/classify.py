@@ -20,7 +20,6 @@ from multiprocessing.pool import Pool
 import os
 from os import path as osp
 import pickle
-# todo: add timing record
 import subprocess
 from time import perf_counter
 
@@ -31,41 +30,11 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
-    ArgumentParserWithDefaults, time_to_h_m_s
+    ArgumentParserWithDefaults, time_to_hms
 from bio import kmers_dic, seq_count_kmer
 
 
 logger = init_logger('classify')
-
-
-# Decorator for all these steps
-# todo: find to which function to apply it to. How to track multiple files
-def timing(func):
-    """ Decorator to print steps and check if results have already been computed
-        Need the second argument to be the output file/folder: it will check if the file exists / folder isn't empty
-    """
-    def wrapper(*args, **kwargs):
-        # Check arguments for debugging
-        args_repr = [repr(a) for a in args]
-        kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
-        signature = ",\t".join(args_repr + kwargs_repr)
-
-        # Time measurement
-        start_time = perf_counter()
-        try:
-            logger.debug(f"START, function \t{func.__name__}({signature})")
-            result = func(*args, **kwargs)
-            # print time spent
-            logger.debug(f"END, {time_to_h_m_s(start_time, perf_counter())}")
-        except:
-            result = None
-        finally:
-            timing.records.append({"func": func.__name__, "time": perf_counter()})  # log time for each step
-        return result
-    return wrapper
-
-
-timing.records = [{"func": "start", "time": perf_counter()}]
 
 
 # #############################################################################
@@ -88,7 +57,6 @@ class ReadToBin(SeqRecord.SeqRecord):
         self.cluster = None
         self._kmer_count = None
         self.scaled = None
-        self.path_out = None
 
     def __getattr__(self, attr):
         if attr in self.__dict__:
@@ -290,25 +258,43 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
     if param == "": param = osp.basename(path_database[:-1])
     logger.info(f"Assuming parameters are: {param}")
 
+    times = {}  # recording time at each step
     for i, file in enumerate(list_fastq):
-        logger.info(f"Opening fastq file ({i}/{len(list_fastq)}) {osp.basename(file)}")
-        # Binning
-        if "bins" in db_type:
-            ReadToBin.set_fastq_model_and_param(file, path_model, param)
-            fastq_binned = ReadToBin.bin_reads()
+        try:
+            assert osp.isfile(file), FileNotFoundError(f"file number {i} not found: {file}")
+            # setting time
+            base_name = osp.basename(file)
+            key = f"{i}-{base_name}"
+            times[key] = {}
+            times[key]["start"] = perf_counter()
+
+            logger.info(f"Opening fastq file ({i}/{len(list_fastq)}) {base_name}")
+            # Binning
+            if "bins" in db_type:
+                ReadToBin.set_fastq_model_and_param(file, path_model, param)
+                fastq_binned = ReadToBin.bin_reads()
+                times[key]["binning"] = perf_counter()
+            else:
+                fastq_binned = {}
+
+            fastq_classifier = MockCommunity(
+                path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
+                path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param)
+
+            fastq_classifier.classify()
+            times[key]["classify"] = perf_counter()
+
+        except:
+            logger.warning(f"script crashed for file: {file}")
+
+    for key in times.keys():
+        if "binning" in times[key]:
+            logger.info(f"timings for file {key} / binning : {time_to_hms(times[key]['start'], times[key]['binning'])}")
+            logger.info(f"timings for file {key} / classify: {time_to_hms(times[key]['binning'], times[key]['classify'])}")
         else:
-            fastq_binned = {}
+            logger.info(f"timings for file {key} / classify: {time_to_hms(times[key]['start'], times[key]['classify'])}")
 
-        fastq_classifier = MockCommunity(
-            path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
-            path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param)
-
-        fastq_classifier.classify()
-
-    times = timing.records
-    for i in range(len(times) - 1):
-        logger.info(f"timing for function {times[i]['func']} - {time_to_h_m_s(times[i]['time'], times[i + 1]['time'])}")
-    logger.info(f"Script ended, total time of {time_to_h_m_s(times[0]['time'], perf_counter())}.")
+    logger.info(f"Script ended, {len(times)} files processed")
     print()
 
 
