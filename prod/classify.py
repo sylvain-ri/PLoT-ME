@@ -242,6 +242,10 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
 
 def bin_classify(list_fastq, path_report, path_database, classifier, db_type, cores=cpu_count()):
     """ Should load a file, do all the processing """
+    print("\n*********************************************************************************************************")
+    logger.info("**** Starting script **** \n ")
+    logger.info(f"Script {__file__} called with {args}")
+
     bin_classify.cores = cores
     logger.info("let's classify reads!")
 
@@ -337,7 +341,6 @@ if __name__ == '__main__':
     # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
 
     args = parser.parse_args()
-    logger.info(f'script called with following arguments: {args.input_fastq}, {args.output_folder}, {args.classifier}')
 
     bin_classify(args.input_fastq, args.output_folder, args.database,
                  classifier=args.classifier, db_type=args.db_type, cores=args.threads)
