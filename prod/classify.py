@@ -252,7 +252,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
     # preparing csv record file
     with open(f_record, 'a', newline='') as csvfile:
         csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS")
+        headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS", "HASH_PATH", "HASH_NAME")
         csv_writer.writerow(headers)
 
     logger.info("let's classify reads!")
@@ -330,7 +330,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['start'], t[key]['classify'])}")
 
         # to CSV
-        row = (key, db_type, t_binning, t_classify, t_total, f"{h_size/10**9:.2f}GB", f"{len(hashes)}")
+        row = (key, db_type, t_binning, t_classify, t_total, f"{h_size/10**9:.2f}GB", f"{len(hashes)}",
+               path_database, osp.basename(path_database))
         records.append(row)
 
     # Timings and to csv
