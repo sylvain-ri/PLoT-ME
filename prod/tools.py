@@ -149,7 +149,7 @@ def time_to_hms(start, end, fstring=True):
 class ArgumentParserWithDefaults(argparse.ArgumentParser):
     """ Customized Argparser to get both formatted docstring and defaults arguments
         https://stackoverflow.com/a/52025430/4767645 """
-    def add_argument(self, *args, help=None, default=None, **kwargs):
+    def add_argument(self, *args, help=None, default=None, choices=None, **kwargs):
         if help is not None:
             kwargs['help'] = help
         if default not in (None, '') and args[0] != '-h':
@@ -162,6 +162,10 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
                     kwargs['help'] += f' ({type(default).__name__} - default: "{formatted})"'
                 else:
                     kwargs['help'] += f' ({type(default).__name__} - default: {default} )'
+        if choices not in (None, [], ()) and args[0] != '-h':
+            kwargs['default'] = default
+            if help is not None:
+                kwargs['help'] += " (choices: " + ", ".join(choices) + ")"
         super().add_argument(*args, **kwargs)
 
 
