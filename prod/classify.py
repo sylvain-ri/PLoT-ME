@@ -330,7 +330,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['start'], t[key]['classify'])}")
 
         # to CSV
-        row = (key, db_type, t_binning, t_classify, t_total, f"{h_size/10**9:.2f} GB", f"{len(hashes)}")
+        row = (key, db_type, t_binning, t_classify, t_total, f"{h_size/10**9:.2f}GB", f"{len(hashes)}")
         records.append(row)
 
     # Timings and to csv
