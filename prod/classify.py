@@ -47,7 +47,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     FILEBASE = ""
     MODEL = None
     PARAM = ""
-    CORES = cpu_count()
+    CORES = 1
     outputs = {}
     NUMBER_BINNED = 0
 
@@ -96,8 +96,9 @@ class ReadToBin(SeqRecord.SeqRecord):
             SeqIO.write(self, f, "fasta")
 
     @classmethod
-    def set_fastq_model_and_param(cls, path_fastq, path_model, param):
+    def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
+        cls.CORES = cores
         cls.PARAM = param
         cls.FASTQ_PATH = path_fastq
         folder, file_base = osp.split(osp.splitext(path_fastq)[0])
@@ -163,7 +164,7 @@ class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
     def __init__(self, path_original_fastq, db_path, db_type, folder_report, path_binned_fastq={}, bin_nb=10,
-                 classifier_name="kraken2", param="", cores=cpu_count(), dry_run=False, verbose=False):
+                 classifier_name="kraken2", param="", cores=1, dry_run=False, verbose=False):
         self.logger = logging.getLogger('classify.MockCommunity')
 
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
@@ -239,8 +240,9 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
                    "2019-12-19_20-WindowReads_EColi_Test/2019-12-19_20-WindowReads_10-EColiTest.fastq"]
 
 
-def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
+def bin_classify(list_fastq, path_report, path_database, classifier, db_type, cores=cpu_count()):
     """ Should load a file, do all the processing """
+    bin_classify.cores = cores
     logger.info("let's classify reads!")
 
     # Find the model
@@ -274,7 +276,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
             logger.info(f"Opening fastq file ({i}/{len(list_fastq)}) {base_name}")
             # Binning
             if "bins" in db_type:
-                ReadToBin.set_fastq_model_and_param(file, path_model, param)
+                ReadToBin.set_fastq_model_and_param(file, path_model, param, cores)
                 fastq_binned = ReadToBin.bin_reads()
                 t[key]["binning"] = perf_counter()
                 t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
@@ -283,7 +285,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
 
             fastq_classifier = MockCommunity(
                 path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
-                path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param)
+                path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param, cores=cores)
 
             fastq_classifier.classify()
             t[key]["classify"] = perf_counter()
@@ -310,6 +312,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
 
 
 bin_classify.classifiers = ('kraken2',)
+bin_classify.cores = 1
 
 
 def test_classification():
@@ -326,8 +329,9 @@ if __name__ == '__main__':
                                                    'and "model_<name>.pkl" ')
     parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
                                               choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
-    parser.add_argument('-t', '--db_type',    help='Choose to use the standard full database or the segmented one',
+    parser.add_argument('-d', '--db_type',    help='Choose to use the standard full database or the segmented one',
                                               default='bins', choices=('full', 'bins',) , metavar='')
+    parser.add_argument('-t', '--threads', default=cpu_count(), type=int, help='Number of threads', metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
@@ -336,7 +340,7 @@ if __name__ == '__main__':
     logger.info(f'script called with following arguments: {args.input_fastq}, {args.output_folder}, {args.classifier}')
 
     bin_classify(args.input_fastq, args.output_folder, args.database,
-                 classifier=args.classifier, db_type=args.db_type)
+                 classifier=args.classifier, db_type=args.db_type, cores=args.threads)
 
 
 
