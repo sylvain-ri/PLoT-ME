@@ -157,9 +157,6 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
-        # todo: remove existing fastq bin files to avoid appending
-        logger.info(f"Removing existing fast bins")
-
         logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
         # todo: try to parallelize it, careful of file writing concurrency.
         #  Dask ? process to load and count kmers, single one for appending read to fastq ?
