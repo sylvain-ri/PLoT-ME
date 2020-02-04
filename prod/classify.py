@@ -368,7 +368,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     bin_classify(args.input_fastq, args.output_folder, args.database,
-                 classifier=args.classifier, db_type=args.db_type, cores=args.threads, record=record)
+                 classifier=args.classifier, db_type=args.db_type, cores=args.threads, f_record=args.record)
 
 
 
