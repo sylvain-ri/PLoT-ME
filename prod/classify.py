@@ -301,13 +301,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             logger.exception(e)
             logger.warning(f"script crashed for file: {file}")
 
-    # Timings and to csv
-    row = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS")
-
-    with open(f_record, 'a', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-    csv_writer.writerow(row)
-    record = []
+    records = []
     for key in t.keys():
         if 'classify' not in t[key].keys():
             break
@@ -331,8 +325,14 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
 
         # to CSV
         row = (key, db_type, t_binning, t_classify, t_total, f"{h_size/10**9:.2f} GB", f"{len(hashes)}")
-        csv_writer.writerow(row)
-        record.append(row)
+        records.append(row)
+
+    # Timings and to csv
+    with open(f_record, 'a', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS")
+        csv_writer.writerow(headers)
+        csv_writer.writerows(records)
 
     logger.info(f"Script ended, {len(t)} files processed")
     print()
