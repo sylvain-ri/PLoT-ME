@@ -301,7 +301,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
             hashes = t[key]["hashes"]
             size = sum([osp.getsize(f) for f in hashes.values()])
             logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['binning'], t[key]['classify'])}, "
-                        f"{len(hashes)} bins, total size of {size/10**9:.2f} GB")
+                        f"{len(hashes)} bins, total size of hashes loaded: {size/10**9:.2f} GB")
         else:
             logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['start'], t[key]['classify'])}")
 
