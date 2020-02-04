@@ -49,6 +49,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     PARAM = ""
     CORES = cpu_count()
     outputs = {}
+    NUMBER_BINNED = 0
 
     def __init__(self, obj):
         # wrap the object
@@ -133,9 +134,8 @@ class ReadToBin(SeqRecord.SeqRecord):
         # counter = len(results)
         counter = 0
         total = 0
-        for total, _ in tqdm(enumerate(SeqIO.parse(cls.FASTQ_PATH, "fasta")), desc="Counting number of reads",
-                             leave=True):
-            pass
+        for _ in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), desc="Counting number of reads", leave=True):
+            total += 1
         for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying reads to bins",
                            leave=True, dynamic_ncols=True):
             counter += 1
@@ -145,6 +145,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             custom_read.find_bin()
             custom_read.to_fastq()
         logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
+        cls.NUMBER_BINNED = counter
         return cls.outputs
 
 
@@ -274,6 +275,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
                 ReadToBin.set_fastq_model_and_param(file, path_model, param)
                 fastq_binned = ReadToBin.bin_reads()
                 times[key]["binning"] = perf_counter()
+                times[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
             else:
                 fastq_binned = {}
 
@@ -289,7 +291,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
 
     for key in times.keys():
         if "binning" in times[key]:
-            logger.info(f"timings for file {key} / binning : {time_to_hms(times[key]['start'], times[key]['binning'])}")
+            logger.info(f"timings for file {key} / binning : {time_to_hms(times[key]['start'], times[key]['binning'])}, "
+                        f"for {times[key]['reads_nb']} reads")
             logger.info(f"timings for file {key} / classify: {time_to_hms(times[key]['binning'], times[key]['classify'])}")
         else:
             logger.info(f"timings for file {key} / classify: {time_to_hms(times[key]['start'], times[key]['classify'])}")
