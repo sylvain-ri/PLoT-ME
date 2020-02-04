@@ -46,6 +46,7 @@ def seq_count_kmer(seq, kmer_count=None, k=4, ignore_N=True):
         kmer_count: dict with all combinations of nucleotides, initialized with zeros (kmer_template["AAAA"] = 0, kmer_count["AAAC"] = 0...)
         the new string hashing behaviour, BiopythonWarning: Using str(seq) to use the new behaviour
     """
+    # todo: numba. to speed the counting by a few folds
     if kmer_count is None:
         kmer_count = kmers_dic(k)
     logger.log(5, 'counting kmers')
