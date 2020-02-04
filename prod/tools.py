@@ -36,7 +36,7 @@ class ProjectPaths:
         self.home = str(Path.home())
         self.data = f"{self.home}/Data"
         n = datetime.now()
-        self.LOGS = f"{self.home}/logs/{n:%Y}-{n:%m}-{n:%d}_{n:%H}-{n:%M}.log"
+        self.LOGS = f"{self.home}/logs/{n:%Y-%m-%d_%H-%M}.log"  # short for f"{n:%Y}-{n:%m}-{n:%d}_{n:%H}-{n:%M}.log"
 
         # self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
         # self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
