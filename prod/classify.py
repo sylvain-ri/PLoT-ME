@@ -312,9 +312,9 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
         if 'classify' not in t[key].keys():
             break
         if "binning" in t[key]:
-            t_binning = time_to_hms(t[key]['start'], t[key]['binning'], short=False)
-            t_classify = time_to_hms(t[key]['binning'], t[key]['classify'], short=False)
-            t_total = time_to_hms(t[key]['start'], t[key]['classify'], short=False)
+            t_binning = time_to_hms(t[key]['start'], t[key]['binning'], short=True)
+            t_classify = time_to_hms(t[key]['binning'], t[key]['classify'], short=True)
+            t_total = time_to_hms(t[key]['start'], t[key]['classify'], short=True)
             hashes = t[key]["hashes"]
             h_size = sum([osp.getsize(f) for f in hashes.values()])
 
@@ -322,8 +322,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             logger.info(f"timings for file {key} / classify: {t_classify}, "
                         f"{len(hashes)} bins, total size of hashes loaded: {h_size/10**9:.2f} GB")
         else:
-            t_binning = time_to_hms(t[key]['start'], t[key]['start'], short=False)
-            t_classify = time_to_hms(t[key]['start'], t[key]['classify'], short=False)
+            t_binning = time_to_hms(t[key]['start'], t[key]['start'], short=True)
+            t_classify = time_to_hms(t[key]['start'], t[key]['classify'], short=True)
             t_total = t_classify
             hashes = t[key]["hashes"]
             h_size = sum([osp.getsize(f) for f in hashes.values()])
