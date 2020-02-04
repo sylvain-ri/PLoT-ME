@@ -140,10 +140,10 @@ def time_to_hms(start, end, fstring=True, short=False):
     delay = int(end - start)
     m, s = divmod(delay, 60)
     h, m = divmod(m, 60)
-    if fstring:
-        return f"{h:d} hours, {m:02d} minutes, {s:02d} seconds"
-    elif short:
+    if short:
         return f"{h:d}:{m:02d}:{s:02d}"
+    elif fstring:
+        return f"{h:d} hours, {m:02d} minutes, {s:02d} seconds"
     else:
         return h, m, s
 
