@@ -176,6 +176,7 @@ class MockCommunity:
         self.classifier_name = classifier_name
         self.db_path         = db_path    # location of the hash table for the classifier
         self.db_type         = db_type    # Either full or bins
+        self.hash_files      = {}
         self.bin_nb          = bin_nb
         self.folder_out      = osp.join(self.folder_report, self.file_name)
         if not os.path.isdir(self.folder_out):
@@ -206,6 +207,7 @@ class MockCommunity:
                 
     def kraken2(self, file, path_hash, arg="unknown"):
         hash_file = osp.join(path_hash, "hash.k2d")
+        self.hash_files[args] = hash_file
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
         self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
         formatted_out = f"{self.path_out}.{arg}.kraken2" if self.db_type == "bins" else f"{self.path_out}.kraken2"
@@ -259,23 +261,23 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
     if param == "": param = osp.basename(path_database[:-1])
     logger.info(f"Assuming parameters are: {param}")
 
-    times = {}  # recording time at each step
+    t = {}  # recording time at each step
     for i, file in enumerate(list_fastq):
         try:
             assert osp.isfile(file), FileNotFoundError(f"file number {i} not found: {file}")
             # setting time
             base_name = osp.basename(file)
             key = f"{i}-{base_name}"
-            times[key] = {}
-            times[key]["start"] = perf_counter()
+            t[key] = {}
+            t[key]["start"] = perf_counter()
 
             logger.info(f"Opening fastq file ({i}/{len(list_fastq)}) {base_name}")
             # Binning
             if "bins" in db_type:
                 ReadToBin.set_fastq_model_and_param(file, path_model, param)
                 fastq_binned = ReadToBin.bin_reads()
-                times[key]["binning"] = perf_counter()
-                times[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
+                t[key]["binning"] = perf_counter()
+                t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
             else:
                 fastq_binned = {}
 
@@ -284,20 +286,25 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type):
                 path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param)
 
             fastq_classifier.classify()
-            times[key]["classify"] = perf_counter()
+            t[key]["classify"] = perf_counter()
+            t[key]["hashes"] = fastq_classifier.hash_files
+
 
         except:
             logger.warning(f"script crashed for file: {file}")
 
-    for key in times.keys():
-        if "binning" in times[key]:
-            logger.info(f"timings for file {key} / binning : {time_to_hms(times[key]['start'], times[key]['binning'])}, "
-                        f"for {times[key]['reads_nb']} reads")
-            logger.info(f"timings for file {key} / classify: {time_to_hms(times[key]['binning'], times[key]['classify'])}")
+    for key in t.keys():
+        if "binning" in t[key]:
+            logger.info(f"timings for file {key} / binning : {time_to_hms(t[key]['start'], t[key]['binning'])}, "
+                        f"for {t[key]['reads_nb']} reads")
+            hashes = t[key]["hashes"]
+            size = sum([osp.getsize(f) for f in hashes.values()])
+            logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['binning'], t[key]['classify'])}, "
+                        f"{len(hashes)} bins, total size of {size/10**9:.2f} GB")
         else:
-            logger.info(f"timings for file {key} / classify: {time_to_hms(times[key]['start'], times[key]['classify'])}")
+            logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['start'], t[key]['classify'])}")
 
-    logger.info(f"Script ended, {len(times)} files processed")
+    logger.info(f"Script ended, {len(t)} files processed")
     print()
 
 
