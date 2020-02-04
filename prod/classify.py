@@ -362,7 +362,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
-                                              default="", type=str, metavar='')
+                                              default="~/classify_records.csv", type=str, metavar='')
     # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
 
     args = parser.parse_args()
