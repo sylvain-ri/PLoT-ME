@@ -247,8 +247,14 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     logger.info(f"Script {__file__} called with {args}")
-
     bin_classify.cores = cores
+
+    # preparing csv record file
+    with open(f_record, 'a', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+    headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS")
+    csv_writer.writerow(headers)
+
     logger.info("let's classify reads!")
 
     # Find the model
@@ -328,11 +334,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
         records.append(row)
 
     # Timings and to csv
-    with open(f_record, 'a', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS")
-        csv_writer.writerow(headers)
-        csv_writer.writerows(records)
+    csv_writer.writerows(records)
 
     logger.info(f"Script ended, {len(t)} files processed")
     print()
