@@ -207,7 +207,7 @@ class MockCommunity:
                 
     def kraken2(self, file, path_hash, arg="unknown"):
         hash_file = osp.join(path_hash, "hash.k2d")
-        self.hash_files[args] = hash_file
+        self.hash_files[arg] = hash_file
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
         self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
         formatted_out = f"{self.path_out}.{arg}.kraken2" if self.db_type == "bins" else f"{self.path_out}.kraken2"
