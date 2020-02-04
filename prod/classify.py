@@ -13,6 +13,7 @@ Reads Binning Project
 """
 
 import argparse
+import csv
 from datetime import datetime as dt
 import logging
 from multiprocessing import cpu_count
@@ -240,7 +241,8 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
                    "2019-12-19_20-WindowReads_EColi_Test/2019-12-19_20-WindowReads_10-EColiTest.fastq"]
 
 
-def bin_classify(list_fastq, path_report, path_database, classifier, db_type, cores=cpu_count()):
+def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
+                 cores=cpu_count(), f_record="~/classify_records.csv"):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -295,21 +297,42 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type, co
             t[key]["classify"] = perf_counter()
             t[key]["hashes"] = fastq_classifier.hash_files
 
-
         except Exception as e:
             logger.exception(e)
             logger.warning(f"script crashed for file: {file}")
 
+    # Timings and to csv
+    row = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS")
+
+    with open(f_record, 'a', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+    csv_writer.writerow(row)
+    record = []
     for key in t.keys():
+        if 'classify' not in t[key].keys():
+            break
         if "binning" in t[key]:
-            logger.info(f"timings for file {key} / binning : {time_to_hms(t[key]['start'], t[key]['binning'])}, "
-                        f"for {t[key]['reads_nb']} reads")
+            t_binning = time_to_hms(t[key]['start'], t[key]['binning'], short=False)
+            t_classify = time_to_hms(t[key]['binning'], t[key]['classify'], short=False)
+            t_total = time_to_hms(t[key]['start'], t[key]['classify'], short=False)
             hashes = t[key]["hashes"]
-            size = sum([osp.getsize(f) for f in hashes.values()])
-            logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['binning'], t[key]['classify'])}, "
-                        f"{len(hashes)} bins, total size of hashes loaded: {size/10**9:.2f} GB")
+            h_size = sum([osp.getsize(f) for f in hashes.values()])
+
+            logger.info(f"timings for file {key} / binning : {t_binning}, for {t[key]['reads_nb']} reads")
+            logger.info(f"timings for file {key} / classify: {t_classify}, "
+                        f"{len(hashes)} bins, total size of hashes loaded: {h_size/10**9:.2f} GB")
         else:
+            t_binning = time_to_hms(t[key]['start'], t[key]['start'], short=False)
+            t_classify = time_to_hms(t[key]['start'], t[key]['classify'], short=False)
+            t_total = t_classify
+            hashes = t[key]["hashes"]
+            h_size = sum([osp.getsize(f) for f in hashes.values()])
             logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['start'], t[key]['classify'])}")
+
+        # to CSV
+        row = (key, db_type, t_binning, t_classify, t_total, f"{h_size/10**9:.2f} GB", f"{len(hashes)}")
+        csv_writer.writerow(row)
+        record.append(row)
 
     logger.info(f"Script ended, {len(t)} files processed")
     print()
@@ -338,12 +361,14 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--threads', default=cpu_count(), type=int, help='Number of threads', metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
+    parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
+                                              default="", type=str, metavar='')
     # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
 
     args = parser.parse_args()
 
     bin_classify(args.input_fastq, args.output_folder, args.database,
-                 classifier=args.classifier, db_type=args.db_type, cores=args.threads)
+                 classifier=args.classifier, db_type=args.db_type, cores=args.threads, record=record)
 
 
 
