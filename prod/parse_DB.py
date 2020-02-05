@@ -640,6 +640,7 @@ if __name__ == '__main__':
          path_taxonomy=args.taxonomy, ml_model=args.ml_model, full_DB=args.full_DB)
 
 
+# python ~/Scripts/Reads_Binning/prod/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
 
 
 
