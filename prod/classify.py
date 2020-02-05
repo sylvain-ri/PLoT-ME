@@ -281,7 +281,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             assert osp.isfile(file), FileNotFoundError(f"file number {i} not found: {file}")
             # setting time
             base_name = osp.basename(file)
-            key = f"{i}-{base_name}"
+            key = base_name
             t[key] = {}
             t[key]["start"] = perf_counter()
 
@@ -330,6 +330,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['start'], t[key]['classify'])}")
 
         # to CSV
+        # todo: add precision / sensitivity / abundance
         row = (key, db_type, t_binning, t_classify, t_total, f"{h_size/10**9:.2f}GB", f"{len(hashes)}",
                path_database, osp.basename(path_database))
         records.append(row)
