@@ -135,7 +135,9 @@ class ReadToBin(SeqRecord.SeqRecord):
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
         counter = 0
-        total = round(int(subprocess.check_output(["wc", "-l", cls.FASTQ_PATH]).split()[0]) / 4)
+        # Count number of lines with bash wc -l and divide by 4 if fastq, otherwise by 2 (fasta)
+        total = round(int(subprocess.check_output(["wc", "-l", cls.FASTQ_PATH]).split()[0]) /
+                      (4 if bin_classify.format == "fastq" else 2))
         for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=total,
                            desc="binning and copying reads to bins", leave=True, dynamic_ncols=True):
             counter += 1

@@ -24,6 +24,7 @@ taxon	category	start	end	name	description	fna_path	AAAA .... TTTT
 ** cluster/bin assignments trade the nucleotides columns to a "cluster" column
 
 Once the bins created, tmp files (kmer counts) can be removed (read_binning_tmp/),
+"segments_clustered.<settings>.pd" in "clustered_by..." can be deleted,
 as well as classifier's tmp files (for kraken2: kraken2-build --clean)
 
 #############################################################################
