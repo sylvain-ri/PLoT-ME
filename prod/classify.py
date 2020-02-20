@@ -150,6 +150,21 @@ class ReadToBin(SeqRecord.SeqRecord):
         cls.NUMBER_BINNED = counter
         return cls.outputs
 
+    @classmethod
+    def sort_bins_by_sizes(cls):
+        """ Sort the bins by their size """
+        bin_size = {}
+        for f in os.scandir(cls.FASTQ_BIN_FOLDER):
+            bin_nb = int(f.name.split('.')[1].split('-')[1])
+            size = osp.getsize(f)
+            bin_size[size] = bin_nb
+        # make a copy first, then empty the dic, and rewrite it in the correct order
+        fastq_outputs = ReadToBin.outputs
+        ReadToBin.outputs = {}
+        for size, bin_nb in sorted(bin_size.items(), reverse=True):
+            ReadToBin.outputs[bin_nb] = fastq_outputs[bin_nb]
+        return ReadToBin.outputs
+
 
 def pll_binning(record):
     """ Parallel processing of read binning """
@@ -295,7 +310,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             # Binning
             if "bins" in db_type:
                 ReadToBin.set_fastq_model_and_param(file, path_model, param, cores)
-                fastq_binned = ReadToBin.bin_reads()
+                ReadToBin.bin_reads()
+                ReadToBin.sort_bins_by_sizes()
                 t[key]["binning"] = perf_counter()
                 t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
             else:
@@ -303,7 +319,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
 
             fastq_classifier = MockCommunity(
                 path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
-                path_binned_fastq=fastq_binned, bin_nb=10, classifier_name=classifier, param=param, cores=cores)
+                path_binned_fastq=ReadToBin.outputs, bin_nb=10, classifier_name=classifier, param=param, cores=cores)
 
             fastq_classifier.classify()
             t[key]["classify"] = perf_counter()
