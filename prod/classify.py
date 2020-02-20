@@ -94,7 +94,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     def to_fastq(self):
         assert self.path_out is not None, AttributeError("Path of the fastq file must first be defined")
         with open(self.path_out, "a") as f:
-            SeqIO.write(self, f, "fasta")
+            SeqIO.write(self, f, bin_classify.format)
 
     @classmethod
     def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores):
@@ -136,9 +136,9 @@ class ReadToBin(SeqRecord.SeqRecord):
         # counter = len(results)
         counter = 0
         total = 0
-        for _ in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), desc="Counting number of reads", leave=True):
+        for _ in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), desc="Counting number of reads", leave=True):
             total += 1
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, "fasta"), total=total, desc="binning and copying reads to bins",
+        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=total, desc="binning and copying reads to bins",
                            leave=True, dynamic_ncols=True):
             counter += 1
             custom_read = ReadToBin(record)
@@ -279,6 +279,12 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
     for i, file in enumerate(list_fastq):
         try:
             assert osp.isfile(file), FileNotFoundError(f"file number {i} not found: {file}")
+            if file.lower().endswith(".fastq"):
+                bin_classify.format = "fastq"
+            elif file.lower().endswith(".fasta"):
+                bin_classify.format = "fasta"
+            else:
+                raise NotImplementedError
             # setting time
             base_name = osp.basename(file)
             key = base_name
@@ -346,6 +352,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
 
 bin_classify.classifiers = ('kraken2',)
 bin_classify.cores = 1
+bin_classify.format = "fastq"
 
 
 def test_classification():
