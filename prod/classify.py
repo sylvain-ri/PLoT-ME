@@ -135,10 +135,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
         counter = 0
-        with open(cls.FASTQ_PATH, 'r') as f:
-            for total, _ in enumerate(f.readlines()):
-                pass
-        total = round(total / 4)
+        total = int(subprocess.check_output(["wc", "-l", cls.FASTQ_PATH]).split()[0])
         for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=total,
                            desc="binning and copying reads to bins", leave=True, dynamic_ncols=True):
             counter += 1
