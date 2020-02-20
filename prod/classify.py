@@ -151,6 +151,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def sort_bins_by_sizes(cls):
         """ Sort the bins by their size """
+        # todo: drop bins with less than 0.1% of the total size ?
         bin_size = {}
         for f in os.scandir(cls.FASTQ_BIN_FOLDER):
             bin_nb = int(f.name.split('.')[1].split('-')[1])
