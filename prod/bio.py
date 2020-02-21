@@ -47,6 +47,7 @@ def seq_count_kmer(seq, kmer_count=None, k=4, ignore_N=True):
         the new string hashing behaviour, BiopythonWarning: Using str(seq) to use the new behaviour
     """
     # todo: numba. to speed the counting by a few folds
+    # todo: add reverse complement into the same count
     # https://numba.pydata.org/numba-doc/dev/reference/pysupported.html#typed-dict
     # https://numba.pydata.org/numba-doc/dev/user/performance-tips.html#performance-tips
     # https://numba.pydata.org/numba-doc/latest/user/parallel.html
