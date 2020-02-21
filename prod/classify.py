@@ -99,6 +99,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
+        # todo: load the parameter file from parse_DB.py instead of parsing string.... parameters_RefSeq_binning.txt
         cls.CORES = cores
         cls.PARAM = param
         cls.FASTQ_PATH = path_fastq

@@ -160,6 +160,8 @@ def create_n_folders(path, n, delete_existing=False):
 def add_file_with_parameters(folder, add_description=""):
     """ Add a file in the folder to remind which parameters were used, which folder were omitted """
     path = osp.join(folder, "parameters_RefSeq_binning.txt")
+    # todo: update for identifier: value kind of. Need kraken k=35, reverse complement, comments to describe settings
+    #  signature inside.
     with open(path, 'w') as f:
         f.write(f"Files created by {__file__} \n"
                 f"From RefSeq located at: {main.folder_database} \n"
@@ -413,9 +415,9 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     # Split it per file to allow parallel processing
     logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
     df_per_fna = []
-    # todo: parallel ? groupby ?
+    # todo: parallel ? groupby ? Try in notebook
     for file in tqdm(df.fna_path.unique()):
-        df_per_fna.append(df[df.fna_path == file])
+        df_per_fna.append(df[df.fna_path == file].copy())
 
     # Copy in parallel
     pll_copy_segments_to_bin.path_db_bins = path_db_bins
