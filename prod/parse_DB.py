@@ -564,8 +564,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     logger.info(f"Script {__file__} called with {args}")
     try:
         # Common folder name keeping parameters
-        parameters = f"{k}mer_s{window}"
-        omitted = "" if len(omit_folders) == 0 else "_omitted_" + "_".join(omit_folders)
+        parameters = f"k{k}_s{window}"
+        omitted = "" if len(omit_folders) == 0 else "_o" + "-".join(omit_folders)
         folder_intermediate_files = osp.join(folder_output, parameters, "kmer_counts")
         # Parameters
         main.folder_database= folder_database
@@ -593,17 +593,17 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         else:
             #    KMER COUNTING
             # get kmer distribution for each window of each genome, parallel folder with same structure
-            path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_{k}mer_s{window}")
+            path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_k{k}_s{window}")
             scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, force_recount=force_recount)
 
             # combine all kmer distributions into one single file
-            path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.{k}mer_s{window}.csv")
+            path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.k{k}_s{window}.csv")
             append_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
             #    CLUSTERING
             # From kmer distributions, use clustering to set the bins per segment
-            string_param = f"{ml_model}_{n_clusters}bins_{main.k}mer_s{main.w}{omitted}"
-            folder_by_model = osp.join(folder_output, parameters, f"clustered_by_{string_param}")
+            string_param = f"{ml_model}_b{n_clusters}_k{main.k}_s{main.w}{omitted}"
+            folder_by_model = osp.join(folder_output, parameters, string_param)
             path_model = osp.join(folder_by_model, f"model_{string_param}.pkl")
             path_segments_clustering = osp.join(folder_by_model, f"segments_clustered.{string_param}.pd")
             clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
