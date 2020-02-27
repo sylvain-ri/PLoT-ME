@@ -462,10 +462,10 @@ def classifier_param_checker(l_param):
             assert 5 < int(l_param[1]) < 100, f"value out of range"
             k_param['k'] = l_param[1]
         if len(l_param) > 2:
-            assert 5 < int(l_param[2]) < k_param['k'], f"value out of range"
+            assert 5 < int(l_param[2]) < int(k_param['k']), f"value out of range"
             k_param['l'] = l_param[2]
         if len(l_param) > 3:
-            assert 0 <= int(l_param[3]) < k_param['l'] / 2, f"value out of range"
+            assert 0 <= float(l_param[3]) < float(k_param['l']) / 2, f"value out of range"
             k_param['s'] = l_param[3]
     else:
         k_param = {}
