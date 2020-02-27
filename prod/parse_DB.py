@@ -493,7 +493,7 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
             os.unlink(taxon_in_cluster)
         os.symlink(path_taxonomy, taxon_in_cluster)
 
-        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)
+        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id),
                "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
         logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
         res = subprocess.call(cmd)
@@ -612,7 +612,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters)
 
             # Run kraken2-build make hash tables
-            kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters)
+            kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, param)
 
     except KeyboardInterrupt:
         logger.error("User interrupted")
