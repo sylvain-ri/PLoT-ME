@@ -451,12 +451,13 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
         logger.debug(res)
 
 
-def kraken2_param_checker(l_param):
+def classifier_param_checker(l_param):
     """ check kraken2-build --help. Default values to feed in """
     assert isinstance(l_param, list), TypeError
     assert len(l_param) > 0, "Empty list"
     if "kraken2" in l_param[0]:
-        k_param = {'k': 35, 'l': 31, 's': 7}  # kraken2 default values --kmer-len, --minimizer-len, --minimizer-spaces
+        # kraken2 default values --kmer-len, --minimizer-len, --minimizer-spaces
+        k_param = {'classifier': 'kraken2', 'k': 35, 'l': 31, 's': 7}
         if len(l_param) > 1:
             assert 5 < int(l_param[1]) < 100, f"value out of range"
             k_param['k'] = l_param[1]
@@ -468,10 +469,15 @@ def kraken2_param_checker(l_param):
             k_param['s'] = l_param[3]
     else:
         k_param = {}
-    return k_param
+    acc = []
+    for k, v in k_param.items():
+        if k != "classifier":
+            acc += [f"{k}{v}"]
+    s = "_".join(acc)
+    return k_param, s
 
 
-kraken2_param_checker.default = ["kraken2", "35", "31", "7"]
+classifier_param_checker.default = ["kraken2", "35", "31", "7"]
 
 
 
@@ -546,7 +552,7 @@ def kraken2_full(path_refseq, path_output, taxonomy, p):
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", ml_model=clustering_segments.models[0], full_DB=False,
-         classifier_param=kraken2_param_checker.default):
+         classifier_param=classifier_param_checker.default):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -574,7 +580,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         check_step.early_stop = early_stop
         check_step.timings.append(perf_counter())  # log time spent
         # Check classifier/kraken2's parameters
-        param = kraken2_param_checker(classifier_param)
+        param, s_param = classifier_param_checker(classifier_param)
         # Check that taxonomy wasn't forgotten
         if '0' in check_step.can_skip[5:] and check_step.early_stop >= 5:
             assert osp.isdir(path_taxonomy), NotADirectoryError
@@ -608,7 +614,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             split_genomes_to_bins(path_segments_clustering, path_refseq_binned, n_clusters)
 
             # Run kraken2-build add libray
-            path_bins_hash = osp.join(folder_by_model, "kraken2_hash")  # Separate hash tables by classifier
+            path_bins_hash = osp.join(folder_by_model, param['classifier'], s_param)
             kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters)
 
             # Run kraken2-build make hash tables
@@ -667,7 +673,7 @@ if __name__ == '__main__':
                              "To recount all kmers, and stop after combining the kmer dataframes, "
                              "add option -f and option -e 0", metavar='')
     parser.add_argument('-p', '--classifier_param', help="classifier's name and its parameters, space separated.",
-                                            default=kraken2_param_checker.default, type=str, nargs="+", metavar='')
+                        default=classifier_param_checker.default, type=str, nargs="+", metavar='')
     args = parser.parse_args()
 
     main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
