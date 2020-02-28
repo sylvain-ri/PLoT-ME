@@ -75,6 +75,7 @@ class Genome:
                   "chromosome", "complete genome", "whole genome shotgun sequence", ]
     K = 0
     col_kmers = []
+    col_types = {}
     kmer_count_zeros = {}
 
     def __init__(self, fna_file, taxon, window_size, k=-1):
@@ -130,8 +131,7 @@ class Genome:
             for_csv.append((taxon, cat, start, end, segment.name, segment.description, self.path_fna,
                             *kmer_count.values() ))
         # kmer_keys = list(self.kmer_count_zeros.keys())
-        df = pd.DataFrame(for_csv, columns=["taxon", "category", "start", "end", "name", "description", "fna_path"]
-                                           + self.col_kmers)
+        df = pd.DataFrame(for_csv, columns=main.cols_types)
         df.taxon       = df.taxon.astype('category')
         df.category    = df.category.astype('category')
         df.name        = df.name.astype('category')
@@ -316,11 +316,13 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     else:
         logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
                     f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
-        cols_types = {k: str for k in ["taxon", "category", "start", "end", "name", "description"]}
-        for k in kmers_dic(k).keys():
-            cols_types[k] = float32
-        df = pd.read_csv(path_kmer_counts, dtype=cols_types)
+        df = pd.read_csv(path_kmer_counts, dtype=main.cols_types)
         logger.info(f"save pickle copy for faster loading {path_pkl_kmer_counts}")
+        # Need to set again as categories
+        df.taxon       = df.taxon.astype('category')
+        df.category    = df.category.astype('category')
+        df.name        = df.name.astype('category')
+        df.fna_path    = df.fna_path.astype('category')
         df.to_pickle(path_pkl_kmer_counts)
 
     cols_kmers = df.columns[-4**k:]
@@ -585,6 +587,16 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         main.k              = k
         main.w              = window
         main.cores          = cores
+        # Set all columns type
+        cols_types = {
+            "taxon": int, "category": str,
+            "start": int, "end": int,
+            "name": str, "description": str, "fna_path": str,
+        }
+        for k in kmers_dic(main.k).keys():
+            cols_types[k] = float32
+        main.cols_types = cols_types
+
         # If force recount of the kmer, disable the skip of the step
         if force_recount:
             skip_existing = "0" + skip_existing[1:]
@@ -654,6 +666,7 @@ main.omit_folders    = ""
 main.k               = 0
 main.w               = 0
 main.cores           = 0
+main.cols_types      = {}
 
 
 if __name__ == '__main__':
