@@ -192,19 +192,22 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count(
         logger.debug(f"{data}")
 
         pll_scaling.ratio = ratio
-        with Pool(cores) as pool:
-            results = list(tqdm(pool.imap(pll_scaling, (data.loc[:, col] for col in kmer_cols)),
-                                total=len(kmer_cols), desc="scaling each Series"))
-        # much faster, but let's see if there an even faster assignment
-        # todo: build a new DataFrame from scratch ?
-        for i, col in tqdm(enumerate(kmer_cols), total=len(kmer_cols), desc="Assigning results back to DataFrame"):
-            data[col] = results[i]
+
+        # Mono thread version (extremely slow for some reasons)
+        for col in tqdm(kmer_cols):
+            data[col] *= ratio
+
+        # with Pool(cores) as pool:
+        #     results = list(tqdm(pool.imap(pll_scaling, (data.loc[:, col] for col in kmer_cols)),
+        #                         total=len(kmer_cols), desc="scaling each Series"))
+        # # much faster, but let's see if there an even faster assignment
+        # # todo: build a new DataFrame from scratch ?
+        # for i, col in tqdm(enumerate(kmer_cols), total=len(kmer_cols), desc="Assigning results back to DataFrame"):
+        #     data.assign[col] = results[i]
+        #     data[col] = results[i]
 
         logger.debug(f"{data}")
-        # Mono thread version (extremely slow for some reasons)
-        # for col in tqdm(kmer_cols):
-        #     data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
-        #     data.loc[:, col] *= ratio
+        # data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
 
 
 class ScanFolder:
