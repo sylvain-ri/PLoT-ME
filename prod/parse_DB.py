@@ -320,6 +320,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
         for k in kmers_dic(k).keys():
             cols_types[k] = float32
         df = pd.read_csv(path_kmer_counts, dtype=cols_types)
+        logger.info(f"save pickle copy for faster loading {path_pkl_kmer_counts}")
         df.to_pickle(path_pkl_kmer_counts)
 
     cols_kmers = df.columns[-4**k:]
@@ -328,7 +329,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
 
     # ## 1 ## Scaling by length and kmers
     df_mem = df.memory_usage(deep=False).sum()
-    logger.info(f"Model loaded, scaling the values to the length of the segments. "
+    logger.info(f"Kmer counts loaded, scaling the values to the length of the segments. "
                 f"DataFrame size: {df_mem/10**9:.2f} GB - shape: {df.shape}")
 
     # todo: save intermediate data
