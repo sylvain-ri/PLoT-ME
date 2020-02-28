@@ -354,7 +354,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     # Model saving
     with open(path_model, 'wb') as f:
         pickle.dump(ml_model, f)
-    logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}")
+    logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}, now predicting bins for each segment...")
 
     # ## 3 ##
     predicted = ml_model.predict(df[cols_kmers])
@@ -373,6 +373,7 @@ def pll_copy_segments_to_bin(df):
         Input is only ONE .fna file, which has to be split into segments, but these might be recombined
         if their bin association are consecutive.
     """
+    df = df[1]
     taxon = df.taxon.iloc[0]
     genome_path = df.fna_path.iloc[0]
     logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
@@ -428,10 +429,11 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
 
     # Split it per file to allow parallel processing
     logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
-    df_per_fna = []
-    # todo: parallel ? groupby ? Try in notebook
-    for file in tqdm(df.fna_path.unique()):
-        df_per_fna.append(df[df.fna_path == file].copy())
+    # # todo: parallel ? groupby ? Try in notebook
+    # df_per_fna = []
+    # for file in tqdm(df.fna_path.unique()):
+    #     df_per_fna.append(df[df.fna_path == file].copy())
+    df_per_fna = df.groupby(["fna_path"])
 
     # Copy in parallel
     pll_copy_segments_to_bin.path_db_bins = path_db_bins
