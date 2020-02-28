@@ -259,7 +259,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
 
 @check_step
 def combine_genome_kmer_counts(folder_kmers, path_df):
-    """ Combine single dataframes into one. Might need high memory """
+    """ DEPRECATED Combine single dataframes into a single Dataframe. Might need high memory """
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
     dfs = []
     added = 0
@@ -564,9 +564,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     logger.info(f"Script {__file__} called with {args}")
     try:
         # Common folder name keeping parameters
-        parameters = f"k{k}_s{window}"
-        omitted = "" if len(omit_folders) == 0 else "_o" + "-".join(omit_folders)
-        folder_intermediate_files = osp.join(folder_output, parameters, "kmer_counts")
+        param_k_s = f"k{k}_s{window}"
+        o_omitted = "" if len(omit_folders) == 0 else "o" + "-".join(omit_folders)
+        folder_intermediate_files = osp.join(folder_output, param_k_s, "kmer_counts")
         # Parameters
         main.folder_database= folder_database
         main.omit_folders   = omit_folders
@@ -587,25 +587,25 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
-            path_full_hash = osp.join(folder_output, f"kraken2_full{omitted}")
+            path_full_hash = osp.join(folder_output, f"kraken2_full.{o_omitted}")
             kraken2_full(folder_database, path_full_hash, path_taxonomy, param)
 
         else:
             #    KMER COUNTING
             # get kmer distribution for each window of each genome, parallel folder with same structure
-            path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts_k{k}_s{window}")
+            path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts.k{k}_s{window}")
             scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, force_recount=force_recount)
 
             # combine all kmer distributions into one single file
-            path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"_all_counts{omitted}.k{k}_s{window}.csv")
+            path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"all-counts.k{k}_s{window}_{o_omitted}.csv")
             append_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
             #    CLUSTERING
             # From kmer distributions, use clustering to set the bins per segment
-            string_param = f"{ml_model}_b{n_clusters}_k{main.k}_s{main.w}{omitted}"
-            folder_by_model = osp.join(folder_output, parameters, string_param)
-            path_model = osp.join(folder_by_model, f"model_{string_param}.pkl")
-            path_segments_clustering = osp.join(folder_by_model, f"segments_clustered.{string_param}.pd")
+            string_param = f"{ml_model}_b{n_clusters}_k{main.k}_s{main.w}_{o_omitted}"
+            folder_by_model = osp.join(folder_output, param_k_s, string_param)
+            path_model = osp.join(folder_by_model, f"model.{string_param}.pkl")
+            path_segments_clustering = osp.join(folder_by_model, f"segments-clustered.{string_param}.pd")
             clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
 
             #    CREATING THE DATABASES
