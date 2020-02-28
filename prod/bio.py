@@ -24,7 +24,7 @@ nucleotides = "ACGT"
 
 
 def kmers_dic(n, choice=nucleotides):
-    return {a: 0 for a in combinaisons(choice, n)}
+    return {a: 0.0 for a in combinaisons(choice, n)}
 
 
 def combinaisons(combi, n, instances=nucleotides):
@@ -55,7 +55,7 @@ def seq_count_kmer(seq, kmer_count=None, k=4, ignore_N=True):
         kmer_count = kmers_dic(k)
     logger.log(5, 'counting kmers')
     wrong_base = "N"*k
-    kmer_count[wrong_base] = 0
+    kmer_count[wrong_base] = 0.0
 
     try:
         for kmer in seq_to_window(str(seq), k):
