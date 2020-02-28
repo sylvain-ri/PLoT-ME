@@ -41,6 +41,7 @@ import subprocess
 from copy import deepcopy
 from itertools import islice
 from multiprocessing import cpu_count, Pool
+from numpy import float32
 import os
 import os.path as osp
 import pandas as pd
@@ -315,7 +316,10 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     else:
         logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
                     f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
-        df = pd.read_csv(path_kmer_counts)
+        cols_types = {k: str for k in ["taxon", "category", "start", "end", "name", "description"]}
+        for k in kmers_dic(k).keys():
+            cols_types[k] = float32
+        df = pd.read_csv(path_kmer_counts, dtype=cols_types)
         df.to_pickle(path_pkl_kmer_counts)
 
     cols_kmers = df.columns[-4**k:]
