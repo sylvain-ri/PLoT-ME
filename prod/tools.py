@@ -108,7 +108,8 @@ def is_valid_file(x):
 
 def create_path(path):
     """ Create the intermediate folders if not existing. """
-    folder = osp.dirname(path) if "." in osp.basename(path) else path
+    # consider that it's a file if the string after the "." is shorter than 4 character
+    folder = osp.dirname(path) if len(osp.splitext(osp.basename(path))[1]) <= 4 else path
     if not osp.isdir(folder):
         logger.log(5, f"created folder {folder}")
         os.makedirs(folder)

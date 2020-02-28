@@ -163,7 +163,7 @@ def add_file_with_parameters(folder, add_description=""):
     # todo: update for identifier: value kind of. Need kraken k=35, reverse complement, comments to describe settings
     #  signature inside.
     with open(path, 'w') as f:
-        f.write(f"Files created by {__file__} \n"
+        f.write(f"script = {__file__} \n"
                 f"From RefSeq located at: {main.folder_database} \n"
                 f"k={main.k}, w={main.w} (segments size), \n"
                 f"folders *containing* these strings have been omitted: " + ", ".join(main.omit_folders) + ". \n"
