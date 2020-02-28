@@ -307,10 +307,17 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     k = main.k
     w = main.w
 
-    logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
-                f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
+    path_pkl_kmer_counts = path_kmer_counts.replace(".csv", ".pkl")
+    if osp.isfile(path_pkl_kmer_counts):
+        logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
+                    f"(file size: {osp.getsize(path_pkl_kmer_counts)/10**9:.2f} GB) ...")
+        df = pd.read_pickle(path_pkl_kmer_counts)
+    else:
+        logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
+                    f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
+        df = pd.read_csv(path_kmer_counts)
+        df.to_pickle(path_pkl_kmer_counts)
 
-    df = pd.read_csv(path_kmer_counts)
     cols_kmers = df.columns[-4**k:]
     cols_spe = df.columns[:-4**k]
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
