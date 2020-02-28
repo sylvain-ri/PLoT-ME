@@ -308,7 +308,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     k = main.k
     w = main.w
 
-    path_pkl_kmer_counts = path_kmer_counts.replace(".csv", ".pkl")
+    path_pkl_kmer_counts = path_kmer_counts.replace(".csv", ".pd")
     if osp.isfile(path_pkl_kmer_counts):
         logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
                     f"(file size: {osp.getsize(path_pkl_kmer_counts)/10**9:.2f} GB) ...")
