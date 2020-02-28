@@ -593,8 +593,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             "start": int, "end": int,
             "name": str, "description": str, "fna_path": str,
         }
-        for k in kmers_dic(main.k).keys():
-            cols_types[k] = float32
+        for key in kmers_dic(main.k).keys():
+            cols_types[key] = float32
         main.cols_types = cols_types
 
         # If force recount of the kmer, disable the skip of the step
