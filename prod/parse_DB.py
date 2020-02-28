@@ -425,7 +425,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
 
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
     Genome.set_k_kmers(main.k)
-    with Pool(min(2, main.cores)) as pool:  # file copy don't need many cores (main.cores)
+    with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
                             total=len(df_per_fna)))
 
