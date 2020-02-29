@@ -459,6 +459,7 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
+        # todo: if library exist in another folder, make a link to it !
         bin_id = f"{cluster}/"
         cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
                "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
