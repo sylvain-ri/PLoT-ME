@@ -521,8 +521,6 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
         res = subprocess.call(cmd)
         logger.debug(res)
 
-        # todo: clean after each build
-
     logger.info(f"Kraken2 finished building hash tables. You can clean the intermediate files with: "
                 f"kraken2-build --clean {path_bins_hash}/<bin number>")
 
@@ -564,11 +562,33 @@ def kraken2_full(path_refseq, path_output, taxonomy, p):
     logger.debug(res)
 
 
+def kraken2_clean(path_bins_hash, n_clusters):
+    """ Use of kraken2-build --clean option to remove temporary files.
+        No cleaning by default because the library is the same for various values of k, l and s
+    """
+    if "full" in n_clusters:
+        logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
+        cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", path_bins_hash]
+        logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
+        res = subprocess.call(cmd)
+        logger.debug(res)
+
+    else:
+        logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
+        for cluster in tqdm(range(n_clusters)):
+            bin_id = f"{cluster}/"
+            cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
+            logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
+            res = subprocess.call(cmd)
+            logger.debug(res)
+    logger.info(f"Cleaning done")
+
+
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", ml_model=clustering_segments.models[0], full_DB=False,
-         classifier_param=classifier_param_checker.default):
+         classifier_param=classifier_param_checker.default, k2_clean=False):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -613,8 +633,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
-            path_full_hash = osp.join(folder_output, f"kraken2_full.{o_omitted}")
+            path_full_hash = osp.join(folder_output, f"kraken2_full.{o_omitted}", s_param)
             kraken2_full(folder_database, path_full_hash, path_taxonomy, param)
+            if k2_clean: kraken2_clean(path_full_hash, "full")
 
         else:
             #    KMER COUNTING
@@ -645,6 +666,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
             # Run kraken2-build make hash tables
             kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, param)
+
+            # Cleaning
+            if k2_clean: kraken2_clean(path_bins_hash, n_clusters)
 
     except KeyboardInterrupt:
         logger.error("User interrupted")
@@ -692,6 +716,8 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
                         default=("plant", "vertebrate"), metavar='')
     parser.add_argument('-r', '--recount',  help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
+    parser.add_argument('-n', '--clean',  action='store_true',
+                        help='Make use of kraken2-build --clean to remove temporary files (library/added/ and others)')
     parser.add_argument('-f', '--full_DB',  action='store_true',
                         help='Build the full RefSeq database, omitting the directories set by --omit, with '
                              '--taxonomy path. Skips all the other steps/processes (unused: -e, -n, -m, -r, -s)')
@@ -707,7 +733,7 @@ if __name__ == '__main__':
          k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
          force_recount=args.recount, early_stop=args.early, omit_folders=tuple(args.omit),
          path_taxonomy=args.taxonomy, ml_model=args.ml_model, full_DB=args.full_DB,
-         classifier_param=args.classifier_param)
+         classifier_param=args.classifier_param, k2_clean=args.clean)
 
 
 # python ~/Scripts/Reads_Binning/prod/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
