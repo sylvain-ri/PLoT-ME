@@ -36,9 +36,15 @@ def main():
 
     for k in (3, 4, 5):
         for w in (5000, 10000, 25000, 50000):
+            omit = ",".join(omit_folders)
+            f_clf_param = ",".join(classifier_param)
+            s_param = f"{dt.datetime.now():%Y-%m-%d_%H-%M}\t{n_clusters}\t{k}\t{w}\t{f_clf_param}\t{omit}"
+            print(s_param)
+
             # skip already done
             df = pd.read_csv(history, sep="\t")
             if df[(df.k == k) & (df.w == w)].shape[0] > 0:
+                print("skipped")
                 continue
 
             parse_DB.main(
@@ -58,10 +64,9 @@ def main():
                 classifier_param=classifier_param,
                 k2_clean=False)
 
-            f_omit_folders = ",".join(omit_folders)
-            f_classifier_param = ",".join(classifier_param)
+            print("done")
             with open(history, 'a') as f:
-                f.write(f"{dt.datetime.now():%Y-%m-%d_%H-%M}\t{n_clusters}\t{k}\t{w}\t{f_classifier_param}\t{f_omit_folders}")
+                f.write(s_param)
 
 
 main()
