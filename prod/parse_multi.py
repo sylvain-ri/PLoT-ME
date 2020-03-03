@@ -66,7 +66,7 @@ def main():
 
             print("done")
             with open(history, 'a') as f:
-                f.write(s_param)
+                f.write(s_param + "\n")
 
 
 main()
