@@ -474,7 +474,7 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
 
 
 def classifier_param_checker(l_param):
-    """ check kraken2-build --help. Default values to feed in """
+    """ check kraken2-build --help. Default values to feed in, default is ["kraken2", "35", "31", "7"] """
     assert isinstance(l_param, list), TypeError
     assert len(l_param) > 0, "Empty list"
     if "kraken2" in l_param[0]:
