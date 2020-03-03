@@ -529,10 +529,9 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
 @check_step
 def kraken2_full(path_refseq, path_output, taxonomy, p):
     """ Build the hash table with the same genomes, but in one bin, for comparison """
-    create_path(path_output)
-    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
     delete_folder_if_exists(path_output)
     create_path(path_output)
+    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
 
     logger.warning(f"DO NOT INTERRUPT this process, you will have restart from scratches.")
     # Add genomes to
