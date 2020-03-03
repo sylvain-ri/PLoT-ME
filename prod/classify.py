@@ -119,7 +119,8 @@ class ReadToBin(SeqRecord.SeqRecord):
         if path_model == "full":
             cls.K = 0
         else:
-            k = path_model.split("/model_")[1].split("mer_")[0].split("_")[1]
+            # todo: find the param file
+            k = path_model.split("/model.")[1].split("_s")[0].split("_k")[1]
             logger.debug(f"got path_model={path_model}, setting k={k}")
             cls.K = int(k)
             cls.KMER = kmers_dic(cls.K)
