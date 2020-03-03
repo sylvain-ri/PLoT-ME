@@ -529,6 +529,7 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
 @check_step
 def kraken2_full(path_refseq, path_output, taxonomy, p):
     """ Build the hash table with the same genomes, but in one bin, for comparison """
+    create_path(path_output)
     add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
     delete_folder_if_exists(path_output)
     create_path(path_output)
@@ -717,7 +718,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
                         default=("plant", "vertebrate"), metavar='')
     parser.add_argument('-r', '--recount',  help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
-    parser.add_argument('-n', '--clean',  action='store_true',
+    parser.add_argument('--clean',  action='store_true',
                         help='Make use of kraken2-build --clean to remove temporary files (library/added/ and others)')
     parser.add_argument('-f', '--full_DB',  action='store_true',
                         help='Build the full RefSeq database, omitting the directories set by --omit, with '

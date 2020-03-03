@@ -278,11 +278,11 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
     if db_type == "bins":
         path_model = ""
         for file in os.scandir(path_database):
-            if file.name.startswith("model_") and file.name.endswith(".pkl"):
+            if file.name.startswith("model.") and file.name.endswith(".pkl"):
                 path_model = file.path
                 break
         assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
-        path_to_hash = osp.join(path_database, f"{classifier}_hash")
+        path_to_hash = osp.join(path_database, classifier)
     else:
         path_model = "full"
         path_to_hash = path_database
@@ -387,9 +387,11 @@ if __name__ == '__main__':
                                                    'and "model_<name>.pkl" ')
     parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
                                               choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
-    parser.add_argument('-d', '--db_type',    help='Choose to use the standard full database or the segmented one',
-                                              default='bins', choices=('full', 'bins',) , metavar='')
-    parser.add_argument('-t', '--threads', default=cpu_count(), type=int, help='Number of threads', metavar='')
+    parser.add_argument('-s', '--classifier_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2",
+                                              metavar='', choices=bin_classify.classifiers, default='k35_l31_s7')
+    parser.add_argument('-f', '--full_bins',  help='Choose to use the standard full database or the segmented one',
+                                              default='bins', choices=('full', 'bins',), metavar='')
+    parser.add_argument('-t', '--threads',    help='Number of threads', default=cpu_count(), type=int, metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
