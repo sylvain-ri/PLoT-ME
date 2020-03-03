@@ -603,7 +603,6 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
-    logger.info(f"Script {__file__} called with {args}")
     try:
         # Common folder name keeping parameters
         param_k_s = f"k{k}_s{window}"
@@ -736,6 +735,7 @@ if __name__ == '__main__':
                         default=classifier_param_checker.default, type=str, nargs="+", metavar='')
     args = parser.parse_args()
 
+    logger.info(f"Script {__file__} called with {args}")
     main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
          k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
          force_recount=args.recount, early_stop=args.early, omit_folders=tuple(args.omit),
