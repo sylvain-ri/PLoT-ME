@@ -36,6 +36,7 @@ Reads Binning Project
 """
 
 import argparse
+from glob import glob
 import shutil
 import subprocess
 from copy import deepcopy
@@ -459,13 +460,17 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
-        # todo: if library exist in another folder, make a link to it !
         bin_id = f"{cluster}/"
-        cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
-               "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
-               "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
-        res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-        logger.debug(res)
+        # if library exist in another folder, make a link to it !
+        existing_lib = glob(f"{osp.dirname(path_bins_hash)}/*/{bin_id}/library")
+        if len(existing_lib) > 0:
+            os.symlink(existing_lib[0], osp.join(path_bins_hash, bin_id, "library"))
+        else:
+            cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
+                   "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+                   "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
+            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+            logger.debug(res)
 
 
 def classifier_param_checker(l_param):
