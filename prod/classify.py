@@ -182,7 +182,7 @@ class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
     def __init__(self, path_original_fastq, db_path, db_type, folder_report, path_binned_fastq={}, bin_nb=10,
-                 classifier_name="kraken2", param="", cores=1, dry_run=False, verbose=False):
+                 classifier_name="kraken2", param="", cores=1, clf_settings="default", dry_run=False, verbose=False):
         self.logger = logging.getLogger('classify.MockCommunity')
 
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
@@ -200,7 +200,7 @@ class MockCommunity:
         self.folder_out      = osp.join(self.folder_report, self.file_name)
         if not os.path.isdir(self.folder_out):
             os.makedirs(self.folder_out)
-        self.path_out        = osp.join(self.folder_out, f"{param}.{self.db_type}")
+        self.path_out        = osp.join(self.folder_out, f"{param}.{classifier_name}.{clf_settings}.{self.db_type}")
         
         self.cores           = cores
         self.dry_run         = dry_run
@@ -229,7 +229,7 @@ class MockCommunity:
         self.hash_files[arg] = hash_file
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
         self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
-        formatted_out = f"{self.path_out}.{arg}.kraken2" if self.db_type == "bins" else f"{self.path_out}.kraken2"
+        formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
         self.logger.info(f'output is {formatted_out}.out')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
