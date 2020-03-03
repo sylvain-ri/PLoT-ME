@@ -15,12 +15,14 @@ import argparse
 import datetime as dt
 from multiprocessing.pool import Pool
 import pandas as pd
-
-import parse_DB
 from tqdm import tqdm
 
+import parse_DB
+from tools import ArgumentParserWithDefaults
 
-def main():
+
+
+def main(k, cores):
     """ record which param have been done
         date	clusters	k	w	clf_param	omit
     """
@@ -34,7 +36,7 @@ def main():
     classifier_param = ["kraken2", "25", "22", "4"]
     omit_folders = ("plant", "vertebrate")
 
-    for k in (3, 4, 5):
+    for k in (k, ):
         for w in (5000, 10000, 25000, 50000):
             omit = ",".join(omit_folders)
             f_clf_param = ",".join(classifier_param)
@@ -53,7 +55,7 @@ def main():
                 n_clusters=n_clusters,
                 k=k,
                 window=w,
-                cores=16,
+                cores=cores,
                 skip_existing="111100",
                 force_recount=False,
                 early_stop=6,
@@ -69,4 +71,12 @@ def main():
                 f.write(s_param + "\n")
 
 
-main()
+
+if __name__ == '__main__':
+    # Option to display default values, metavar='' to remove ugly capitalized option's names
+    parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-k', '--kmer',     default=4, type=int, help='Size of the kmers', metavar='')
+    parser.add_argument('-c', '--cores',     default=4, type=int, help='number of cores', metavar='')
+    args = parser.parse_args()
+
+    main(args.kmer, args.cores)
