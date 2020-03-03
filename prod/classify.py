@@ -259,7 +259,7 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
 
 
 def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
-                 cores=cpu_count(), f_record="/home/ubuntu/classify_records.csv"):
+                 cores=cpu_count(), f_record="/home/ubuntu/classify_records.csv", clf_settings=""):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -282,10 +282,10 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
                 path_model = file.path
                 break
         assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
-        path_to_hash = osp.join(path_database, classifier)
+        path_to_hash = osp.join(path_database, classifier, clf_settings)
     else:
         path_model = "full"
-        path_to_hash = path_database
+        path_to_hash = osp.join(path_database, "oplant-vertebrate", classifier, clf_settings)
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
@@ -387,9 +387,9 @@ if __name__ == '__main__':
                                                    'and "model_<name>.pkl" ')
     parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
                                               choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
-    parser.add_argument('-s', '--classifier_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2",
-                                              metavar='', choices=bin_classify.classifiers, default='k35_l31_s7')
-    parser.add_argument('-f', '--full_bins',  help='Choose to use the standard full database or the segmented one',
+    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2",
+                                              metavar='', default='k35_l31_s7')
+    parser.add_argument('-f', '--full_DB',  help='Choose to use the standard full database or the segmented one',
                                               default='bins', choices=('full', 'bins',), metavar='')
     parser.add_argument('-t', '--threads',    help='Number of threads', default=cpu_count(), type=int, metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
@@ -401,7 +401,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     bin_classify(args.input_fastq, args.output_folder, args.database,
-                 classifier=args.classifier, db_type=args.db_type, cores=args.threads, f_record=args.record)
+                 classifier=args.classifier, db_type=args.full_DB, cores=args.threads, f_record=args.record,
+                 clf_settings=args.clf_settings)
 
 
 

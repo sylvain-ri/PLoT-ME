@@ -635,7 +635,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
             check_step.can_skip = "00"
-            path_full_hash = osp.join(folder_output, f"kraken2_full.{o_omitted}", s_param)
+            path_full_hash = osp.join(folder_output, "full", o_omitted, param['classifier'], s_param)
             kraken2_full(folder_database, path_full_hash, path_taxonomy, param)
             if k2_clean: kraken2_clean(path_full_hash, "full")
 
