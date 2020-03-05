@@ -36,6 +36,7 @@ Reads Binning Project
 """
 
 import argparse
+from glob import glob
 import shutil
 import subprocess
 from copy import deepcopy
@@ -460,15 +461,20 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters)):
         bin_id = f"{cluster}/"
-        cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
-               "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
-               "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
-        res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-        logger.debug(res)
+        # if library exist in another folder, make a link to it !
+        existing_lib = glob(f"{osp.dirname(path_bins_hash)}/*/{bin_id}/library")
+        if len(existing_lib) > 0:
+            os.symlink(existing_lib[0], osp.join(path_bins_hash, bin_id, "library"))
+        else:
+            cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
+                   "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+                   "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
+            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+            logger.debug(res)
 
 
 def classifier_param_checker(l_param):
-    """ check kraken2-build --help. Default values to feed in """
+    """ check kraken2-build --help. Default values to feed in, default is ["kraken2", "35", "31", "7"] """
     assert isinstance(l_param, list), TypeError
     assert len(l_param) > 0, "Empty list"
     if "kraken2" in l_param[0]:
@@ -528,9 +534,9 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
 @check_step
 def kraken2_full(path_refseq, path_output, taxonomy, p):
     """ Build the hash table with the same genomes, but in one bin, for comparison """
-    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
     delete_folder_if_exists(path_output)
     create_path(path_output)
+    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
 
     logger.warning(f"DO NOT INTERRUPT this process, you will have restart from scratches.")
     # Add genomes to
@@ -597,7 +603,6 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
-    logger.info(f"Script {__file__} called with {args}")
     try:
         # Common folder name keeping parameters
         param_k_s = f"k{k}_s{window}"
@@ -633,7 +638,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
-            path_full_hash = osp.join(folder_output, f"kraken2_full.{o_omitted}", s_param)
+            check_step.can_skip = "00"
+            path_full_hash = osp.join(folder_output, "full", o_omitted, param['classifier'], s_param)
             kraken2_full(folder_database, path_full_hash, path_taxonomy, param)
             if k2_clean: kraken2_clean(path_full_hash, "full")
 
@@ -716,7 +722,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
                         default=("plant", "vertebrate"), metavar='')
     parser.add_argument('-r', '--recount',  help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
-    parser.add_argument('-n', '--clean',  action='store_true',
+    parser.add_argument('--clean',  action='store_true',
                         help='Make use of kraken2-build --clean to remove temporary files (library/added/ and others)')
     parser.add_argument('-f', '--full_DB',  action='store_true',
                         help='Build the full RefSeq database, omitting the directories set by --omit, with '
@@ -729,6 +735,7 @@ if __name__ == '__main__':
                         default=classifier_param_checker.default, type=str, nargs="+", metavar='')
     args = parser.parse_args()
 
+    logger.info(f"Script {__file__} called with {args}")
     main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
          k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
          force_recount=args.recount, early_stop=args.early, omit_folders=tuple(args.omit),

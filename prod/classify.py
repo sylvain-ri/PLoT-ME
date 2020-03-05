@@ -119,7 +119,8 @@ class ReadToBin(SeqRecord.SeqRecord):
         if path_model == "full":
             cls.K = 0
         else:
-            k = path_model.split("/model_")[1].split("mer_")[0].split("_")[1]
+            # todo: find the param file
+            k = path_model.split("/model.")[1].split("_s")[0].split("_k")[1]
             logger.debug(f"got path_model={path_model}, setting k={k}")
             cls.K = int(k)
             cls.KMER = kmers_dic(cls.K)
@@ -182,7 +183,7 @@ class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
     def __init__(self, path_original_fastq, db_path, db_type, folder_report, path_binned_fastq={}, bin_nb=10,
-                 classifier_name="kraken2", param="", cores=1, dry_run=False, verbose=False):
+                 classifier_name="kraken2", param="", cores=1, clf_settings="default", dry_run=False, verbose=False):
         self.logger = logging.getLogger('classify.MockCommunity')
 
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
@@ -200,7 +201,7 @@ class MockCommunity:
         self.folder_out      = osp.join(self.folder_report, self.file_name)
         if not os.path.isdir(self.folder_out):
             os.makedirs(self.folder_out)
-        self.path_out        = osp.join(self.folder_out, f"{param}.{self.db_type}")
+        self.path_out        = osp.join(self.folder_out, f"{param}.{classifier_name}.{clf_settings}.{self.db_type}")
         
         self.cores           = cores
         self.dry_run         = dry_run
@@ -229,7 +230,7 @@ class MockCommunity:
         self.hash_files[arg] = hash_file
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
         self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
-        formatted_out = f"{self.path_out}.{arg}.kraken2" if self.db_type == "bins" else f"{self.path_out}.kraken2"
+        formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
         self.logger.info(f'output is {formatted_out}.out')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
@@ -259,7 +260,7 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
 
 
 def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
-                 cores=cpu_count(), f_record="/home/ubuntu/classify_records.csv"):
+                 cores=cpu_count(), f_record="/home/ubuntu/classify_records.csv", clf_settings=""):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -278,14 +279,14 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
     if db_type == "bins":
         path_model = ""
         for file in os.scandir(path_database):
-            if file.name.startswith("model_") and file.name.endswith(".pkl"):
+            if file.name.startswith("model.") and file.name.endswith(".pkl"):
                 path_model = file.path
                 break
         assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
-        path_to_hash = osp.join(path_database, f"{classifier}_hash")
+        path_to_hash = osp.join(path_database, classifier, clf_settings)
     else:
         path_model = "full"
-        path_to_hash = path_database
+        path_to_hash = osp.join(path_database, "oplant-vertebrate", classifier, clf_settings)
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
@@ -387,9 +388,11 @@ if __name__ == '__main__':
                                                    'and "model_<name>.pkl" ')
     parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
                                               choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
-    parser.add_argument('-d', '--db_type',    help='Choose to use the standard full database or the segmented one',
-                                              default='bins', choices=('full', 'bins',) , metavar='')
-    parser.add_argument('-t', '--threads', default=cpu_count(), type=int, help='Number of threads', metavar='')
+    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2",
+                                              metavar='', default='k35_l31_s7')
+    parser.add_argument('-f', '--full_DB',  help='Choose to use the standard full database or the segmented one',
+                                              default='bins', choices=('full', 'bins',), metavar='')
+    parser.add_argument('-t', '--threads',    help='Number of threads', default=cpu_count(), type=int, metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
@@ -399,7 +402,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     bin_classify(args.input_fastq, args.output_folder, args.database,
-                 classifier=args.classifier, db_type=args.db_type, cores=args.threads, f_record=args.record)
+                 classifier=args.classifier, db_type=args.full_DB, cores=args.threads, f_record=args.record,
+                 clf_settings=args.clf_settings)
 
 
 
