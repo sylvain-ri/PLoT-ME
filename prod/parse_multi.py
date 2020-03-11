@@ -21,7 +21,7 @@ import parse_DB
 from tools import ArgumentParserWithDefaults
 
 
-def main(k, cores):
+def main(k, cores, skip_existing):
     """ record which param have been done
         date	clusters	k	w	clf_param	omit
     """
@@ -44,7 +44,7 @@ def main(k, cores):
 
             # skip already done
             df = pd.read_csv(history, sep="\t")
-            if df[(df.k == k) & (df.w == w)].shape[0] > 0:
+            if df[(df.k == k) & (df.w == w) & (df.cluster == n_clusters) & (df.clf_param == f_clf_param)].shape[0] > 0:
                 print("skipped")
                 continue
 
@@ -55,7 +55,7 @@ def main(k, cores):
                 k=k,
                 window=w,
                 cores=cores,
-                skip_existing="111100",
+                skip_existing=skip_existing,
                 force_recount=False,
                 early_stop=6,
                 omit_folders=omit_folders,
@@ -74,8 +74,9 @@ def main(k, cores):
 if __name__ == '__main__':
     # Option to display default values, metavar='' to remove ugly capitalized option's names
     parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('-k', '--kmer',     default=4, type=int, help='Size of the kmers', metavar='')
+    parser.add_argument('-k', '--kmer',      default=4, type=int, help='Size of the kmers', metavar='')
     parser.add_argument('-c', '--cores',     default=4, type=int, help='number of cores', metavar='')
+    parser.add_argument('-s', '--skip_existing',     default=110000, type=str, help='skip steps', metavar='')
     args = parser.parse_args()
 
-    main(args.kmer, args.cores)
+    main(args.kmer, args.cores, args.skip_existing)
