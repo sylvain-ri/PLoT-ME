@@ -21,7 +21,6 @@ import parse_DB
 from tools import ArgumentParserWithDefaults
 
 
-
 def main(k, cores):
     """ record which param have been done
         date	clusters	k	w	clf_param	omit
@@ -32,12 +31,12 @@ def main(k, cores):
     #     results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
     #                         total=len(df_per_fna)))
 
-    n_clusters = 10
-    classifier_param = ["kraken2", "25", "22", "4"]
+    n_clusters = 20
+    classifier_param = ["kraken2", "35", "31", "7"]  # ["kraken2", "25", "22", "4"]
     omit_folders = ("plant", "vertebrate")
 
     for k in (k, ):
-        for w in (5000, 10000, 25000, 50000):
+        for w in (5000, 10000, 25000):
             omit = ",".join(omit_folders)
             f_clf_param = ",".join(classifier_param)
             s_param = f"{dt.datetime.now():%Y-%m-%d_%H-%M}\t{n_clusters}\t{k}\t{w}\t{f_clf_param}\t{omit}"
