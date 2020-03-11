@@ -254,7 +254,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
     with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
                                                                      stop if stop>0 else None)),
-                            total=ScanFolder.count_root_files()))
+                            total=ScanFolder.count_root_files(), dynamic_ncols=True))
 
     logger.info(f"{len(results)} genomes have been scanned and kmer counted.")
 
@@ -432,7 +432,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
     # # todo: parallel ? groupby ? Try in notebook
     # df_per_fna = []
-    # for file in tqdm(df.fna_path.unique()):
+    # for file in tqdm(df.fna_path.unique(), dynamic_ncols=True):
     #     df_per_fna.append(df[df.fna_path == file].copy())
     df_per_fna = df.groupby(["fna_path"])
 
@@ -444,7 +444,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     Genome.set_k_kmers(main.k)
     with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
-                            total=len(df_per_fna)))
+                            total=len(df_per_fna), dynamic_ncols=True))
 
     logger.info(f"split {len(results)} genomes...")
 
@@ -459,7 +459,7 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
     add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
-    for cluster in tqdm(range(n_clusters)):
+    for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
         # if library exist in another folder, make a link to it !
         existing_lib = glob(f"{osp.dirname(path_bins_hash)}/*/{bin_id}/library")
@@ -513,7 +513,7 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
     add_file_with_parameters(path_bins_hash, add_description=f"cluster = {n_clusters} \ntaxonomy = {path_taxonomy}")
 
     logger.info(f"kraken2 build its hash tables, {n_clusters} clusters, will take lots of time.... ")
-    for cluster in tqdm(range(n_clusters)):
+    for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
         taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
         if osp.islink(taxon_in_cluster):
@@ -581,7 +581,7 @@ def kraken2_clean(path_bins_hash, n_clusters):
 
     else:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
-        for cluster in tqdm(range(n_clusters)):
+        for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
             bin_id = f"{cluster}/"
             cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
             logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
