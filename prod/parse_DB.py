@@ -709,7 +709,7 @@ if __name__ == '__main__':
     parser.add_argument('path_output_files', type=is_valid_directory,
                         help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
 
-    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy', metavar='')
+    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to taxonomy (absolute path)', metavar='')
     parser.add_argument('-m', '--ml_model', choices=clustering_segments.models, type=str, metavar='',
                         help='name of the model to use for clustering', default=clustering_segments.models[0])
     parser.add_argument('-k', '--kmer',     default=4, type=int, help='Size of the kmers', metavar='')
