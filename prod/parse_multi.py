@@ -23,7 +23,7 @@ from tools import ArgumentParserWithDefaults
 
 def main(k, cores, skip_existing):
     """ record which param have been done
-        date	clusters	k	w	clf_param	omit
+        date	cluster	k	w	clf_param	omit
     """
     history = "/home/ubuntu/Scripts/Reads_Binning/prod/tried_param.tsv"
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-k', '--kmer',      default=4, type=int, help='Size of the kmers', metavar='')
     parser.add_argument('-c', '--cores',     default=4, type=int, help='number of cores', metavar='')
-    parser.add_argument('-s', '--skip_existing',     default=110000, type=str, help='skip steps', metavar='')
+    parser.add_argument('-s', '--skip_existing',     default="110000", type=str, help='skip steps', metavar='')
     args = parser.parse_args()
 
     main(args.kmer, args.cores, args.skip_existing)
