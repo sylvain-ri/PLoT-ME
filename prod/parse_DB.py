@@ -403,8 +403,8 @@ def pll_copy_segments_to_bin(df):
         # Need to find the genome/plasmid/ and the right chromosome
         for seq in genome.records[category]:
             if seq.name == name:
-                logger.debug(f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
-                             f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
+                logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
+                              f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
 
                 segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
                                     seq.features, seq.annotations, seq.letter_annotations)
