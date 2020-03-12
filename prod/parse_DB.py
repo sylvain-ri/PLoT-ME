@@ -309,6 +309,13 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     k = main.k
     w = main.w
 
+    # https://www.codementor.io/@guidotournois/4-strategies-to-deal-with-large-datasets-using-pandas-qdw3an95k
+    # filename = "data.csv"
+    # n = sum(1 for line in open(filename)) - 1  # Calculate number of rows in file
+    # s = n // 10  # sample size of 10%
+    # skip = sorted(random.sample(range(1, n + 1), n - s))  # n+1 to compensate for header
+    # df = pandas.read_csv(filename, skiprows=skip)
+
     path_pkl_kmer_counts = path_kmer_counts.replace(".csv", ".pd")
     if osp.isfile(path_pkl_kmer_counts):
         logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
@@ -319,11 +326,12 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
                     f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
         df = pd.read_csv(path_kmer_counts, dtype=main.cols_types)
         logger.info(f"save pickle copy for faster loading {path_pkl_kmer_counts}")
-        # Need to set again as categories
-        df.taxon       = df.taxon.astype('category')
+        # Soon DEPRECATED, set my the loading type
+        # (Need to set again as categories)
         df.category    = df.category.astype('category')
         df.name        = df.name.astype('category')
         df.fna_path    = df.fna_path.astype('category')
+        df.description = df.description.astype('category')
         df.to_pickle(path_pkl_kmer_counts)
 
     cols_kmers = df.columns[-4**k:]
@@ -616,9 +624,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         main.cores          = cores
         # Set all columns type
         cols_types = {
-            "taxon": int, "category": str,
+            "taxon": int, "category": 'category',
             "start": int, "end": int,
-            "name": str, "description": str, "fna_path": str,
+            "name": 'category', "description": 'category', "fna_path": 'category',
         }
         for key in kmers_dic(main.k).keys():
             cols_types[key] = float32
