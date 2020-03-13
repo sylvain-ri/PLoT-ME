@@ -13,7 +13,7 @@ Needs a lot of disk space, and RAM according to the largest genome to process.
 3 -> Copy these segments of genomes into bins (DISK intensive)
 4 -> kraken2-build --add-to-library
 5 -> kraken2-build --build
-f -> Building the hash for the full refseq, for comparison bins vs full
+f -> Building the hash for the full refseq, for comparison bins vs no binning
 
 For 17GB file of combined kmer counts, combining counts took up to 55GB,
 loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
@@ -541,10 +541,10 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
 
 @check_step
 def kraken2_full(path_refseq, path_output, taxonomy, p):
-    """ Build the hash table with the same genomes, but in one bin, for comparison """
+    """ Build the hash table with the same genomes, but without binning, for comparison """
     delete_folder_if_exists(path_output)
     create_path(path_output)
-    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
+    add_file_with_parameters(path_output, add_description=f"no binning database for comparison \ntaxonomy = {taxonomy}")
 
     logger.warning(f"DO NOT INTERRUPT this process, you will have restart from scratches.")
     # Add genomes to
@@ -580,7 +580,7 @@ def kraken2_clean(path_bins_hash, n_clusters):
     """ Use of kraken2-build --clean option to remove temporary files.
         No cleaning by default because the library is the same for various values of k, l and s
     """
-    if "full" in n_clusters:
+    if n_clusters <= 1:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
         cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", path_bins_hash]
         logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
@@ -648,9 +648,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
             check_step.can_skip = "00"
-            path_full_hash = osp.join(folder_output, "full", o_omitted, param['classifier'], s_param)
+            path_full_hash = osp.join(folder_output, "no-binning", o_omitted, param['classifier'], s_param)
             kraken2_full(folder_database, path_full_hash, path_taxonomy, param)
-            if k2_clean: kraken2_clean(path_full_hash, "full")
+            if k2_clean: kraken2_clean(path_full_hash, 1)
 
         else:
             #    KMER COUNTING
@@ -733,9 +733,9 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--recount',  help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
     parser.add_argument('--clean',  action='store_true',
                         help='Make use of kraken2-build --clean to remove temporary files (library/added/ and others)')
-    parser.add_argument('-f', '--full_DB',  action='store_true',
-                        help='Build the full RefSeq database, omitting the directories set by --omit, with '
-                             '--taxonomy path. Skips all the other steps/processes (unused: -e, -n, -m, -r, -s)')
+    parser.add_argument('-f', '--full_no_binning',  action='store_true',
+                        help='Build the full RefSeq database, without binning, omitting the directories set by --omit, '
+                             'with --taxonomy path. Skips all the other steps/processes (unused: -e, -n, -m, -r, -s)')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, skip files/folders that already exist. Write 1100000 to skip steps 0 and 1. "
                              "To recount all kmers, and stop after combining the kmer dataframes, "
@@ -748,7 +748,7 @@ if __name__ == '__main__':
     main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
          k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
          force_recount=args.recount, early_stop=args.early, omit_folders=tuple(args.omit),
-         path_taxonomy=args.taxonomy, ml_model=args.ml_model, full_DB=args.full_DB,
+         path_taxonomy=args.taxonomy, ml_model=args.ml_model, full_DB=args.full_no_binning,
          classifier_param=args.classifier_param, k2_clean=args.clean)
 
 
