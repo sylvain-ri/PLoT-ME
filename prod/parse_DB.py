@@ -529,10 +529,16 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
             os.unlink(taxon_in_cluster)
         os.symlink(path_taxonomy, taxon_in_cluster)
 
-        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id),
+        path_kraken2 = osp.join(path_bins_hash, bin_id)
+        path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
+        if osp.isfile(path_kraken2_hash):
+            logger.info(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
+            continue
+
+        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
                "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
         logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
-        res = subprocess.call(cmd)
+        res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
         logger.debug(res)
 
     logger.info(f"Kraken2 finished building hash tables. You can clean the intermediate files with: "
