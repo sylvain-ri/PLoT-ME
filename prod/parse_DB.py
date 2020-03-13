@@ -523,18 +523,22 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
     logger.info(f"kraken2 build its hash tables, {n_clusters} clusters, will take lots of time.... ")
     for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
-        taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
-        if osp.islink(taxon_in_cluster):
-            logger.debug(f"removing existing link at {taxon_in_cluster}")
-            os.unlink(taxon_in_cluster)
-        os.symlink(path_taxonomy, taxon_in_cluster)
 
+        # check if hash has already been done
         path_kraken2 = osp.join(path_bins_hash, bin_id)
         path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
         if osp.isfile(path_kraken2_hash) and not any([fname.endswith('.tmp') for fname in os.listdir(path_kraken2)]):
             logger.debug(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
             continue
 
+        # add link to taxonomy
+        taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
+        if osp.islink(taxon_in_cluster):
+            logger.debug(f"removing existing link at {taxon_in_cluster}")
+            os.unlink(taxon_in_cluster)
+        os.symlink(path_taxonomy, taxon_in_cluster)
+
+        # Build
         cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
                "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
         logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
