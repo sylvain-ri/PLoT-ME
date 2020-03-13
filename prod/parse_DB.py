@@ -531,8 +531,8 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
 
         path_kraken2 = osp.join(path_bins_hash, bin_id)
         path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
-        if osp.isfile(path_kraken2_hash):
-            logger.info(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
+        if osp.isfile(path_kraken2_hash) and not any([fname.endswith('.tmp') for fname in os.listdir(path_kraken2)]):
+            logger.debug(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
             continue
 
         cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
