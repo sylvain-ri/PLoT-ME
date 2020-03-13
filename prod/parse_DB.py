@@ -635,9 +635,10 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         # If force recount of the kmer, disable the skip of the step
         if force_recount:
             skip_existing = "0" + skip_existing[1:]
-        check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
+        check_step.timings    = [perf_counter(), ]  # log time spent
+        check_step.step_nb    = 0         # For decorator to know which steps has been
         check_step.early_stop = early_stop
-        check_step.timings.append(perf_counter())  # log time spent
+        check_step.can_skip   = skip_existing        # Set the skip variable for the decorator of each step
         # Check classifier/kraken2's parameters
         param, s_param = classifier_param_checker(classifier_param)
         # Check that taxonomy wasn't forgotten
