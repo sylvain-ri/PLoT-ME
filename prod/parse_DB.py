@@ -462,7 +462,6 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
     """ launch kraken2-build add-to-library. DELETE EXISTING FOLDER !!
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
-    delete_folder_if_exists(path_bins_hash)
     create_n_folders(path_bins_hash, n_clusters)
     add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
 
@@ -471,8 +470,12 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
         bin_id = f"{cluster}/"
         # if library exist in another folder, make a link to it !
         existing_lib = glob(f"{osp.dirname(path_bins_hash)}/*/{bin_id}/library")
+        path_new_lib = osp.join(path_bins_hash, bin_id, "library")
         if len(existing_lib) > 0:
-            os.symlink(existing_lib[0], osp.join(path_bins_hash, bin_id, "library"))
+            os.symlink(existing_lib[0], path_new_lib)
+            # If library has already been done, skip it
+        elif osp.isdir(path_new_lib):
+            logger.debug(f"Library {bin_id} already existing. Delete folder if reinstall needed: {path_new_lib}")
         else:
             cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
                    "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",

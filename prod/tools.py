@@ -112,7 +112,7 @@ def create_path(path):
     folder = osp.dirname(path) if "." in osp.basename(path) and len(osp.splitext(osp.basename(path))[1]) <= 4 else path
     if not osp.isdir(folder):
         logger.log(5, f"created folder {folder}")
-        os.makedirs(folder)
+        os.makedirs(folder, exist_ok=True)
 
 
 def delete_folder_if_exists(path_dir):
