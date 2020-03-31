@@ -268,10 +268,11 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
     bin_classify.cores = cores
 
     # preparing csv record file
-    with open(f_record, 'a', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS", "HASH_PATH", "HASH_NAME")
-        csv_writer.writerow(headers)
+    if not osp.isfile(f_record):
+        with open(f_record, 'w', newline='') as csv_file:
+            csv_writer = csv.writer(csv_file, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS", "HASH_PATH", "HASH_NAME")
+            csv_writer.writerow(headers)
 
     logger.info("let's classify reads!")
 
@@ -317,8 +318,6 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
                 ReadToBin.sort_bins_by_sizes()
                 t[key]["binning"] = perf_counter()
                 t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
-            else:
-                fastq_binned = {}
 
             fastq_classifier = MockCommunity(
                 path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
@@ -361,8 +360,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
         records.append(row)
 
     # Timings and to csv
-    with open(f_record, 'a', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+    with open(f_record, 'a', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         csv_writer.writerows(records)
 
     logger.info(f"Script ended, {len(t)} files processed")
@@ -390,7 +389,7 @@ if __name__ == '__main__':
                                               choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
     parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2",
                                               metavar='', default='k35_l31_s7')
-    parser.add_argument('-f', '--full_DB',  help='Choose to use the standard full database or the segmented one',
+    parser.add_argument('-b', '--full_DB',  help='Choose to use the standard full database or the segmented one',
                                               default='bins', choices=('full', 'bins',), metavar='')
     parser.add_argument('-t', '--threads',    help='Number of threads', default=cpu_count(), type=int, metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
