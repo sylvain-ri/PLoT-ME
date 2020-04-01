@@ -391,23 +391,21 @@ def test_classification():
 
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('output_folder',      help='Folder for output reports', type=is_valid_directory)
     parser.add_argument('database',           help='Folder with the hash table for the classifier, name '
                                                    '"minikm_<param>" with sub-folders "RefSeq/<bins> '
                                                    'and "model_<name>.pkl" ')
-    parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use (default: %(default)s)',
-                                              metavar='', choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
-    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2 "
-                                                     "(default: %(default)s)", metavar='', default='k35_l31_s7')
-    parser.add_argument('-b', '--full_DB',    help='Choose to use the standard full database or the segmented one '
-                                                   '(default: %(default)s)',
+    parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
+                                              choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
+    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2",
+                                              metavar='', default='k35_l31_s7')
+    parser.add_argument('-b', '--full_DB',  help='Choose to use the standard full database or the segmented one',
                                               default='bins', choices=('full', 'bins',), metavar='')
-    parser.add_argument('-t', '--threads',    help='Number of threads (default: %(default)d)',
-                                              default=cpu_count(), type=int, metavar='')
+    parser.add_argument('-t', '--threads',    help='Number of threads', default=cpu_count(), type=int, metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
-    parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format (default: %(default)s)',
+    parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
                                               default="/home/ubuntu/classify_records.csv", type=str, metavar='')
     # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
 
