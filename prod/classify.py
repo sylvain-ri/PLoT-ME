@@ -150,19 +150,26 @@ class ReadToBin(SeqRecord.SeqRecord):
         return cls.outputs
 
     @classmethod
-    def sort_bins_by_sizes(cls):
-        """ Sort the bins by their size """
+    def sort_bins_by_sizes_and_drop_smalls(cls, drop_bins):
+        """ Sort the fastq bins by their size. drop_bins is the *percentage* below which a bin is ignored """
         # todo: drop bins with less than 0.1% of the total size ?
         bin_size = {}
         for f in os.scandir(cls.FASTQ_BIN_FOLDER):
             bin_nb = int(f.name.split('.')[1].split('-')[1])
             size = osp.getsize(f)
             bin_size[size] = bin_nb
+        full_fastq_size = osp.getsize(cls.FASTQ_PATH)
+        minimum_size = full_fastq_size * drop_bins / 100
+
         # make a copy first, then empty the dic, and rewrite it in the correct order
         fastq_outputs = ReadToBin.outputs
         ReadToBin.outputs = {}
         for size, bin_nb in sorted(bin_size.items(), reverse=True):
-            ReadToBin.outputs[bin_nb] = fastq_outputs[bin_nb]
+            if size > minimum_size:
+                ReadToBin.outputs[bin_nb] = fastq_outputs[bin_nb]
+            else:
+                logger.debug(f"Reads in bin {bin_nb} has a size of {size/10**6:.2f} MB, and will be dropped "
+                             f"(less than {drop_bins}% of all binned reads {full_fastq_size/10**9:.2f} GB)")
         return ReadToBin.outputs
 
 
@@ -262,8 +269,8 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
                    "2019-12-19_20-WindowReads_EColi_Test/2019-12-19_20-WindowReads_10-EColiTest.fastq"]
 
 
-def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
-                 cores=cpu_count(), f_record="/home/ubuntu/classify_records.csv", clf_settings=""):
+def bin_classify(list_fastq, path_report, path_database, classifier, db_type, cores=cpu_count(),
+                 f_record="/home/ubuntu/classify_records.csv", clf_settings="", drop_bin_threshold=0.5):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -326,7 +333,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             if "bins" in db_type:
                 ReadToBin.set_fastq_model_and_param(file, path_model, param, cores, k)
                 ReadToBin.bin_reads()
-                ReadToBin.sort_bins_by_sizes()
+                ReadToBin.sort_bins_by_sizes_and_drop_smalls(drop_bin_threshold)
                 t[key]["binning"] = perf_counter()
                 t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
 
@@ -403,6 +410,9 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--full_DB',  help='Choose to use the standard full database or the segmented one',
                                               default='bins', choices=('full', 'bins',), metavar='')
     parser.add_argument('-t', '--threads',    help='Number of threads', default=cpu_count(), type=int, metavar='')
+    parser.add_argument('-d', '--drop_bin_threshold',    help='Drop fastq bins smaller than x percent of the total file'
+                                                              '. Helps to avoid loading hash tables for very few reads',
+                                              default=0.5, type=float, metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
@@ -413,7 +423,7 @@ if __name__ == '__main__':
 
     bin_classify(args.input_fastq, args.output_folder, args.database,
                  classifier=args.classifier, db_type=args.full_DB, cores=args.threads, f_record=args.record,
-                 clf_settings=args.clf_settings)
+                 clf_settings=args.clf_settings, drop_bin_threshold=args.drop_bin_threshold)
 
 
 
