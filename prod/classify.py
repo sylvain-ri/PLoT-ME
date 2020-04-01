@@ -218,18 +218,18 @@ class MockCommunity:
         self.logger.info(f"Classifying reads with {self.db_type} setting")
         if "bins" in self.db_type:
             for bin_id in self.path_binned_fastq.keys():
-                path_hash_bin = osp.join(self.db_path, f"{bin_id}")
+                folder_hash = osp.join(self.db_path, f"{bin_id}")
                 logger.debug(f"Path of fastq bin : {self.path_binned_fastq[bin_id]}")
-                logger.debug(f"Path of hash bin : {path_hash_bin}")
-                assert osp.isfile(path_hash_bin), FileNotFoundError(f"Hash table not found ! {path_hash_bin}")
-                self.classifier(self.path_binned_fastq[bin_id], path_hash_bin, arg=f"bin-{bin_id}")
+                logger.debug(f"Path of folder of hash bin : {folder_hash}")
+                self.classifier(self.path_binned_fastq[bin_id], folder_hash, arg=f"bin-{bin_id}")
         elif "full" in self.db_type:
             self.classifier(self.path_original_fastq, self.db_path, arg="full")
         else:
             NotImplementedError("The database choice is either full or bins")
                 
-    def kraken2(self, file, path_hash, arg="unknown"):
-        hash_file = osp.join(path_hash, "hash.k2d")
+    def kraken2(self, file, folder_hash, arg="unknown"):
+        hash_file = osp.join(folder_hash, "hash.k2d")
+        assert osp.isfile(hash_file), FileNotFoundError(f"Hash table not found ! {hash_file}")
         self.hash_files[arg] = hash_file
         self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
         self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {path_hash}')
