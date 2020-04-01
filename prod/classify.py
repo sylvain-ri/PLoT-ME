@@ -23,7 +23,7 @@ from os import path as osp
 import pickle
 import subprocess
 from time import perf_counter
-
+import re
 
 import numpy as np
 from Bio import SeqRecord, SeqIO
@@ -97,7 +97,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             SeqIO.write(self, f, bin_classify.format)
 
     @classmethod
-    def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores):
+    def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores, k):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
         # todo: load the parameter file from parse_DB.py instead of parsing string.... parameters_RefSeq_binning.txt
         cls.CORES = cores
@@ -119,9 +119,6 @@ class ReadToBin(SeqRecord.SeqRecord):
         if path_model == "full":
             cls.K = 0
         else:
-            # todo: find the param file
-            k = path_model.split("/model.")[1].split("_s")[0].split("_k")[1]
-            logger.debug(f"got path_model={path_model}, setting k={k}")
             cls.K = int(k)
             cls.KMER = kmers_dic(cls.K)
             with open(path_model, 'rb') as f:
@@ -187,6 +184,8 @@ class MockCommunity:
         self.logger = logging.getLogger('classify.MockCommunity')
 
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
+        logger.debug(f"Path to hash files: db_path = {db_path}")
+
         self.path_original_fastq    = path_original_fastq
 
         self.folder, self.file_name = osp.split(osp.splitext(self.path_original_fastq)[0])
@@ -288,10 +287,17 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
                 path_model = file.path
                 break
         assert osp.isfile(path_model), FileNotFoundError(f"didn't find the ML model in {path_database}... {path_model}")
+
+        # Parse the model name to find parameters:
+        basename = path_model.split("/model.")[1]
+        clusterer, bin_nb, k, w, omitted = re.split('_b|_k|_s|_o', basename)
+
         path_to_hash = osp.join(path_database, classifier, clf_settings)
+        logger.info(f"WTH: {path_to_hash}\t{path_database}\t{classifier}\t{clf_settings}")
     else:
         path_model = "full"
-        path_to_hash = osp.join(path_database, "oplant-vertebrate", classifier, clf_settings)
+        clusterer, bin_nb, k, w, omitted = (None, 1, None, None, "oplant-vertebrate")
+        path_to_hash = osp.join(path_database, omitted, classifier, clf_settings)
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
@@ -317,7 +323,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
             logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {base_name}")
             # Binning
             if "bins" in db_type:
-                ReadToBin.set_fastq_model_and_param(file, path_model, param, cores)
+                ReadToBin.set_fastq_model_and_param(file, path_model, param, cores, k)
                 ReadToBin.bin_reads()
                 ReadToBin.sort_bins_by_sizes()
                 t[key]["binning"] = perf_counter()
@@ -325,7 +331,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
 
             fastq_classifier = MockCommunity(
                 path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
-                path_binned_fastq=ReadToBin.outputs, bin_nb=10, classifier_name=classifier, param=param, cores=cores)
+                path_binned_fastq=ReadToBin.outputs, bin_nb=bin_nb, classifier_name=classifier, param=param, cores=cores)
 
             fastq_classifier.classify()
             t[key]["classify"] = perf_counter()
@@ -387,7 +393,7 @@ if __name__ == '__main__':
     parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('output_folder',      help='Folder for output reports', type=is_valid_directory)
     parser.add_argument('database',           help='Folder with the hash table for the classifier, name '
-                                                   '"clustered_by_<param>" with sub-folders "RefSeq/<bins> '
+                                                   '"minikm_<param>" with sub-folders "RefSeq/<bins> '
                                                    'and "model_<name>.pkl" ')
     parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
                                               choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
