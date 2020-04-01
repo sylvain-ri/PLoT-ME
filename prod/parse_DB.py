@@ -727,7 +727,7 @@ main.cols_types      = {}
 
 if __name__ == '__main__':
     # Option to display default values, metavar='' to remove ugly capitalized option's names
-    parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019')
     parser.add_argument('path_output_files', type=is_valid_directory,

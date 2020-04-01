@@ -398,7 +398,7 @@ if __name__ == '__main__':
                                                    'and "model_<name>.pkl" ')
     parser.add_argument('-c', '--classifier', help='choose which metagenomics classifier to use', metavar='',
                                               choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
-    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k35_l31_s7' for kraken2",
+    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k25_l22_s5' for kraken2",
                                               metavar='', default='k35_l31_s7')
     parser.add_argument('-b', '--full_DB',  help='Choose to use the standard full database or the segmented one',
                                               default='bins', choices=('full', 'bins',), metavar='')
