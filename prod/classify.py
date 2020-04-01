@@ -298,6 +298,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
         path_model = "full"
         clusterer, bin_nb, k, w, omitted = (None, 1, None, None, "oplant-vertebrate")
         path_to_hash = osp.join(path_database, omitted, classifier, clf_settings)
+    logger.debug(f"Found parameters: clusterer={clusterer}, bin number={bin_nb}, k={k}, w={w}, omitted={omitted}")
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
