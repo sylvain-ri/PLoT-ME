@@ -227,18 +227,18 @@ class MockCommunity:
         else:
             NotImplementedError("The database choice is either full or bins")
                 
-    def kraken2(self, file, folder_hash, arg="unknown"):
+    def kraken2(self, fastq_input, folder_hash, arg="unknown"):
         hash_file = osp.join(folder_hash, "hash.k2d")
         assert osp.isfile(hash_file), FileNotFoundError(f"Hash table not found ! {hash_file}")
         self.hash_files[arg] = hash_file
-        self.logger.info(f'start to classify reads from file ({osp.getsize(file)/10**6:.2f} MB) {file}')
+        self.logger.info(f'start to classify reads from file ({osp.getsize(fastq_input)/10**6:.2f} MB) {fastq_input}')
         self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {hash_file}')
         formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
         self.logger.info(f'output is {formatted_out}.out')
         self.cmd = [
             "kraken2", "--threads", f"{self.cores}",
-            "--db", hash_file,
-            file,
+            "--db", folder_hash,
+            fastq_input,
             "--output", f"{formatted_out}.out",
             "--report", f"{formatted_out}.report",
         ]
@@ -290,7 +290,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type,
 
         # Parse the model name to find parameters:
         basename = path_model.split("/model.")[1]
-        clusterer, bin_nb, k, w, omitted = re.split('_b|_k|_s|_o', basename)
+        clusterer, bin_nb, k, w, omitted, _ = re.split('_b|_k|_s|_o|.pkl', basename)
 
         path_to_hash = osp.join(path_database, classifier, clf_settings)
         logger.info(f"WTH: {path_to_hash}\t{path_database}\t{classifier}\t{clf_settings}")
