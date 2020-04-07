@@ -13,7 +13,7 @@ Needs a lot of disk space, and RAM according to the largest genome to process.
 3 -> Copy these segments of genomes into bins (DISK intensive)
 4 -> kraken2-build --add-to-library
 5 -> kraken2-build --build
-f -> Building the hash for the full refseq, for comparison bins vs full
+f -> Building the hash for the full refseq, for comparison bins vs no binning
 
 For 17GB file of combined kmer counts, combining counts took up to 55GB,
 loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
@@ -254,7 +254,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
     with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
                                                                      stop if stop>0 else None)),
-                            total=ScanFolder.count_root_files()))
+                            total=ScanFolder.count_root_files(), dynamic_ncols=True))
 
     logger.info(f"{len(results)} genomes have been scanned and kmer counted.")
 
@@ -309,6 +309,13 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     k = main.k
     w = main.w
 
+    # https://www.codementor.io/@guidotournois/4-strategies-to-deal-with-large-datasets-using-pandas-qdw3an95k
+    # filename = "data.csv"
+    # n = sum(1 for line in open(filename)) - 1  # Calculate number of rows in file
+    # s = n // 10  # sample size of 10%
+    # skip = sorted(random.sample(range(1, n + 1), n - s))  # n+1 to compensate for header
+    # df = pandas.read_csv(filename, skiprows=skip)
+
     path_pkl_kmer_counts = path_kmer_counts.replace(".csv", ".pd")
     if osp.isfile(path_pkl_kmer_counts):
         logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
@@ -319,11 +326,12 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
                     f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
         df = pd.read_csv(path_kmer_counts, dtype=main.cols_types)
         logger.info(f"save pickle copy for faster loading {path_pkl_kmer_counts}")
-        # Need to set again as categories
-        df.taxon       = df.taxon.astype('category')
+        # Soon DEPRECATED, set my the loading type
+        # (Need to set again as categories)
         df.category    = df.category.astype('category')
         df.name        = df.name.astype('category')
         df.fna_path    = df.fna_path.astype('category')
+        df.description = df.description.astype('category')
         df.to_pickle(path_pkl_kmer_counts)
 
     cols_kmers = df.columns[-4**k:]
@@ -403,8 +411,8 @@ def pll_copy_segments_to_bin(df):
         # Need to find the genome/plasmid/ and the right chromosome
         for seq in genome.records[category]:
             if seq.name == name:
-                logger.debug(f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
-                             f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
+                logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
+                              f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
 
                 segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
                                     seq.features, seq.annotations, seq.letter_annotations)
@@ -432,7 +440,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
     # # todo: parallel ? groupby ? Try in notebook
     # df_per_fna = []
-    # for file in tqdm(df.fna_path.unique()):
+    # for file in tqdm(df.fna_path.unique(), dynamic_ncols=True):
     #     df_per_fna.append(df[df.fna_path == file].copy())
     df_per_fna = df.groupby(["fna_path"])
 
@@ -444,7 +452,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     Genome.set_k_kmers(main.k)
     with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
         results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
-                            total=len(df_per_fna)))
+                            total=len(df_per_fna), dynamic_ncols=True))
 
     logger.info(f"split {len(results)} genomes...")
 
@@ -454,17 +462,22 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
     """ launch kraken2-build add-to-library. DELETE EXISTING FOLDER !!
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
-    delete_folder_if_exists(path_bins_hash)
     create_n_folders(path_bins_hash, n_clusters)
     add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
 
     logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
-    for cluster in tqdm(range(n_clusters)):
+    for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
         # if library exist in another folder, make a link to it !
         existing_lib = glob(f"{osp.dirname(path_bins_hash)}/*/{bin_id}/library")
-        if len(existing_lib) > 0:
-            os.symlink(existing_lib[0], osp.join(path_bins_hash, bin_id, "library"))
+        path_new_lib = osp.join(path_bins_hash, bin_id, "library")
+
+        # If library has already been done, skip it
+        if osp.isdir(path_new_lib):
+            logger.debug(f"Library {bin_id} already existing. Delete folder if reinstall needed: {path_new_lib}")
+        # If done with other parameters, k25, can reuse it
+        elif len(existing_lib) > 0:
+            os.symlink(existing_lib[0], path_new_lib)
         else:
             cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
                    "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
@@ -513,18 +526,28 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
     add_file_with_parameters(path_bins_hash, add_description=f"cluster = {n_clusters} \ntaxonomy = {path_taxonomy}")
 
     logger.info(f"kraken2 build its hash tables, {n_clusters} clusters, will take lots of time.... ")
-    for cluster in tqdm(range(n_clusters)):
+    for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
+
+        # check if hash has already been done
+        path_kraken2 = osp.join(path_bins_hash, bin_id)
+        path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
+        if osp.isfile(path_kraken2_hash) and not any([fname.endswith('.tmp') for fname in os.listdir(path_kraken2)]):
+            logger.debug(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
+            continue
+
+        # add link to taxonomy
         taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
         if osp.islink(taxon_in_cluster):
             logger.debug(f"removing existing link at {taxon_in_cluster}")
             os.unlink(taxon_in_cluster)
         os.symlink(path_taxonomy, taxon_in_cluster)
 
-        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id),
+        # Build
+        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
                "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
         logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
-        res = subprocess.call(cmd)
+        res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
         logger.debug(res)
 
     logger.info(f"Kraken2 finished building hash tables. You can clean the intermediate files with: "
@@ -533,10 +556,10 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
 
 @check_step
 def kraken2_full(path_refseq, path_output, taxonomy, p):
-    """ Build the hash table with the same genomes, but in one bin, for comparison """
+    """ Build the hash table with the same genomes, but without binning, for comparison """
     delete_folder_if_exists(path_output)
     create_path(path_output)
-    add_file_with_parameters(path_output, add_description=f"full database for comparison \ntaxonomy = {taxonomy}")
+    add_file_with_parameters(path_output, add_description=f"no binning database for comparison \ntaxonomy = {taxonomy}")
 
     logger.warning(f"DO NOT INTERRUPT this process, you will have restart from scratches.")
     # Add genomes to
@@ -572,7 +595,7 @@ def kraken2_clean(path_bins_hash, n_clusters):
     """ Use of kraken2-build --clean option to remove temporary files.
         No cleaning by default because the library is the same for various values of k, l and s
     """
-    if "full" in n_clusters:
+    if n_clusters <= 1:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
         cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", path_bins_hash]
         logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
@@ -581,7 +604,7 @@ def kraken2_clean(path_bins_hash, n_clusters):
 
     else:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
-        for cluster in tqdm(range(n_clusters)):
+        for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
             bin_id = f"{cluster}/"
             cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
             logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
@@ -616,9 +639,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         main.cores          = cores
         # Set all columns type
         cols_types = {
-            "taxon": int, "category": str,
+            "taxon": int, "category": 'category',
             "start": int, "end": int,
-            "name": str, "description": str, "fna_path": str,
+            "name": 'category', "description": 'category', "fna_path": 'category',
         }
         for key in kmers_dic(main.k).keys():
             cols_types[key] = float32
@@ -627,9 +650,10 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         # If force recount of the kmer, disable the skip of the step
         if force_recount:
             skip_existing = "0" + skip_existing[1:]
-        check_step.can_skip = skip_existing        # Set the skip variable for the decorator of each step
+        check_step.timings    = [perf_counter(), ]  # log time spent
+        check_step.step_nb    = 0         # For decorator to know which steps has been
         check_step.early_stop = early_stop
-        check_step.timings.append(perf_counter())  # log time spent
+        check_step.can_skip   = skip_existing        # Set the skip variable for the decorator of each step
         # Check classifier/kraken2's parameters
         param, s_param = classifier_param_checker(classifier_param)
         # Check that taxonomy wasn't forgotten
@@ -639,9 +663,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
             check_step.can_skip = "00"
-            path_full_hash = osp.join(folder_output, "full", o_omitted, param['classifier'], s_param)
+            path_full_hash = osp.join(folder_output, "no-binning", o_omitted, param['classifier'], s_param)
             kraken2_full(folder_database, path_full_hash, path_taxonomy, param)
-            if k2_clean: kraken2_clean(path_full_hash, "full")
+            if k2_clean: kraken2_clean(path_full_hash, 1)
 
         else:
             #    KMER COUNTING
@@ -703,13 +727,13 @@ main.cols_types      = {}
 
 if __name__ == '__main__':
     # Option to display default values, metavar='' to remove ugly capitalized option's names
-    parser = ArgumentParserWithDefaults(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path_database', type=is_valid_directory,
                         help='Database root folder. Support format: RefSeq 2019')
     parser.add_argument('path_output_files', type=is_valid_directory,
                         help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
 
-    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to the taxonomy', metavar='')
+    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to taxonomy (absolute path)', metavar='')
     parser.add_argument('-m', '--ml_model', choices=clustering_segments.models, type=str, metavar='',
                         help='name of the model to use for clustering', default=clustering_segments.models[0])
     parser.add_argument('-k', '--kmer',     default=4, type=int, help='Size of the kmers', metavar='')
@@ -724,9 +748,9 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--recount',  help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
     parser.add_argument('--clean',  action='store_true',
                         help='Make use of kraken2-build --clean to remove temporary files (library/added/ and others)')
-    parser.add_argument('-f', '--full_DB',  action='store_true',
-                        help='Build the full RefSeq database, omitting the directories set by --omit, with '
-                             '--taxonomy path. Skips all the other steps/processes (unused: -e, -n, -m, -r, -s)')
+    parser.add_argument('-f', '--full_no_binning',  action='store_true',
+                        help='Build the full RefSeq database, without binning, omitting the directories set by --omit, '
+                             'with --taxonomy path. Skips all the other steps/processes (unused: -e, -n, -m, -r, -s)')
     parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
                         help="By default, skip files/folders that already exist. Write 1100000 to skip steps 0 and 1. "
                              "To recount all kmers, and stop after combining the kmer dataframes, "
@@ -739,7 +763,7 @@ if __name__ == '__main__':
     main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
          k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
          force_recount=args.recount, early_stop=args.early, omit_folders=tuple(args.omit),
-         path_taxonomy=args.taxonomy, ml_model=args.ml_model, full_DB=args.full_DB,
+         path_taxonomy=args.taxonomy, ml_model=args.ml_model, full_DB=args.full_no_binning,
          classifier_param=args.classifier_param, k2_clean=args.clean)
 
 
