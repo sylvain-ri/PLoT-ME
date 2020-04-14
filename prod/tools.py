@@ -183,7 +183,8 @@ pll_scaling.ratio = 0
 
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count()):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
-    ratio = 4**k / (w - k + 1)
+    divider = w - k + 1
+    ratio = 4**k / divider if divider > 1 else 4**k  # avoid divide by 0
     ratio = np.float32(ratio)
     if single_row:
         return data * ratio
