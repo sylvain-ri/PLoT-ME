@@ -229,8 +229,10 @@ class MockCommunity:
                 logger.debug(f"Path of fastq bin : {self.path_binned_fastq[bin_id]}")
                 logger.debug(f"Path of folder of hash bin : {folder_hash}")
                 self.classifier(self.path_binned_fastq[bin_id], folder_hash, arg=f"bin-{bin_id}")
+            # todo: combine reports and create .csv per species
         elif "full" in self.db_type:
             self.classifier(self.path_original_fastq, self.db_path, arg="full")
+            # todo: combine reports and create .csv per species
         else:
             NotImplementedError("The database choice is either full or bins")
                 
