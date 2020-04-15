@@ -300,9 +300,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type, co
         # Parse the model name to find parameters:
         basename = path_model.split("/model.")[1]
         clusterer, bin_nb, k, w, omitted, _ = re.split('_b|_k|_s|_o|.pkl', basename)
-
         path_to_hash = osp.join(path_database, classifier, clf_settings)
-        logger.info(f"WTH: {path_to_hash}\t{path_database}\t{classifier}\t{clf_settings}")
+        logger.debug(f"path_to_hash: {path_to_hash}")
     else:
         path_model = "full"
         clusterer, bin_nb, k, w, omitted = (None, 1, None, None, "oplant-vertebrate")
