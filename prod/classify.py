@@ -335,7 +335,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type, co
             elif file.lower().endswith(".fasta"):
                 bin_classify.format = "fasta"
             else:
-                raise NotImplementedError
+                raise NotImplementedError("The file is neither ending with .fasta nor with .fastq")
             # setting time
             base_name = osp.basename(file)
             key = base_name
