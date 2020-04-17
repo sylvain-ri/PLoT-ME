@@ -228,7 +228,7 @@ class MockCommunity:
     def archive_previous_reports(self):
         """ move existing reports to _archive """
         archive_folder = osp.join(self.folder_out, "_archive")
-        self.logger.debug("archiving previous reports into: " + archive_folder)
+        self.logger.info("archiving previous reports into: " + archive_folder)
         os.makedirs(archive_folder, exist_ok=True)
         for file in glob(self.path_out + "*"):
             shutil.move(file, osp.join(archive_folder, osp.basename(file)))
