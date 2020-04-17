@@ -15,12 +15,14 @@ Reads Binning Project
 import argparse
 import csv
 from datetime import datetime as dt
+from glob import glob
 import logging
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 import os
 from os import path as osp
 import pickle
+import shutil
 import subprocess
 from time import perf_counter
 import re
@@ -205,14 +207,16 @@ class MockCommunity:
         self.hash_files      = {}
         self.bin_nb          = bin_nb
         self.folder_out      = osp.join(self.folder_report, self.file_name)
-        if not os.path.isdir(self.folder_out):
-            os.makedirs(self.folder_out)
         self.path_out        = osp.join(self.folder_out, f"{param}.{classifier_name}.{clf_settings}.{self.db_type}")
-        
+
         self.cores           = cores
         self.dry_run         = dry_run
         self.verbose         = verbose
         self.cmd             = None
+
+        # Initialization functions
+        os.makedirs(self.folder_out, exist_ok=True)
+        self.archive_previous_reports()
 
     @property
     def classifier(self):
@@ -220,6 +224,14 @@ class MockCommunity:
             return self.kraken2
         else:
             NotImplementedError("This classifier hasn't been implemented")
+
+    def archive_previous_reports(self):
+        """ move existing reports to _archive """
+        archive_folder = osp.join(self.folder_out, "_archive")
+        self.logger.debug("archiving previous reports into: " + archive_folder)
+        os.makedirs(archive_folder, exist_ok=True)
+        for file in glob(self.path_out + "*"):
+            shutil.move(file, osp.join(archive_folder, osp.basename(file)))
 
     def classify(self):
         self.logger.info(f"Classifying reads with {self.db_type} setting")
@@ -258,6 +270,7 @@ class MockCommunity:
             
     def kraken2_report_merging(self):
         self.logger.info('Merging kraken2 reports')
+        # todo: merging reports to species level
         raise NotImplementedError()
     
     def __repr__(self):
