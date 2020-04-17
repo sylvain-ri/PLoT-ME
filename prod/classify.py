@@ -342,7 +342,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type, co
             t[key] = {}
             t[key]["start"] = perf_counter()
 
-            logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {base_name}")
+            logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {osp.getsize(file)/10**9:.2f} GB, {base_name}")
             # Binning
             if "bins" in db_type:
                 ReadToBin.set_fastq_model_and_param(file, path_model, param, cores, k)
