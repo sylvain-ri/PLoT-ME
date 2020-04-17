@@ -56,6 +56,7 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def __init__(self, obj):
         # wrap the object
+        self.logger = logging.getLogger('classify.ReadToBin')
         self._wrapped_obj = obj
         # Additional attributes
         self.cluster = None
@@ -79,13 +80,13 @@ class ReadToBin(SeqRecord.SeqRecord):
         return f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster if cluster is None else cluster}.fastq"
 
     def scale(self):
-        logger.log(5, "scaling the read by it's length and k-mer")
+        self.logger.log(5, "scaling the read by it's length and k-mer")
         self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
                                          None, k=self.K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
-        logger.log(5, 'finding bins for each read')
+        self.logger.log(5, 'finding bins for each read')
         self.cluster = int(self.MODEL.predict(self.scaled)[0])
         self.description = f"bin_id={self.cluster}|{self.description}"
         # self.path_out = f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster}.fastq"
@@ -111,12 +112,12 @@ class ReadToBin(SeqRecord.SeqRecord):
         if osp.isdir(cls.FASTQ_BIN_FOLDER):
             last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
             save_folder = f"{cls.FASTQ_BIN_FOLDER}_{last_modif:%Y-%m-%d_%H-%M}"
-            logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
+            cls.logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
             os.rename(cls.FASTQ_BIN_FOLDER, save_folder)
         create_path(cls.FASTQ_BIN_FOLDER)
 
         cls.FILEBASE = file_base
-        logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
+        cls.logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
         # /home/ubuntu/data/Segmentation/4mer_s10000/clustered_by_minikm_4mer_s10000/model_miniKM_4mer_s10000.pkl
         if path_model == "full":
             cls.K = 0
@@ -129,7 +130,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
-        logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
+        cls.logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
         # todo: try to parallelize it, careful of file writing concurrency.
         #  Dask ? process to load and count kmers, single one for appending read to fastq ?
         # with Pool(cls.CORES) as pool:
@@ -147,7 +148,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             custom_read.scale()
             custom_read.find_bin()
             custom_read.to_fastq()
-        logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
+        cls.logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
         cls.NUMBER_BINNED = counter
         return cls.outputs
 
@@ -164,14 +165,20 @@ class ReadToBin(SeqRecord.SeqRecord):
         minimum_size = full_fastq_size * drop_bins / 100
 
         # make a copy first, then empty the dic, and rewrite it in the correct order
-        fastq_outputs = ReadToBin.outputs
+        fastq_outputs = ReadToBin.outputs.copy()
         ReadToBin.outputs = {}
+        dropped_bins = []
+        dropped_size = 0
         for size, bin_nb in sorted(bin_size.items(), reverse=True):
             if size > minimum_size:
                 ReadToBin.outputs[bin_nb] = fastq_outputs[bin_nb]
             else:
-                logger.debug(f"Reads in bin {bin_nb} has a size of {size/10**6:.2f} MB, and will be dropped "
-                             f"(less than {drop_bins}% of all binned reads {full_fastq_size/10**9:.2f} GB)")
+                dropped_bins.append(bin_nb)
+                dropped_size += size
+                cls.logger.debug(f"Reads in bin {bin_nb} has a size of {size/10**6:.2f} MB, and will be dropped "
+                                 f"(less than {drop_bins}% of all binned reads {full_fastq_size/10**9:.2f} GB)")
+        cls.logger.info(f"Dropped bins {dropped_bins}, saving {dropped_size/10**9:.2f} GB of loading. "
+                        f"Lower parameter drop_bin_threshold to load all bins despite low number of reads in a bin.")
         return ReadToBin.outputs
 
 
@@ -238,8 +245,8 @@ class MockCommunity:
         if "bins" in self.db_type:
             for bin_id in self.path_binned_fastq.keys():
                 folder_hash = osp.join(self.db_path, f"{bin_id}")
-                logger.debug(f"Path of fastq bin : {self.path_binned_fastq[bin_id]}")
-                logger.debug(f"Path of folder of hash bin : {folder_hash}")
+                self.logger.debug(f"Path of fastq bin : {self.path_binned_fastq[bin_id]}")
+                self.logger.debug(f"Path of folder of hash bin : {folder_hash}")
                 self.classifier(self.path_binned_fastq[bin_id], folder_hash, arg=f"bin-{bin_id}")
             # todo: combine reports and create .csv per species
         elif "full" in self.db_type:
