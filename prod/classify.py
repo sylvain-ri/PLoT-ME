@@ -43,6 +43,7 @@ logger = init_logger('classify')
 # #############################################################################
 class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
+    logger = logging.getLogger('classify.ReadToBin')
     K = 0
     KMER = {}  # kmers_dic(K)
     FASTQ_PATH = None
@@ -56,7 +57,6 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def __init__(self, obj):
         # wrap the object
-        self.logger = logging.getLogger('classify.ReadToBin')
         self._wrapped_obj = obj
         # Additional attributes
         self.cluster = None
