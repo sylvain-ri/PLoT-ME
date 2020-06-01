@@ -15,12 +15,14 @@ Reads Binning Project
 import argparse
 import csv
 from datetime import datetime as dt
+from glob import glob
 import logging
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 import os
 from os import path as osp
 import pickle
+import shutil
 import subprocess
 from time import perf_counter
 import re
@@ -41,6 +43,7 @@ logger = init_logger('classify')
 # #############################################################################
 class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
+    logger = logging.getLogger('classify.ReadToBin')
     K = 0
     KMER = {}  # kmers_dic(K)
     FASTQ_PATH = None
@@ -77,13 +80,13 @@ class ReadToBin(SeqRecord.SeqRecord):
         return f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster if cluster is None else cluster}.fastq"
 
     def scale(self):
-        logger.log(5, "scaling the read by it's length and k-mer")
+        self.logger.log(5, "scaling the read by it's length and k-mer")
         self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
                                          None, k=self.K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
-        logger.log(5, 'finding bins for each read')
+        self.logger.log(5, 'finding bins for each read')
         self.cluster = int(self.MODEL.predict(self.scaled)[0])
         self.description = f"bin_id={self.cluster}|{self.description}"
         # self.path_out = f"{self.FASTQ_BIN_FOLDER}/{self.FILEBASE}.bin-{self.cluster}.fastq"
@@ -109,12 +112,12 @@ class ReadToBin(SeqRecord.SeqRecord):
         if osp.isdir(cls.FASTQ_BIN_FOLDER):
             last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
             save_folder = f"{cls.FASTQ_BIN_FOLDER}_{last_modif:%Y-%m-%d_%H-%M}"
-            logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
+            cls.logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
             os.rename(cls.FASTQ_BIN_FOLDER, save_folder)
         create_path(cls.FASTQ_BIN_FOLDER)
 
         cls.FILEBASE = file_base
-        logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
+        cls.logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
         # /home/ubuntu/data/Segmentation/4mer_s10000/clustered_by_minikm_4mer_s10000/model_miniKM_4mer_s10000.pkl
         if path_model == "full":
             cls.K = 0
@@ -127,7 +130,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     @classmethod
     def bin_reads(cls):
         """ Bin all reads from provide file """
-        logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
+        cls.logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
         # todo: try to parallelize it, careful of file writing concurrency.
         #  Dask ? process to load and count kmers, single one for appending read to fastq ?
         # with Pool(cls.CORES) as pool:
@@ -145,7 +148,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             custom_read.scale()
             custom_read.find_bin()
             custom_read.to_fastq()
-        logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
+        cls.logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
         cls.NUMBER_BINNED = counter
         return cls.outputs
 
@@ -162,14 +165,20 @@ class ReadToBin(SeqRecord.SeqRecord):
         minimum_size = full_fastq_size * drop_bins / 100
 
         # make a copy first, then empty the dic, and rewrite it in the correct order
-        fastq_outputs = ReadToBin.outputs
+        fastq_outputs = ReadToBin.outputs.copy()
         ReadToBin.outputs = {}
+        dropped_bins = []
+        dropped_size = 0
         for size, bin_nb in sorted(bin_size.items(), reverse=True):
             if size > minimum_size:
                 ReadToBin.outputs[bin_nb] = fastq_outputs[bin_nb]
             else:
-                logger.debug(f"Reads in bin {bin_nb} has a size of {size/10**6:.2f} MB, and will be dropped "
-                             f"(less than {drop_bins}% of all binned reads {full_fastq_size/10**9:.2f} GB)")
+                dropped_bins.append(bin_nb)
+                dropped_size += size
+                cls.logger.debug(f"Reads in bin {bin_nb} has a size of {size/10**6:.2f} MB, and will be dropped "
+                                 f"(less than {drop_bins}% of all binned reads {full_fastq_size/10**9:.2f} GB)")
+        cls.logger.info(f"Dropped bins {dropped_bins}, saving {dropped_size/10**9:.2f} GB of loading. "
+                        f"Lower parameter drop_bin_threshold to load all bins despite low number of reads in a bin.")
         return ReadToBin.outputs
 
 
@@ -205,14 +214,16 @@ class MockCommunity:
         self.hash_files      = {}
         self.bin_nb          = bin_nb
         self.folder_out      = osp.join(self.folder_report, self.file_name)
-        if not os.path.isdir(self.folder_out):
-            os.makedirs(self.folder_out)
         self.path_out        = osp.join(self.folder_out, f"{param}.{classifier_name}.{clf_settings}.{self.db_type}")
-        
+
         self.cores           = cores
         self.dry_run         = dry_run
         self.verbose         = verbose
         self.cmd             = None
+
+        # Initialization functions
+        os.makedirs(self.folder_out, exist_ok=True)
+        self.archive_previous_reports()
 
     @property
     def classifier(self):
@@ -221,16 +232,26 @@ class MockCommunity:
         else:
             NotImplementedError("This classifier hasn't been implemented")
 
+    def archive_previous_reports(self):
+        """ move existing reports to _archive """
+        archive_folder = osp.join(self.folder_out, "_archive")
+        self.logger.info("archiving previous reports into: " + archive_folder)
+        os.makedirs(archive_folder, exist_ok=True)
+        for file in glob(self.path_out + "*"):
+            shutil.move(file, osp.join(archive_folder, osp.basename(file)))
+
     def classify(self):
         self.logger.info(f"Classifying reads with {self.db_type} setting")
         if "bins" in self.db_type:
             for bin_id in self.path_binned_fastq.keys():
                 folder_hash = osp.join(self.db_path, f"{bin_id}")
-                logger.debug(f"Path of fastq bin : {self.path_binned_fastq[bin_id]}")
-                logger.debug(f"Path of folder of hash bin : {folder_hash}")
+                self.logger.debug(f"Path of fastq bin : {self.path_binned_fastq[bin_id]}")
+                self.logger.debug(f"Path of folder of hash bin : {folder_hash}")
                 self.classifier(self.path_binned_fastq[bin_id], folder_hash, arg=f"bin-{bin_id}")
+            # todo: combine reports and create .csv per species
         elif "full" in self.db_type:
             self.classifier(self.path_original_fastq, self.db_path, arg="full")
+            # todo: combine reports and create .csv per species
         else:
             NotImplementedError("The database choice is either full or bins")
                 
@@ -256,6 +277,7 @@ class MockCommunity:
             
     def kraken2_report_merging(self):
         self.logger.info('Merging kraken2 reports')
+        # todo: merging reports to species level
         raise NotImplementedError()
     
     def __repr__(self):
@@ -298,9 +320,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type, co
         # Parse the model name to find parameters:
         basename = path_model.split("/model.")[1]
         clusterer, bin_nb, k, w, omitted, _ = re.split('_b|_k|_s|_o|.pkl', basename)
-
         path_to_hash = osp.join(path_database, classifier, clf_settings)
-        logger.info(f"WTH: {path_to_hash}\t{path_database}\t{classifier}\t{clf_settings}")
+        logger.debug(f"path_to_hash: {path_to_hash}")
     else:
         path_model = "full"
         clusterer, bin_nb, k, w, omitted = (None, 1, None, None, "oplant-vertebrate")
@@ -321,14 +342,14 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type, co
             elif file.lower().endswith(".fasta"):
                 bin_classify.format = "fasta"
             else:
-                raise NotImplementedError
+                raise NotImplementedError("The file is neither ending with .fasta nor with .fastq")
             # setting time
             base_name = osp.basename(file)
             key = base_name
             t[key] = {}
             t[key]["start"] = perf_counter()
 
-            logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {base_name}")
+            logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {osp.getsize(file)/10**9:.2f} GB, {base_name}")
             # Binning
             if "bins" in db_type:
                 ReadToBin.set_fastq_model_and_param(file, path_model, param, cores, k)
