@@ -292,7 +292,7 @@ path_fastq_comm = ["/home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Geno
 
 
 def bin_classify(list_fastq, path_report, path_database, classifier, db_type, cores=cpu_count(),
-                 f_record="/home/ubuntu/classify_records.csv", clf_settings="", drop_bin_threshold=0.5):
+                 f_record="/home/ubuntu/classify_records.csv", clf_settings="", drop_bin_threshold=0.5, skip_clas=False):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -358,13 +358,14 @@ def bin_classify(list_fastq, path_report, path_database, classifier, db_type, co
                 t[key]["binning"] = perf_counter()
                 t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
 
-            fastq_classifier = MockCommunity(
-                path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
-                path_binned_fastq=ReadToBin.outputs, bin_nb=bin_nb, classifier_name=classifier, param=param, cores=cores)
+            if not skip_clas:
+                fastq_classifier = MockCommunity(
+                    path_original_fastq=file, db_path=path_to_hash, db_type=db_type, folder_report=path_report,
+                    path_binned_fastq=ReadToBin.outputs, bin_nb=bin_nb, classifier_name=classifier, param=param, cores=cores)
 
-            fastq_classifier.classify()
-            t[key]["classify"] = perf_counter()
-            t[key]["hashes"] = fastq_classifier.hash_files
+                fastq_classifier.classify()
+                t[key]["classify"] = perf_counter()
+                t[key]["hashes"] = fastq_classifier.hash_files
 
         except Exception as e:
             logger.exception(e)
@@ -431,20 +432,22 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--full_DB',  help='Choose to use the standard full database or the segmented one',
                                               default='bins', choices=('full', 'bins',), metavar='')
     parser.add_argument('-t', '--threads',    help='Number of threads', default=cpu_count(), type=int, metavar='')
-    parser.add_argument('-d', '--drop_bin_threshold',    help='Drop fastq bins smaller than x percent of the total file'
+    parser.add_argument('-d', '--drop_bin_threshold',    help='Drop fastq bins smaller than x percent of the intial fastq'
                                                               '. Helps to avoid loading hash tables for very few reads',
                                               default=0.5, type=float, metavar='')
     parser.add_argument('-i', '--input_fastq',help='List of input files in fastq format, space separated.',
                                               default=path_fastq_comm, type=is_valid_file, nargs="+", metavar='')
     parser.add_argument('-r', '--record',     help='Record the time spent for each run in CSV format',
                                               default="/home/ubuntu/classify_records.csv", type=str, metavar='')
-    # parser.add_argument('-c', '--cores',         help='Number of cores', default=cpu_count(), metavar='')
+    parser.add_argument('--skip_clas',        help='Skip the classification itself (for profiling PLoT-ME)', 
+                                              action='store_true')
 
     args = parser.parse_args()
-
+    
     bin_classify(args.input_fastq, args.output_folder, args.database,
                  classifier=args.classifier, db_type=args.full_DB, cores=args.threads, f_record=args.record,
-                 clf_settings=args.clf_settings, drop_bin_threshold=args.drop_bin_threshold)
+                 clf_settings=args.clf_settings, drop_bin_threshold=args.drop_bin_threshold, 
+                 skip_clas=args.skip_clas)
 
 
 
