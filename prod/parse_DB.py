@@ -31,7 +31,7 @@ as well as classifier's tmp files (for kraken2: kraken2-build --clean)
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
 Started on 2019-12-11
-Reads Binning Project
+ReSPLIT-ME / Reads Binning Project
 #############################################################################
 """
 
@@ -220,22 +220,18 @@ check_step.can_skip   = "111110"  # By default skip step that has been started, 
 
 
 def parallel_kmer_counting(fastq, ):
-    if osp.isfile(fastq.path_target) and parallel_kmer_counting.force_recount is False:
+    if osp.isfile(fastq.path_target):
         logger.debug(f"File already existing, skipping ({fastq.path_target})")
         return
     with open(fastq.path_check) as f:
         taxon = int(f.read())
-    genome = Genome(fastq.path_abs, taxon,
-                    window_size=main.w, k=main.k)
+    genome = Genome(fastq.path_abs, taxon, window_size=main.w, k=main.k)
     genome.load_genome()
     genome.count_kmers_to_df(fastq.path_target)
 
 
-parallel_kmer_counting.force_recount = True
-
-
 @check_step
-def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False):
+def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1):
     """ Scan through RefSeq, split genomes into segments, count their k-mer, save in similar structure
         Compatible with 2019 RefSeq format hopefully
     """
@@ -247,8 +243,6 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1, force_recount=False
 
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
 
-    # Set constants to avoid arguments passing
-    parallel_kmer_counting.force_recount = force_recount
     # Count in parallel. islice() to take a part of an iterable
     Genome.set_k_kmers(main.k)
     with Pool(main.cores) as pool:
@@ -512,7 +506,7 @@ def classifier_param_checker(l_param):
     return k_param, s
 
 
-classifier_param_checker.default = ["kraken2", "35", "31", "7"]
+classifier_param_checker.default = ("kraken2", "35", "31", "7")
 
 
 
@@ -615,9 +609,9 @@ def kraken2_clean(path_bins_hash, n_clusters):
 
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
-         force_recount=False, early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
-         path_taxonomy="", ml_model=clustering_segments.models[0], full_DB=False,
-         classifier_param=classifier_param_checker.default, k2_clean=False):
+         early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
+         path_taxonomy="", full_DB=False, k2_clean=False,
+         ml_model=clustering_segments.models[0], classifier_param=classifier_param_checker.default):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -647,9 +641,6 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             cols_types[key] = float32
         main.cols_types = cols_types
 
-        # If force recount of the kmer, disable the skip of the step
-        if force_recount:
-            skip_existing = "0" + skip_existing[1:]
         check_step.timings    = [perf_counter(), ]  # log time spent
         check_step.step_nb    = 0         # For decorator to know which steps has been
         check_step.early_stop = early_stop
@@ -671,7 +662,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             #    KMER COUNTING
             # get kmer distribution for each window of each genome, parallel folder with same structure
             path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts.k{k}_s{window}")
-            scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts, force_recount=force_recount)
+            scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts)
 
             # combine all kmer distributions into one single file
             path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"all-counts.k{k}_s{window}_{o_omitted}.csv")
@@ -727,44 +718,56 @@ main.cols_types      = {}
 
 if __name__ == '__main__':
     # Option to display default values, metavar='' to remove ugly capitalized option's names
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('path_database', type=is_valid_directory,
-                        help='Database root folder. Support format: RefSeq 2019')
-    parser.add_argument('path_output_files', type=is_valid_directory,
-                        help="Folder for the k-mer counts, bins with genomes'segments, ML models and final hash tables")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    parser.add_argument('-t', '--taxonomy', default="", type=str, help='path to taxonomy (absolute path)', metavar='')
-    parser.add_argument('-m', '--ml_model', choices=clustering_segments.models, type=str, metavar='',
-                        help='name of the model to use for clustering', default=clustering_segments.models[0])
-    parser.add_argument('-k', '--kmer',     default=4, type=int, help='Size of the kmers', metavar='')
-    parser.add_argument('-w', '--window',   default=10000, type=int, help='Size of each segments/windows of the genomes', metavar='')
-    parser.add_argument('-n', '--number_bins', default=10, type=int, help='Number of bins to split the DB into', metavar='')
-    parser.add_argument('-c', '--cores',    default=cpu_count(), type=int, help='Number of threads', metavar='')
+    parser.add_argument('path_database',    help='Database root folder. Support format: RefSeq 2019',
+                                            type=is_valid_directory)
+    parser.add_argument('path_clustered',   help="Folder for the k-mer counts, bins with genomes'segments, ML models "
+                                                 "and final hash tables",
+                                            type=is_valid_directory)
+    parser.add_argument('taxonomy',         help='path to taxonomy (absolute path)',
+                                            type=is_valid_directory, metavar='')
 
-    parser.add_argument('-e', '--early',    default=len(check_step.can_skip)-1, type=int, metavar='',
-                        help="Early stop. Index of last step to run. Use -1 to display all steps and paths (DRY RUN)")
-    parser.add_argument('-o', '--omit', nargs="+", type=str, help='Omit some folder/families. Write names with spaces',
-                        default=("plant", "vertebrate"), metavar='')
-    parser.add_argument('-r', '--recount',  help='Force recount kmers (set skip to 0xxxxx)', action='store_true')
-    parser.add_argument('--clean',  action='store_true',
-                        help='Make use of kraken2-build --clean to remove temporary files (library/added/ and others)')
-    parser.add_argument('-f', '--full_no_binning',  action='store_true',
-                        help='Build the full RefSeq database, without binning, omitting the directories set by --omit, '
-                             'with --taxonomy path. Skips all the other steps/processes (unused: -e, -n, -m, -r, -s)')
-    parser.add_argument('-s', '--skip_existing', type=str, default=check_step.can_skip,
-                        help="By default, skip files/folders that already exist. Write 1100000 to skip steps 0 and 1. "
-                             "To recount all kmers, and stop after combining the kmer dataframes, "
-                             "add option -f and option -e 0", metavar='')
-    parser.add_argument('-p', '--classifier_param', help="classifier's name and its parameters, space separated.",
-                        default=classifier_param_checker.default, type=str, nargs="+", metavar='')
+    parser.add_argument('-k', '--kmer',     help='Size of the kmers (default=%(default)d)',
+                                            default=4,          type=int, metavar='')
+    parser.add_argument('-w', '--window',   help='Segments/windows size to split genomes into (default=%(default)d)',
+                                            default=10000,      type=int, metavar='')
+    parser.add_argument('-c', '--clusters', help='Number of clusters/bins to split the DB into (default=%(default)d)',
+                                            default=10,         type=int, metavar='')
+
+    parser.add_argument('-t', '--threads',  help='Number of threads (default=%(default)d)',
+                                            default=cpu_count(), type=int,  metavar='')
+    parser.add_argument('-e', '--early',    help="Early stop. Index of last step to run. "
+                                                 "Use -1 to display all steps and paths (DRY RUN)",
+                                            default=len(check_step.can_skip)-1, type=int, metavar='',)
+    parser.add_argument('-o', '--omit',     help='Omit some folder/families containing these names. '
+                                                 'Write names with spaces (defaults=plant vertebrate)',
+                                            default=("plant", "vertebrate"), nargs="+", type=str, metavar='')
+    parser.add_argument('-s', '--skip_existing', help="By default, skip already existing files/folders. 1100000 means "
+                                                      "that steps 0 and 1 will be skipped if file/folders exist. "
+                                                      "If the script has been stopped in the middle, use 0 to redo "
+                                                      "that step. (default=%(default)s)'",
+                                            default=check_step.can_skip, type=str, metavar='')
+    parser.add_argument('--clean',          help='Make use of kraken2-build --clean to remove temporary files '
+                                                 '(library/added/ and others)',
+                                            action='store_true',)
+    parser.add_argument('-f', '--full_index', help='Build the full RefSeq database, without binning, omitting the '
+                                                   'directories set by --omit. Skips all the other steps/processes '
+                                                   '(unused: -e, -n, -s). Used for comparison/benchmarking',
+                                            action='store_true')
+    # parser.add_argument('-p', '--classifier_param', help="classifier's name and its parameters, "
+    #                                                      "space separated.",
+    #                                         default=classifier_param_checker.default, type=str, nargs="+", metavar='')
+    # parser.add_argument('-m', '--ml_model', help='name of the model to use for clustering',
+    #                                         choices=clustering_segments.models, type=str, metavar='',
+    #                                         default=clustering_segments.models[0])
     args = parser.parse_args()
 
     logger.info(f"Script {__file__} called with {args}")
-    main(folder_database=args.path_database, folder_output=args.path_output_files, n_clusters=args.number_bins,
-         k=args.kmer, window=args.window, cores=args.cores, skip_existing=args.skip_existing,
-         force_recount=args.recount, early_stop=args.early, omit_folders=tuple(args.omit),
-         path_taxonomy=args.taxonomy, ml_model=args.ml_model, full_DB=args.full_no_binning,
-         classifier_param=args.classifier_param, k2_clean=args.clean)
+    main(folder_database=args.path_database, folder_output=args.path_clustered, n_clusters=args.clusters,
+         k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
+         early_stop=args.early, omit_folders=tuple(args.omit),
+         path_taxonomy=args.taxonomy, full_DB=args.full_index, k2_clean=args.clean)
 
 
 # python ~/Scripts/Reads_Binning/prod/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
