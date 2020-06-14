@@ -15,6 +15,11 @@ Needs a lot of disk space, and RAM according to the largest genome to process.
 5 -> kraken2-build --build
 f -> Building the hash for the full refseq, for comparison bins vs no binning
 
+*** FULL Index ***
+-> with option --full_index, builds the comparable index without the clustering.
+  Good for comparison and benchmarking. skip_existing only takes the first 2,
+  such as "00", with character for kraken2 --add_library and --build respectively.
+
 For 17GB file of combined kmer counts, combining counts took up to 55GB,
 loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
 Using AWS R4.2XLarge instance with 60GB RAM
@@ -482,7 +487,7 @@ def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
 
 def classifier_param_checker(l_param):
     """ check kraken2-build --help. Default values to feed in, default is ["kraken2", "35", "31", "7"] """
-    assert isinstance(l_param, list), TypeError
+    assert isinstance(l_param, (list, tuple)), TypeError
     assert len(l_param) > 0, "Empty list"
     if "kraken2" in l_param[0]:
         # kraken2 default values --kmer-len, --minimizer-len, --minimizer-spaces
@@ -549,11 +554,11 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
 
 
 @check_step
-def kraken2_full(path_refseq, path_output, taxonomy, p):
+def kraken2_full_add_lib(path_refseq, path_output):
     """ Build the hash table with the same genomes, but without binning, for comparison """
     delete_folder_if_exists(path_output)
     create_path(path_output)
-    add_file_with_parameters(path_output, add_description=f"no binning database for comparison \ntaxonomy = {taxonomy}")
+    add_file_with_parameters(path_output, add_description=f"no binning database for comparison")
 
     logger.warning(f"DO NOT INTERRUPT this process, you will have restart from scratches.")
     # Add genomes to
@@ -570,6 +575,10 @@ def kraken2_full(path_refseq, path_output, taxonomy, p):
             logger.info(f"kraken2 add_to_library.... " + " ".join(cmd))
             res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
             logger.debug(res)
+
+
+@check_step
+def kraken2_full_build_hash(taxonomy, path_output, p):
 
     # Build hash table
     taxon_link = osp.join(path_output, "taxonomy")
@@ -653,9 +662,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
-            check_step.can_skip = "00"
             path_full_hash = osp.join(folder_output, "no-binning", o_omitted, param['classifier'], s_param)
-            kraken2_full(folder_database, path_full_hash, path_taxonomy, param)
+            kraken2_full_add_lib(folder_database, path_full_hash)
+            kraken2_full_build_hash(path_taxonomy, path_full_hash, param)
             if k2_clean: kraken2_clean(path_full_hash, 1)
 
         else:
