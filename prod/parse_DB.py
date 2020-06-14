@@ -433,6 +433,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     create_n_folders(path_db_bins, clusters, delete_existing=True)
 
     # Load bin assignment of each segment
+    logger.info(f"loading cluster/bin assignment for each genomes' window: {path_bins_assignments}")
     df = pd.read_pickle(path_bins_assignments)
 
     # Split it per file to allow parallel processing
