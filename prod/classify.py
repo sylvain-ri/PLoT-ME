@@ -258,6 +258,7 @@ class MockCommunity:
             NotImplementedError("The database choice is either full or bins")
                 
     def kraken2(self, fastq_input, folder_hash, arg="unknown"):
+        if "hash.k2d" in folder_hash: folder_hash = osp.dirname(folder_hash)
         hash_file = osp.join(folder_hash, "hash.k2d")
         assert osp.isfile(hash_file), FileNotFoundError(f"Hash table not found ! {hash_file}")
         self.hash_files[arg] = hash_file
@@ -316,8 +317,10 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
         bin_nb = 1
         # clusterer, bin_nb, k, w, omitted = (None, 1, None, None, None)
         path_to_hash = path_database
-        assert osp.isfile(path_to_hash) and path_to_hash.endswith(".k2d"), \
-            FileNotFoundError(f"wrong file: {path_to_hash}")
+        if "hash.k2d" in path_to_hash:
+            path_to_hash = osp.dirname(path_to_hash)
+        if "hash.k2d" not in os.listdir(path_to_hash):
+            FileNotFoundError(f"hash.k2d not found in folder: {path_to_hash}")
     else:
         path_model = ""
         for file in os.scandir(path_database):
