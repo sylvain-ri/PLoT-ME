@@ -214,7 +214,7 @@ class MockCommunity:
         self.classifier_name = classifier_name
         self.db_path         = db_path    # location of the hash table for the classifier
         self.db_type         = "full" if full_DB else "bins"    # Either full or bins
-        self.hash_files      = {}
+        self.hash_size      = {}
         self.bin_nb          = bin_nb
         self.folder_out      = osp.join(self.folder_report, self.file_name)
         self.path_out        = osp.join(self.folder_out, f"{param}.{classifier_name}.{clf_settings}.{self.db_type}")
@@ -232,6 +232,8 @@ class MockCommunity:
     def classifier(self):
         if self.classifier_name == "kraken2":
             return self.kraken2
+        elif self.classifier_name == "centrifuge":
+            return self.centrifuge
         else:
             NotImplementedError("This classifier hasn't been implemented")
 
@@ -257,11 +259,38 @@ class MockCommunity:
         else:
             NotImplementedError("The database choice is either full or bins")
                 
+    def centrifuge(self, fastq_input, folder_hash, arg="unknown"):
+        """ Centrifuge calls
+            https://ccb.jhu.edu/software/centrifuge/manual.shtml#command-line
+        """
+        # todo: work in progress
+        hashes_file = [osp.join(folder_hash, f"cf_index.{i}.cf") for i in range(1, 4)]
+        hahs_root = osp.join(folder_hash, "cf_index")
+        assert osp.isfile(hashes_file[0]), FileNotFoundError(f"Hash table not found ! {hahs_root}*")
+        self.hash_size[arg] = sum(osp.getsize(f) for f in hashes_file)
+        self.logger.info(f'start to classify reads from file ({osp.getsize(fastq_input)/10**6:.2f} MB) {fastq_input}')
+        self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {hash_file}')
+        formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
+        self.logger.info(f'output is {formatted_out}.out')
+        self.cmd = [
+            "kraken2", "--threads", f"{self.cores}",
+            "--db", folder_hash,
+            fastq_input,
+            "--output", f"{formatted_out}.out",
+            "--report", f"{formatted_out}.report",
+        ]
+        self.logger.debug(" ".join(self.cmd))
+        if not self.dry_run:
+            results = subprocess.check_output(self.cmd)
+            self.logger.debug(results)
+
+        # todo: centrifuge-kreport
+
     def kraken2(self, fastq_input, folder_hash, arg="unknown"):
         if "hash.k2d" in folder_hash: folder_hash = osp.dirname(folder_hash)
         hash_file = osp.join(folder_hash, "hash.k2d")
         assert osp.isfile(hash_file), FileNotFoundError(f"Hash table not found ! {hash_file}")
-        self.hash_files[arg] = hash_file
+        self.hash_size[arg] = osp.getsize(hash_file)
         self.logger.info(f'start to classify reads from file ({osp.getsize(fastq_input)/10**6:.2f} MB) {fastq_input}')
         self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {hash_file}')
         formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
@@ -373,7 +402,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
 
                 fastq_classifier.classify()
                 t[key]["classify"] = perf_counter()
-                t[key]["hashes"] = fastq_classifier.hash_files
+                t[key]["hashes"] = fastq_classifier.hash_size
             # todo: process reports to have one clean one
 
         except Exception as e:
@@ -389,7 +418,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
             t_classify = time_to_hms(t[key]['binning'], t[key]['classify'], short=True)
             t_total = time_to_hms(t[key]['start'], t[key]['classify'], short=True)
             hashes = t[key]["hashes"]
-            h_size = sum([osp.getsize(f) for f in hashes.values()])
+            h_size = sum(hashes.values())
 
             logger.info(f"timings for file {key} / binning : {t_binning}, for {t[key]['reads_nb']} reads")
             logger.info(f"timings for file {key} / classify: {t_classify}, "
@@ -399,7 +428,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
             t_classify = time_to_hms(t[key]['start'], t[key]['classify'], short=True)
             t_total = t_classify
             hashes = t[key]["hashes"]
-            h_size = sum([osp.getsize(f) for f in hashes.values()])
+            h_size = sum(hashes.values())
             logger.info(f"timings for file {key} / classify: {time_to_hms(t[key]['start'], t[key]['classify'])}")
 
         # to CSV
@@ -417,7 +446,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     print()
 
 
-bin_classify.classifiers = ('kraken2',)
+bin_classify.classifiers = ('kraken2', "centrifuge")
 bin_classify.format = "fastq"
 
 
