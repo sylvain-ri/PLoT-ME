@@ -47,6 +47,8 @@ import subprocess
 from copy import deepcopy
 from itertools import islice
 from multiprocessing import cpu_count, Pool
+from pathlib import Path
+
 from numpy import float32
 import os
 import os.path as osp
@@ -71,6 +73,8 @@ from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
 logger = init_logger('parse_DB')
+CLASSIFIERS     = ("kraken2 k 35 l 31 s 7".split(),
+                   ("centrifuge", ))
 
 
 class Genome:
@@ -457,67 +461,66 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     logger.info(f"split {len(results)} genomes...")
 
 
+def classifier_param_checker(l_param):
+    """ check kraken2-build --help. Default values to feed in, default is ["kraken2", "35", "31", "7"] """
+    assert isinstance(l_param, (list, tuple)), TypeError
+    assert len(l_param) > 0, "Empty list"
+
+    params = {"name": l_param[0], }
+    buffer = []
+    for i in range(2, len(l_param), 2):
+        params[l_param[i - 1]] = l_param[i]
+        buffer.append(l_param[i - 1] + l_param[i])
+    s = "_".join(buffer)
+    return params, s
+
+
 @check_step
-def kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters):
+def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
     """ launch kraken2-build add-to-library. DELETE EXISTING FOLDER !!
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
     create_n_folders(path_bins_hash, n_clusters)
     add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
 
-    logger.info(f"kraken2 add_to_library, {n_clusters} clusters.... ")
+    logger.info(f"{classifier} add_to_library, {n_clusters} clusters.... ")
     for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
-        # if library exist in another folder, make a link to it !
-        existing_lib = glob(f"{osp.dirname(path_bins_hash)}/*/{bin_id}/library")
-        path_new_lib = osp.join(path_bins_hash, bin_id, "library")
 
-        # If library has already been done, skip it
-        if osp.isdir(path_new_lib):
-            logger.debug(f"Library {bin_id} already existing. Delete folder if reinstall needed: {path_new_lib}")
-        # If done with other parameters, k25, can reuse it
-        elif len(existing_lib) > 0:
-            os.symlink(existing_lib[0], path_new_lib)
+        if "kraken2" in classifier:
+            # if library exist in another folder (other classifier parameters, but same binning param), make a link to it !
+            existing_lib = glob(f"{osp.dirname(path_bins_hash)}/*/{bin_id}/library")
+            path_new_lib = osp.join(path_bins_hash, bin_id, "library")
+
+            # If library has already been done, skip it
+            if osp.isdir(path_new_lib):
+                logger.debug(f"Library {bin_id} already existing. Delete folder if reinstall needed: {path_new_lib}")
+            # If done with other parameters, k25, can reuse it
+            elif len(existing_lib) > 0:
+                os.symlink(existing_lib[0], path_new_lib)
+            else:
+                cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
+                       "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+                       "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
+                res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+                logger.debug(res)
+
+        elif "centrifuge" in classifier:
+            # Concat all .fna files in a bin into one file.
+            path_fnas = osp.join(path_bins_hash, bin_id, "library.fna")
+            if osp.isfile(path_fnas):
+                logger.warning(f"Library file for centrifuge exists, skipping step")
+                return
+            with open(path_fnas, 'w') as concatenated_fna:
+                for path in tqdm(Path(path_refseq_binned, bin_id).rglob("*.fna"), leave=False):
+                    with open(path) as fna:
+                        concatenated_fna.write(fna.read())
         else:
-            cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
-                   "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
-                   "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
-            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-            logger.debug(res)
-
-
-def classifier_param_checker(l_param):
-    """ check kraken2-build --help. Default values to feed in, default is ["kraken2", "35", "31", "7"] """
-    assert isinstance(l_param, (list, tuple)), TypeError
-    assert len(l_param) > 0, "Empty list"
-    if "kraken2" in l_param[0]:
-        # kraken2 default values --kmer-len, --minimizer-len, --minimizer-spaces
-        k_param = {'classifier': 'kraken2', 'k': 35, 'l': 31, 's': 7}
-        if len(l_param) > 1:
-            assert 5 < int(l_param[1]) < 100, f"value out of range"
-            k_param['k'] = l_param[1]
-        if len(l_param) > 2:
-            assert 5 < int(l_param[2]) < int(k_param['k']), f"value out of range"
-            k_param['l'] = l_param[2]
-        if len(l_param) > 3:
-            assert 0 <= float(l_param[3]) < float(k_param['l']) / 2, f"value out of range"
-            k_param['s'] = l_param[3]
-    else:
-        k_param = {}
-    acc = []
-    for k, v in k_param.items():
-        if k != "classifier":
-            acc += [f"{k}{v}"]
-    s = "_".join(acc)
-    return k_param, s
-
-
-classifier_param_checker.default = ("kraken2", "35", "31", "7")
-
+            raise NotImplementedError(f"classifier unsupported {classifier}")
 
 
 @check_step
-def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
+def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
     """ launch kraken build on each bin
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
         Skip skipping by checking if folder exists: **check_step NO FOLDER CHECK** (DON'T REMOVE)
@@ -529,29 +532,49 @@ def kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, p):
     for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
 
-        # check if hash has already been done
-        path_kraken2 = osp.join(path_bins_hash, bin_id)
-        path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
-        if osp.isfile(path_kraken2_hash) and not any([fname.endswith('.tmp') for fname in os.listdir(path_kraken2)]):
-            logger.debug(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
-            continue
+        if "kraken2" in p['name']:
+            # check if hash has already been done
+            path_kraken2 = osp.join(path_bins_hash, bin_id)
+            path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
+            if osp.isfile(path_kraken2_hash) and not any([fname.endswith('.tmp') for fname in os.listdir(path_kraken2)]):
+                logger.debug(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
+                continue
 
-        # add link to taxonomy
-        taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
-        if osp.islink(taxon_in_cluster):
-            logger.debug(f"removing existing link at {taxon_in_cluster}")
-            os.unlink(taxon_in_cluster)
-        os.symlink(path_taxonomy, taxon_in_cluster)
+            # add link to taxonomy
+            taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
+            if osp.islink(taxon_in_cluster):
+                logger.debug(f"removing existing link at {taxon_in_cluster}")
+                os.unlink(taxon_in_cluster)
+            os.symlink(path_taxonomy, taxon_in_cluster)
 
-        # Build
-        cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
-               "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
-        logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
-        res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-        logger.debug(res)
+            # Build
+            cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
+                   "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
+            logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
+            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+            logger.debug(res)
 
-    logger.info(f"Kraken2 finished building hash tables. You can clean the intermediate files with: "
-                f"kraken2-build --clean {path_bins_hash}/<bin number>")
+        elif "centrifuge" in p['name']:
+            path_bin = osp.join(path_bins_hash, bin_id)
+            path_lib = osp.join(path_bin, "library.fna")
+            path_cf = osp.join(path_bin, "cf_index")
+
+            if osp.isfile(f"{path_cf}.1.cf"):
+                logger.info(f"index has already been generated for this bin, skipping it")
+                continue
+
+            cmd = ["centrifuge-build", "-p", f"{main.cores}",
+                   "--conversion-table", osp.join(path_bins_hash, "../../kraken2/k35_l31_s7", bin_id, "seqid2taxid.map"),
+                   "--taxonomy-tree", osp.join(path_taxonomy, "nodes.dmp"),
+                   "--name-table", osp.join(path_taxonomy, "names.dmp"),
+                   path_lib, path_cf, ]
+            logger.debug(f"Launching CMD to build CENTRIFUGE index: " + " ".join(cmd))
+            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
+            logger.debug(res)
+
+    logger.info(f"{p['name']} finished building hash tables. " +
+                ("You can clean the intermediate files with: kraken2-build --clean {path_bins_hash}/<bin number>"
+                 if "kraken2" in p['name'] else "All files, except the index *.[123].cf, can be removed"))
 
 
 @check_step
@@ -621,7 +644,7 @@ def kraken2_clean(path_bins_hash, n_clusters):
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", full_DB=False, k2_clean=False,
-         ml_model=clustering_segments.models[0], classifier_param=classifier_param_checker.default):
+         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS["kraken2"]):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -663,7 +686,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
 
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
-            path_full_hash = osp.join(folder_output, "no-binning", o_omitted, param['classifier'], s_param)
+            path_full_hash = osp.join(folder_output, "no-binning", o_omitted, param['name'], s_param)
             kraken2_full_add_lib(folder_database, path_full_hash)
             kraken2_full_build_hash(path_taxonomy, path_full_hash, param)
             if k2_clean: kraken2_clean(path_full_hash, 1)
@@ -692,14 +715,14 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             split_genomes_to_bins(path_segments_clustering, path_refseq_binned, n_clusters)
 
             # Run kraken2-build add libray
-            path_bins_hash = osp.join(folder_by_model, param['classifier'], s_param)
-            kraken2_add_lib(path_refseq_binned, path_bins_hash, n_clusters)
+            path_bins_hash = osp.join(folder_by_model, param['name'], s_param)
+            add_library(path_refseq_binned, path_bins_hash, n_clusters, param['name'])
 
             # Run kraken2-build make hash tables
-            kraken2_build_hash(path_taxonomy, path_bins_hash, n_clusters, param)
+            build_indexes(path_taxonomy, path_bins_hash, n_clusters, param)
 
             # Cleaning
-            if k2_clean: kraken2_clean(path_bins_hash, n_clusters)
+            if k2_clean and "kraken2" in param['name']: kraken2_clean(path_bins_hash, n_clusters)
 
     except KeyboardInterrupt:
         logger.error("User interrupted")
@@ -742,7 +765,7 @@ if __name__ == '__main__':
                                             default=4,          type=int, metavar='')
     parser.add_argument('-w', '--window',   help='Segments/windows size to split genomes into (default=%(default)d)',
                                             default=10000,      type=int, metavar='')
-    parser.add_argument('-c', '--clusters', help='Number of clusters/bins to split the DB into (default=%(default)d)',
+    parser.add_argument('-b', '--bins',     help='Number of bins/clusters to split the DB into (default=%(default)d)',
                                             default=10,         type=int, metavar='')
 
     parser.add_argument('-t', '--threads',  help='Number of threads (default=%(default)d)',
@@ -758,6 +781,7 @@ if __name__ == '__main__':
                                                       "If the script has been stopped in the middle, use 0 to redo "
                                                       "that step. (default=%(default)s)'",
                                             default=check_step.can_skip, type=str, metavar='')
+
     parser.add_argument('--clean',          help='Make use of kraken2-build --clean to remove temporary files '
                                                  '(library/added/ and others)',
                                             action='store_true',)
@@ -765,9 +789,11 @@ if __name__ == '__main__':
                                                    'directories set by --omit. Skips all the other steps/processes '
                                                    '(unused: -e, -n, -s). Used for comparison/benchmarking',
                                             action='store_true')
-    # parser.add_argument('-p', '--classifier_param', help="classifier's name and its parameters, "
-    #                                                      "space separated.",
-    #                                         default=classifier_param_checker.default, type=str, nargs="+", metavar='')
+    parser.add_argument('-c', '--classifier', help="classifier's name and its parameters, space separated. "
+                                                   "Ex: '--classifier kraken k 35 l 31 s 7', or '-c centrifuge'. "
+                                                   "For unsupported classifiers, you can stop after "
+                                                   "step 3, and build their index based on 'RefSeq_binned'",
+                                            default=CLASSIFIERS[0][0], choices=CLASSIFIERS, type=str, nargs="+", metavar='')
     # parser.add_argument('-m', '--ml_model', help='name of the model to use for clustering',
     #                                         choices=clustering_segments.models, type=str, metavar='',
     #                                         default=clustering_segments.models[0])
@@ -776,8 +802,8 @@ if __name__ == '__main__':
     logger.info(f"Script {__file__} called with {args}")
     main(folder_database=args.path_database, folder_output=args.path_clustered, n_clusters=args.clusters,
          k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
-         early_stop=args.early, omit_folders=tuple(args.omit),
-         path_taxonomy=args.taxonomy, full_DB=args.full_index, k2_clean=args.clean)
+         early_stop=args.early, omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy,
+         full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean)
 
 
 # python ~/Scripts/Reads_Binning/prod/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
