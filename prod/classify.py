@@ -258,6 +258,7 @@ class MockCommunity:
             NotImplementedError("The database choice is either full or bins")
                 
     def kraken2(self, fastq_input, folder_hash, arg="unknown"):
+        if "hash.k2d" in folder_hash: folder_hash = osp.dirname(folder_hash)
         hash_file = osp.join(folder_hash, "hash.k2d")
         assert osp.isfile(hash_file), FileNotFoundError(f"Hash table not found ! {hash_file}")
         self.hash_files[arg] = hash_file
@@ -313,8 +314,13 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     # Find the model
     if full_DB:
         path_model = "full"
-        clusterer, bin_nb, k, w, omitted = (None, 1, None, None, "oplant-vertebrate")
-        path_to_hash = osp.join(path_database, omitted, classifier, clf_settings)
+        bin_nb = 1
+        # clusterer, bin_nb, k, w, omitted = (None, 1, None, None, None)
+        path_to_hash = path_database
+        if "hash.k2d" in path_to_hash:
+            path_to_hash = osp.dirname(path_to_hash)
+        if "hash.k2d" not in os.listdir(path_to_hash):
+            FileNotFoundError(f"hash.k2d not found in folder: {path_to_hash}")
     else:
         path_model = ""
         for file in os.scandir(path_database):
@@ -328,7 +334,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
         clusterer, bin_nb, k, w, omitted, _ = re.split('_b|_k|_s|_o|.pkl', basename)
         path_to_hash = osp.join(path_database, classifier, clf_settings)
         logger.debug(f"path_to_hash: {path_to_hash}")
-    logger.debug(f"Found parameters: clusterer={clusterer}, bin number={bin_nb}, k={k}, w={w}, omitted={omitted}")
+        logger.debug(f"Found parameters: clusterer={clusterer}, bin number={bin_nb}, k={k}, w={w}, omitted={omitted}")
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
@@ -445,14 +451,15 @@ if __name__ == '__main__':
     parser.add_argument('--skip_classification',help='Skip the classification itself '
                                                      '(for benchmarking or to use other classifiers)',
                                                 action='store_true')
-    # parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k25_l22_s5' for kraken2",
-    #                                           metavar='', default='k35_l31_s7')
+    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k25_l22_s5' for kraken2",
+                                                metavar='', default='k35_l31_s7')
 
     args = parser.parse_args()
     
     bin_classify(args.input_fastq, args.path_reports, args.path_clusters,
                  classifier=args.classifier, full_DB=args.full_index, cores=args.threads, f_record=args.record,
-                 drop_bin_threshold=args.drop_bin_threshold, skip_clas=args.skip_classification)
+                 drop_bin_threshold=args.drop_bin_threshold, skip_clas=args.skip_classification,
+                 clf_settings=args.clf_settings)
 
 
 
