@@ -390,6 +390,7 @@ def pll_copy_segments_to_bin(df):
     # Load the entire genome
     genome = Genome(genome_path, taxon, window_size=main.w, k=main.k)
     genome.load_genome()
+    # todo: probably memory or integer size issue somewhere here
     # First get the real segmentation depending on cluster continuity of the segments
     # Aggregate segments with same cluster (consecutive values of cluster), get start, end and description updated
     count = 0
@@ -427,21 +428,18 @@ pll_copy_segments_to_bin.path_db_bins = ""
 
 
 @check_step
-def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1):
+def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters):
     """ Write .fna files from the clustering into n bins """
     logger.info(f"deleting existing sub-folders to avoid duplicates by append to existing files at: {path_db_bins}")
     create_n_folders(path_db_bins, clusters, delete_existing=True)
 
     # Load bin assignment of each segment
-    logger.info(f"loading cluster/bin assignment for each genomes' window: {path_bins_assignments}")
+    logger.info(f"loading cluster/bin assignment for each genomes' window "
+                f"({osp.getsize(path_bins_assignments)/10**9:.2f} GB): {path_bins_assignments}")
     df = pd.read_pickle(path_bins_assignments)
 
     # Split it per file to allow parallel processing
-    logger.info(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
-    # # todo: parallel ? groupby ? Try in notebook
-    # df_per_fna = []
-    # for file in tqdm(df.fna_path.unique(), dynamic_ncols=True):
-    #     df_per_fna.append(df[df.fna_path == file].copy())
+    logger.debug(f"Split the DF of segments assignments per fna file ({path_bins_assignments}")
     df_per_fna = df.groupby(["fna_path"])
 
     # Copy in parallel
@@ -451,10 +449,9 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters, stop=-1
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
     Genome.set_k_kmers(main.k)
     with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
-        results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),
-                            total=len(df_per_fna), dynamic_ncols=True))
+        results = list(tqdm(pool.imap(pll_copy_segments_to_bin, df_per_fna), total=len(df_per_fna), dynamic_ncols=True))
 
-    logger.info(f"split {len(results)} genomes...")
+    logger.info(f"{len(results)} genomes have been split into {path_db_bins}")
 
 
 @check_step
