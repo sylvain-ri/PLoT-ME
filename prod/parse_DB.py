@@ -73,7 +73,7 @@ from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
 logger = init_logger('parse_DB')
-CLASSIFIERS     = ("kraken2 k 35 l 31 s 7".split(),
+CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
 
 
@@ -646,7 +646,7 @@ def kraken2_clean(path_bins_hash, n_clusters):
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", full_DB=False, k2_clean=False,
-         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS["kraken2"]):
+         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0]):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -795,7 +795,7 @@ if __name__ == '__main__':
                                                    "Ex: '--classifier kraken k 35 l 31 s 7', or '-c centrifuge'. "
                                                    "For unsupported classifiers, you can stop after "
                                                    "step 3, and build their index based on 'RefSeq_binned'",
-                                            default=CLASSIFIERS[0][0], choices=CLASSIFIERS, type=str, nargs="+", metavar='')
+                                            default=CLASSIFIERS[0], choices=CLASSIFIERS, type=str, nargs="+", metavar='')
     # parser.add_argument('-m', '--ml_model', help='name of the model to use for clustering',
     #                                         choices=clustering_segments.models, type=str, metavar='',
     #                                         default=clustering_segments.models[0])
