@@ -152,7 +152,8 @@ def bash_process(cmd, msg=""):
     for line in iter(proc.stdout.readline, ''):
         logger.debug(line, flush=True)
     # Check that the process ended successfully
-    if proc.poll() != 0:
+    proc.wait()
+    if proc.returncode != 0:
         logger.warning(f"Process {proc.pid} exited with exit status {proc.returncode}")
         raise ChildProcessError(f"see log file, bash command raised errors: " +
                                 cmd if isinstance(cmd, str) else " ".join(cmd))
