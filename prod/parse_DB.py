@@ -575,8 +575,9 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
             logger.debug(f"Launching CMD to build CENTRIFUGE index: " + " ".join(cmd))
             # https://docs.python.org/3/library/subprocess.html#subprocess.run
             # Combine stdout and stderr into the same stream, both as text (non binary)
-            res = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            res = subprocess.run(cmd, text=True, capture_output=True)
             logger.debug(res.stdout)
+            logger.warning(res.stderr)
             res.check_returncode()
 
     logger.info(f"{p['name']} finished building hash tables. " +
