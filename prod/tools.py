@@ -150,7 +150,7 @@ def bash_process(cmd, msg=""):
     # Combine stdout and stderr into the same stream, both as text (non binary)
     proc = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
     for line in iter(proc.stdout.readline, ''):
-        logger.debug(line, flush=True)
+        logger.debug(line)
     # Check that the process ended successfully
     proc.wait()
     if proc.returncode != 0:
