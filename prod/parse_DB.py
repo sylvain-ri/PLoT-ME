@@ -467,6 +467,7 @@ def classifier_param_checker(l_param):
     """ check kraken2-build --help. Default values to feed in, default is ["kraken2", "35", "31", "7"] """
     assert isinstance(l_param, (list, tuple)), TypeError
     assert len(l_param) > 0, "Empty list"
+    assert l_param[0] in [i[0] for i in CLASSIFIERS], f"{l_param[0]} does not correspond to existing supported classifiers"
 
     params = {"name": l_param[0], }
     buffer = []
@@ -558,6 +559,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
 
         elif "centrifuge" in p['name']:
             path_bin = osp.join(path_bins_hash, bin_id)
+            p_seqtxid = Path(path_bins_hash).parent.parent.joinpath("kraken2/k35_l31_s7", bin_id, "seqid2taxid.map")
             path_lib = osp.join(path_bin, "library.fna")
             path_cf = osp.join(path_bin, "cf_index")
 
@@ -566,13 +568,16 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
                 continue
 
             cmd = ["centrifuge-build", "-p", f"{main.cores}",
-                   "--conversion-table", osp.join(path_bins_hash, "../../kraken2/k35_l31_s7", bin_id, "seqid2taxid.map"),
+                   "--conversion-table", p_seqtxid,
                    "--taxonomy-tree", osp.join(path_taxonomy, "nodes.dmp"),
                    "--name-table", osp.join(path_taxonomy, "names.dmp"),
                    path_lib, path_cf, ]
             logger.debug(f"Launching CMD to build CENTRIFUGE index: " + " ".join(cmd))
-            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-            logger.debug(res)
+            # https://docs.python.org/3/library/subprocess.html#subprocess.run
+            # Combine stdout and stderr into the same stream, both as text (non binary)
+            res = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            logger.debug(res.stdout)
+            res.check_returncode()
 
     logger.info(f"{p['name']} finished building hash tables. " +
                 ("You can clean the intermediate files with: kraken2-build --clean {path_bins_hash}/<bin number>"
@@ -802,7 +807,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logger.info(f"Script {__file__} called with {args}")
-    main(folder_database=args.path_database, folder_output=args.path_clustered, n_clusters=args.clusters,
+    main(folder_database=args.path_database, folder_output=args.path_clustered, n_clusters=args.bins,
          k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
          early_stop=args.early, omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy,
          full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean)
