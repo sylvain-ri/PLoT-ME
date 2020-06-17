@@ -559,7 +559,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
 
         elif "centrifuge" in p['name']:
             path_bin = osp.join(path_bins_hash, bin_id)
-            p_seqtxid = Path(path_bins_hash).parent.parent.joinpath("kraken2/k35_l31_s7", bin_id, "seqid2taxid.map").as_posix()
+            p_seqtxid = Path(path_bins_hash).parent.joinpath("kraken2/k35_l31_s7", bin_id, "seqid2taxid.map").as_posix()
             path_lib = osp.join(path_bin, "library.fna")
             path_cf = osp.join(path_bin, "cf_index")
 
