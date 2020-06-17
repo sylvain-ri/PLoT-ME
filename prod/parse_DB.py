@@ -800,7 +800,7 @@ if __name__ == '__main__':
                                                    "Ex: '--classifier kraken k 35 l 31 s 7', or '-c centrifuge'. "
                                                    "For unsupported classifiers, you can stop after "
                                                    "step 3, and build their index based on 'RefSeq_binned'",
-                                            default=CLASSIFIERS[0], choices=CLASSIFIERS, type=str, nargs="+", metavar='')
+                                            default=CLASSIFIERS[0], type=str, nargs="+", metavar='')
     # parser.add_argument('-m', '--ml_model', help='name of the model to use for clustering',
     #                                         choices=clustering_segments.models, type=str, metavar='',
     #                                         default=clustering_segments.models[0])
