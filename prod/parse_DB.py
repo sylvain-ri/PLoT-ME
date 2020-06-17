@@ -43,7 +43,6 @@ ReSPLIT-ME / Reads Binning Project
 import argparse
 from glob import glob
 import shutil
-import subprocess
 from copy import deepcopy
 from itertools import islice
 from multiprocessing import cpu_count, Pool
@@ -60,7 +59,7 @@ import traceback
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from Bio.Seq import Seq
+# from Bio.Seq import Seq
 from sklearn.cluster import KMeans, MiniBatchKMeans
 # from sklearn.decomposition import PCA
 
@@ -68,7 +67,7 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
-    time_to_hms, ArgumentParserWithDefaults, delete_folder_if_exists
+    time_to_hms, ArgumentParserWithDefaults, delete_folder_if_exists, bash_process
 from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
@@ -506,8 +505,7 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
                 cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
                        "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
                        "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
-                res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-                logger.debug(res)
+                bash_process(" ".join(cmd), "Adding genomes to kraken2 library")
 
         elif "centrifuge" in classifier:
             # Concat all .fna files in a bin into one file.
@@ -554,9 +552,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
             # Build
             cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
                    "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
-            logger.debug(f"Launching CMD to build KRAKEN2 Hash: " + " ".join(cmd))
-            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-            logger.debug(res)
+            bash_process(cmd, "launching kraken2-build")
 
         elif "centrifuge" in p['name']:
             path_bin = osp.join(path_bins_hash, bin_id)
@@ -565,7 +561,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
             path_cf = osp.join(path_bin, "cf_index")
 
             if osp.isfile(f"{path_cf}.1.cf"):
-                logger.info(f"index has already been generated for this bin, skipping it")
+                logger.info(f"index has already been generated,  skipping this bin ({bin_id}), {path_cf}")
                 continue
 
             cmd = ["centrifuge-build", "-p", f"{main.cores}",
@@ -573,13 +569,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
                    "--taxonomy-tree", osp.join(path_taxonomy, "nodes.dmp"),
                    "--name-table", osp.join(path_taxonomy, "names.dmp"),
                    path_lib, path_cf, ]
-            logger.debug(f"Launching CMD to build CENTRIFUGE index: " + " ".join(cmd))
-            # https://docs.python.org/3/library/subprocess.html#subprocess.run
-            # Combine stdout and stderr into the same stream, both as text (non binary)
-            res = subprocess.run(cmd, text=True, capture_output=True)
-            logger.debug(res.stdout)
-            logger.warning(res.stderr)
-            res.check_returncode()
+            bash_process(cmd, "launching centrifuge-build. Expect very long run time (in hours)")
 
     logger.info(f"{p['name']} finished building hash tables. " +
                 ("You can clean the intermediate files with: kraken2-build --clean {path_bins_hash}/<bin number>"
@@ -605,9 +595,7 @@ def kraken2_full_add_lib(path_refseq, path_output):
             cmd = ["find", folder.path, "-name", "'*.fna'", "-print0", "|",
                    "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
                    "kraken2-build", "--add-to-library", "{}", "--db", path_output]
-            logger.info(f"kraken2 add_to_library.... " + " ".join(cmd))
-            res = subprocess.call(" ".join(cmd), shell=True, stderr=subprocess.DEVNULL)
-            logger.debug(res)
+            bash_process(" ".join(cmd), "adding genomes for kraken2 libraries")
 
 
 @check_step
@@ -621,10 +609,7 @@ def kraken2_full_build_hash(taxonomy, path_output, p):
     os.symlink(taxonomy, taxon_link)
     cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_output,
            "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
-    logger.info(f"Launching CMD to build KRAKEN2 Hash, will take lots of time and memory: " + " ".join(cmd))
-    # logger.info(f"kraken2 build its hash tables, will take lots of time and memory.... ")
-    res = subprocess.call(cmd)
-    logger.debug(res)
+    bash_process(cmd, f"Launching CMD to build KRAKEN2 Hash, will take lots of time and memory: ")
 
 
 def kraken2_clean(path_bins_hash, n_clusters):
@@ -634,18 +619,14 @@ def kraken2_clean(path_bins_hash, n_clusters):
     if n_clusters <= 1:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
         cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", path_bins_hash]
-        logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
-        res = subprocess.call(cmd)
-        logger.debug(res)
+        bash_process(cmd, "Launching cleaning with kraken2-build --clean")
 
     else:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
         for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
             bin_id = f"{cluster}/"
             cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
-            logger.debug(f"Launching cleaning with kraken2-build --clean: " + " ".join(cmd))
-            res = subprocess.call(cmd)
-            logger.debug(res)
+            bash_process(cmd, "Launching cleaning with kraken2-build --clean")
     logger.info(f"Cleaning done")
 
 

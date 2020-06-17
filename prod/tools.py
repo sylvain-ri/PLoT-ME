@@ -11,22 +11,22 @@ Reads Binning Project
 #############################################################################
 """
 import argparse
-import shutil
 from datetime import datetime
+import logging
+from multiprocessing import cpu_count
+# from multiprocessing.pool import Pool
+import numpy as np
 import os
 import os.path as osp
-from multiprocessing import cpu_count
-from multiprocessing.pool import Pool
-
-import numpy as np
 import pandas as pd
 from pathlib import Path
-import logging
+import shutil
+import subprocess
+from tqdm import tqdm
 
 # import sys
 # print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
 # print(sys.argv[0])
-from tqdm import tqdm
 
 
 # #############################################################################
@@ -125,11 +125,37 @@ def delete_folder_if_exists(path_dir):
 
 
 def folder_today(path):
-    s_today = f"{date.today()}"
+    s_today = f"{datetime.today()}"
     final_path = osp.join(path, s_today)
     if not osp.isdir(final_path):
         os.makedirs(final_path)
     return final_path
+
+
+def bash_process(cmd, msg=""):
+    """ execute a bash command (list of string), redirect stream into logger
+        encoding=utf-8 to have text stream (somehow text=True not accepted by PyCharm),
+        redirecting all stream to the Pipe, shell on for commands with bash syntax like wild cards
+    """
+    # https://docs.python.org/3/library/subprocess.html#subprocess.Popen
+    if isinstance(cmd, str):
+        shell = True
+    else:
+        shell = False
+        assert isinstance(cmd, (list, tuple)), \
+            TypeError(f"the input should be a list or tuple, but got type:{type(cmd)}, {cmd}")
+    logger.info((msg if msg != "" else "launching bash command")
+                + ": " + (cmd if shell else " ".join(cmd)))
+
+    # Combine stdout and stderr into the same stream, both as text (non binary)
+    proc = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
+    for line in iter(proc.stdout.readline, ''):
+        logger.debug(line, flush=True)
+    # Check that the process ended successfully
+    if proc.poll() != 0:
+        logger.warning(f"Process {proc.pid} exited with exit status {proc.returncode}")
+        raise ChildProcessError(f"see log file, bash command raised errors: " +
+                                cmd if isinstance(cmd, str) else " ".join(cmd))
 
 
 def div_z(n, d):
