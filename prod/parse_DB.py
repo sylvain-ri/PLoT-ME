@@ -457,8 +457,9 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters):
             results = list(tqdm(pool.imap(pll_copy_segments_to_bin, df_per_fna), total=len(df_per_fna), dynamic_ncols=True))
     except:
         logger.warning(f"Multiprocessing failed, launching single core version")
+        results = []
         for part in tqdm(df_per_fna, total=len(df_per_fna), dynamic_ncols=True):
-            pll_copy_segments_to_bin(part)
+            results.append(pll_copy_segments_to_bin(part))
 
     logger.info(f"{len(results)} genomes have been split into {path_db_bins}")
 
