@@ -156,7 +156,7 @@ class Genome:
 
 def create_n_folders(path, n, delete_existing=False):
     """ Create the sub-folders of bins from 0/ to n/ """
-    logger.info(f"creates {n} folder under {path}")
+    logger.debug(f"creates {n} folder under {path}")
     for i in range(n):
         new_path = osp.join(path, str(i))
         if delete_existing and osp.isdir(new_path):
@@ -448,8 +448,13 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters):
 
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
     Genome.set_k_kmers(main.k)
-    with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
-        results = list(tqdm(pool.imap(pll_copy_segments_to_bin, df_per_fna), total=len(df_per_fna), dynamic_ncols=True))
+    try:
+        with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
+            results = list(tqdm(pool.imap(pll_copy_segments_to_bin, df_per_fna), total=len(df_per_fna), dynamic_ncols=True))
+    except:
+        logger.warning(f"Multiprocessing failed, launching single core version")
+        for part in tqdm(df_per_fna, total=len(df_per_fna), dynamic_ncols=True):
+            pll_copy_segments_to_bin(part)
 
     logger.info(f"{len(results)} genomes have been split into {path_db_bins}")
 
