@@ -530,7 +530,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
     assert osp.isdir(path_taxonomy), logger.error(f"Path to taxonomy doesn't seem to be a directory: {path_taxonomy}")
     add_file_with_parameters(path_bins_hash, add_description=f"cluster = {n_clusters} \ntaxonomy = {path_taxonomy}")
 
-    logger.info(f"kraken2 build its hash tables, {n_clusters} clusters, will take lots of time.... ")
+    logger.info(f"{p['name']} build its hash tables, {n_clusters} clusters, will take lots of time.... ")
     for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
 
