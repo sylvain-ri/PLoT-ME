@@ -41,6 +41,8 @@ from bio import kmers_dic, seq_count_kmer
 
 
 logger = init_logger('classify')
+# If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
+DROP_BIN_THRESHOLD = 0.1
 
 
 # #############################################################################
@@ -156,9 +158,8 @@ class ReadToBin(SeqRecord.SeqRecord):
         return cls.outputs
 
     @classmethod
-    def sort_bins_by_sizes_and_drop_smalls(cls, drop_bins):
+    def sort_bins_by_sizes_and_drop_smalls(cls, drop_bins=DROP_BIN_THRESHOLD):
         """ Sort the fastq bins by their size. drop_bins is the *percentage* below which a bin is ignored """
-        # todo: drop bins with less than 0.1% of the total size ?
         bin_size = {}
         for f in os.scandir(cls.FASTQ_BIN_FOLDER):
             bin_nb = int(f.name.split('.')[1].split('-')[1])
@@ -325,7 +326,7 @@ class MockCommunity:
 # Defaults and main method
 
 def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=False, cores=cpu_count(),
-                 f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=0.1, skip_clas=False):
+                 f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD, skip_clas=False):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -474,7 +475,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--drop_bin_threshold', help='Drop fastq bins smaller than x percent of the initial '
                                                            'fastq. Helps to avoid loading hash tables for very few '
                                                            'reads (default=%(default)f)',
-                                                default=0.1, type=float, metavar='')
+                                                default=DROP_BIN_THRESHOLD, type=float, metavar='')
     parser.add_argument('-r', '--record',       help='Record the time spent for each run in CSV format (default=%(default)s)',
                                                 default="/home/ubuntu/classify_records.csv", type=str, metavar='')
     parser.add_argument('--skip_classification',help='Skip the classification itself '
