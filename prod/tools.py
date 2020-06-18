@@ -38,22 +38,8 @@ class ProjectPaths:
         n = datetime.now()
         self.LOGS = f"{self.home}/logs/{n:%Y-%m-%d_%H-%M}.log"  # short for f"{n:%Y}-{n:%m}-{n:%d}_{n:%H}-{n:%M}.log"
 
-        # self.RefSeq_DB = f"{self.data}/NCBI/20190704/refseq"
-        # self.RefSeq_kmer_freq = f"{self.data}/kmer_freq"
-        # self.RefSeq_4mer_freq = f"{self.RefSeq_kmer_freq}/4mer"
-
-        # self.classifiers = ('kraken2', )
-        # self.classifier_DB = f"{self.home}/database/kraken2"
-        # self.kraken2_DB = {
-        #     "2015-10bins"  : f"{self.classifier_DB}/2015-10bins",
-        #     "2015-standard": f"{self.classifier_DB}/2015-standard",
-        # }
         self.folder_reports = f"{self.data}/Reports"
         
-        # self.models = f"{self.data}/kmer_freq/4mer/V4"
-        # self.lda_model = f"{self.models}/LDA/lda_model_20_int.pd"
-        # self.kmeans_model = f"{self.models}/clustering/10_kmeans_2019-05-09_04-08.pkl"
-
 
 PATHS = ProjectPaths()
 
@@ -64,8 +50,7 @@ def init_logger(logger_name='reads_binning', verbose=True):
     # create formatter for the handlers
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # create file handler which logs even debug messages
-    # todo: find better log name: name of the script attached to the date ?
-    fh = logging.FileHandler(PATHS.LOGS)
+    fh = logging.FileHandler(PATHS.LOGS.replace(".log", f".{logger_name}.log"))
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
     # create console handler with a higher log level
