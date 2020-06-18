@@ -117,6 +117,33 @@ def folder_today(path):
     return final_path
 
 
+def f_size(path_or_size):
+    """ If supplied a string, try to get the file size (otherwise size can be directly feed),
+        then format the file size with MB/GB/TB and return it as a string """
+    if isinstance(path_or_size, str):
+        assert osp.isfile(path_or_size), FileNotFoundError(f"checking for file size, but file not found: {path_or_size}")
+        size = osp.getsize(path_or_size)
+    elif isinstance(path_or_size, (int, float)):
+        assert path_or_size > 0, ValueError(f"this function doesn't work with non positive value: {path_or_size}. supposed to be a file size")
+        size = path_or_size
+    else:
+        raise NotImplementedError(f"Received neither a path (string) nor a number: {path_or_size}, can't return a file size")
+
+    for threshold in f_size.splits.keys():
+        if size > threshold:
+            return f"{size/threshold:.2f} {f_size.splits[threshold]}"
+    raise
+
+
+f_size.splits = {
+    10**12: "TB",
+    10**9 : "GB",
+    10**6 : "MB",
+    10**3 : "kB",
+    1     : "B",
+}
+
+
 def bash_process(cmd, msg=""):
     """ execute a bash command (list of string), redirect stream into logger
         encoding=utf-8 to have text stream (somehow text=True not accepted by PyCharm),
