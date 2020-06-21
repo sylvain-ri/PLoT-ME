@@ -36,7 +36,7 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
-    ArgumentParserWithDefaults, time_to_hms
+    ArgumentParserWithDefaults, time_to_hms, f_size, bash_process
 from bio import kmers_dic, seq_count_kmer
 
 
@@ -266,34 +266,33 @@ class MockCommunity:
         """
         # todo: work in progress
         hashes_file = [osp.join(folder_hash, f"cf_index.{i}.cf") for i in range(1, 4)]
-        hahs_root = osp.join(folder_hash, "cf_index")
-        assert osp.isfile(hashes_file[0]), FileNotFoundError(f"Hash table not found ! {hahs_root}*")
+        hash_root = osp.join(folder_hash, "cf_index")
+        assert osp.isfile(hashes_file[0]), FileNotFoundError(f"Hash table not found ! {hash_root}*")
         self.hash_size[arg] = sum(osp.getsize(f) for f in hashes_file)
-        self.logger.info(f'start to classify reads from file ({osp.getsize(fastq_input)/10**6:.2f} MB) {fastq_input}')
-        self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {hash_file}')
-        formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
-        self.logger.info(f'output is {formatted_out}.out')
+        self.logger.info(f'start to classify reads from file ({f_size(fastq_input)}) {fastq_input}')
+        self.logger.info(f'with centrifuge, {arg}. hash table is ({f_size(self.hash_size[arg])}) {hash_root}*')
+        out_path = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
+        out_file = f"{out_path}.out"
+        self.logger.info(f'output is {out_file}')
         self.cmd = [
-            "kraken2", "--threads", f"{self.cores}",
-            "--db", folder_hash,
-            fastq_input,
-            "--output", f"{formatted_out}.out",
-            "--report", f"{formatted_out}.report",
+            "centrifuge", "-x", hash_root, "-U", fastq_input,
+            "-S", out_file, "--report-file", f"{out_path}.centrifuge-report.tsv",
+            "--time", "--threads", f"{self.cores}",
         ]
-        self.logger.debug(" ".join(self.cmd))
-        if not self.dry_run:
-            results = subprocess.check_output(self.cmd)
-            self.logger.debug(results)
-
-        # todo: centrifuge-kreport
+        if self.dry_run:
+            self.logger.debug(" ".join(self.cmd))
+        else:
+            bash_process(self.cmd, f"launching centrifuge classification on {fastq_input}")
+            cmd2 = ["centrifuge-kreport", "-x", hash_root, out_file, ">", f"{out_path}.report"]
+            bash_process(cmd2, f"launching centrifuge kreport on {fastq_input}")
 
     def kraken2(self, fastq_input, folder_hash, arg="unknown"):
         if "hash.k2d" in folder_hash: folder_hash = osp.dirname(folder_hash)
         hash_file = osp.join(folder_hash, "hash.k2d")
         assert osp.isfile(hash_file), FileNotFoundError(f"Hash table not found ! {hash_file}")
         self.hash_size[arg] = osp.getsize(hash_file)
-        self.logger.info(f'start to classify reads from file ({osp.getsize(fastq_input)/10**6:.2f} MB) {fastq_input}')
-        self.logger.info(f'with kraken2, {arg}. hash table is ({osp.getsize(hash_file)/10**9:.2f} GB) {hash_file}')
+        self.logger.info(f'start to classify reads from file ({f_size(fastq_input)}) {fastq_input}')
+        self.logger.info(f'with kraken2, {arg}. hash table is ({f_size(hash_file)}) {hash_file}')
         formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
         self.logger.info(f'output is {formatted_out}.out')
         self.cmd = [
@@ -303,10 +302,10 @@ class MockCommunity:
             "--output", f"{formatted_out}.out",
             "--report", f"{formatted_out}.report",
         ]
-        self.logger.debug(" ".join(self.cmd))
-        if not self.dry_run:
-            results = subprocess.check_output(self.cmd)
-            self.logger.debug(results)
+        if self.dry_run:
+            self.logger.debug(" ".join(self.cmd))
+        else:
+            bash_process(self.cmd, f"launching kraken2 classification on {fastq_input}")
             
     def kraken2_report_merging(self):
         self.logger.info('Merging kraken2 reports')
