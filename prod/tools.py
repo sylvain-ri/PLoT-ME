@@ -50,7 +50,7 @@ def init_logger(logger_name='reads_binning', verbose=True):
     # create formatter for the handlers
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # create file handler which logs even debug messages
-    fh = logging.FileHandler(PATHS.LOGS.replace(".log", f".{logger_name}.log"))
+    fh = logging.FileHandler(PATHS.LOGS)
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
     # create console handler with a higher log level
