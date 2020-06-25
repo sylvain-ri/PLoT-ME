@@ -157,12 +157,13 @@ def bash_process(cmd, msg=""):
         assert isinstance(cmd, (list, tuple)), \
             TypeError(f"the input should be a list or tuple, but got type:{type(cmd)}, {cmd}")
     logger.info((msg if msg != "" else "launching bash command")
-                + ": " + (cmd if shell else " ".join(cmd)))
+                + ": " + (cmd.split()[0] if shell else cmd[0]))
+    logger.debug(cmd if shell else " ".join(cmd))
 
     # Combine stdout and stderr into the same stream, both as text (non binary)
     proc = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
     for line in iter(proc.stdout.readline, ''):
-        logger.debug(line.replace("\n", ". "))
+        logger.debug(line.replace("\n", ""))
     # Check that the process ended successfully
     proc.wait()
     if proc.returncode != 0:
