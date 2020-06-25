@@ -7,6 +7,11 @@ and launch a classifier for each bin at the time.
 The higher the number of clusters, the lower the memory requirement.
 https://github.com/sylvain-ri/PLoT-ME
 
+python ~/Scripts/Reads_Binning/prod/classify.py ~/data/Reports/
+ ~/data/Segmentation/4mer_s25000/clustered_by_minikm_4mer_s25000_omitted_plant_vertebrate/
+ -i /home/ubuntu/data/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-19_20-WindowReads_EColi_Test/2019-12-19_20-WindowReads_10-EColiTest.fastq
+
+
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
@@ -177,6 +182,9 @@ class ReadToBin(SeqRecord.SeqRecord):
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
+
+        # todo: create empty files
+
         counter = 0
         for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=cls.total_reads,
                            desc="binning and copying reads to bins", leave=True, dynamic_ncols=True):
