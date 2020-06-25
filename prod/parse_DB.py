@@ -511,9 +511,10 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
             # Concat all .fna files in a bin into one file.
             path_fnas = osp.join(path_bins_hash, bin_id, "library.fna")
             if osp.isfile(path_fnas):
-                logger.warning(f"Library file for centrifuge exists, bin {cluster}, skipping step")
+                logger.warning(f"Library file for centrifuge, bin {cluster} exists, skipping step {path_fnas}")
                 continue
             with open(path_fnas, 'w') as concatenated_fna:
+                logger.debug(f"for centrifuge library, concatenated fna files into {path_fnas}")
                 for path in tqdm(Path(path_refseq_binned, bin_id).rglob("*.fna"), leave=False):
                     with open(path) as fna:
                         concatenated_fna.write(fna.read())
@@ -522,28 +523,28 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
 
 
 @check_step
-def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
+def build_indexes(path_taxonomy, path_classifier, n_clusters, p):
     """ launch kraken build on each bin
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
         Skip skipping by checking if folder exists: **check_step NO FOLDER CHECK** (DON'T REMOVE)
     """
     assert osp.isdir(path_taxonomy), logger.error(f"Path to taxonomy doesn't seem to be a directory: {path_taxonomy}")
-    add_file_with_parameters(path_bins_hash, add_description=f"cluster = {n_clusters} \ntaxonomy = {path_taxonomy}")
+    add_file_with_parameters(path_classifier, add_description=f"cluster = {n_clusters} \ntaxonomy = {path_taxonomy}")
 
-    logger.info(f"{p['name']} build its hash tables, {n_clusters} clusters, will take lots of time.... ")
+    logger.info(f"{p['name']} build its {n_clusters} indexes, will take lots of time. Under: {path_classifier}")
     for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
 
         if "kraken2" in p['name']:
             # check if hash has already been done
-            path_kraken2 = osp.join(path_bins_hash, bin_id)
+            path_kraken2 = osp.join(path_classifier, bin_id)
             path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
             if osp.isfile(path_kraken2_hash) and not any([fname.endswith('.tmp') for fname in os.listdir(path_kraken2)]):
-                logger.debug(f"Hash table already created, skipping this bin ({bin_id}), {path_kraken2_hash}")
+                logger.debug(f"Hash table already created, skipping bin {cluster}")
                 continue
 
             # add link to taxonomy
-            taxon_in_cluster = osp.join(path_bins_hash, bin_id, "taxonomy")
+            taxon_in_cluster = osp.join(path_classifier, bin_id, "taxonomy")
             if osp.islink(taxon_in_cluster):
                 logger.debug(f"removing existing link at {taxon_in_cluster}")
                 os.unlink(taxon_in_cluster)
@@ -555,14 +556,15 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
             bash_process(cmd, "launching kraken2-build")
 
         elif "centrifuge" in p['name']:
-            path_bin = osp.join(path_bins_hash, bin_id)
-            p_seqtxid = Path(path_bins_hash).parent.joinpath("kraken2/k35_l31_s7", bin_id, "seqid2taxid.map").as_posix()
+            path_bin = osp.join(path_classifier, bin_id)
+            p_seqtxid = Path(path_classifier).parent.joinpath("kraken2/k35_l31_s7", bin_id, "seqid2taxid.map").as_posix()
             path_lib = osp.join(path_bin, "library.fna")
             path_cf = osp.join(path_bin, "cf_index")
 
-            # todo: if <file>.sa exist, redo bin
-            if osp.isfile(f"{path_cf}.1.cf"):
-                logger.info(f"index has already been generated,  skipping this bin ({bin_id}), {path_cf}")
+            # if one cf_index.1.cf exists, and there's no more *.sa files, and all *.cf files are not empty...
+            if osp.isfile(f"{path_cf}.1.cf") and not list(Path(path_bin).rglob("*.sa")) \
+                    and all([f.stat().st_size > 0 for f in Path(path_bin).rglob("*.cf")]):
+                logger.info(f"index has already been generated, skipping bin {cluster}")
                 continue
 
             cmd = ["centrifuge-build", "-p", f"{main.cores}",
