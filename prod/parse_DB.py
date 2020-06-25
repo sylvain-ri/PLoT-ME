@@ -486,7 +486,7 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
     create_n_folders(path_bins_hash, n_clusters)
     add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
 
-    logger.info(f"{classifier} add_to_library, {n_clusters} clusters.... ")
+    logger.info(f"{classifier} add_to_library, {n_clusters} clusters, under {path_bins_hash} ")
     for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
         bin_id = f"{cluster}/"
 
@@ -511,7 +511,7 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
             # Concat all .fna files in a bin into one file.
             path_fnas = osp.join(path_bins_hash, bin_id, "library.fna")
             if osp.isfile(path_fnas):
-                logger.warning(f"Library file for centrifuge, bin {cluster} exists, skipping step {path_fnas}")
+                logger.info(f"Library file for centrifuge, bin {cluster} exists, skipping step")
                 continue
             with open(path_fnas, 'w') as concatenated_fna:
                 logger.debug(f"for centrifuge library, concatenated fna files into {path_fnas}")
