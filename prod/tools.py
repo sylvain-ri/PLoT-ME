@@ -165,7 +165,7 @@ def bash_process(cmd, msg=""):
     for line in iter(proc.stdout.readline, ''):
         logger.debug(line.replace("\n", ""))
     # Check that the process ended successfully
-    proc.wait()
+    proc.wait(60*60*24)  # wait 24 hours max
     if proc.returncode != 0:
         logger.warning(f"Process {proc.pid} exited with exit status {proc.returncode}")
         raise ChildProcessError(f"see log file, bash command raised errors: " +
