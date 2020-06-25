@@ -216,7 +216,7 @@ class ReadToBin(SeqRecord.SeqRecord):
                 dropped_size += size
                 cls.logger.debug(f"Reads in bin {bin_nb} has a size of {f_size(size)}, and will be dropped "
                                  f"(less than {drop_bins}% of all binned reads {f_size(full_fastq_size)})")
-        cls.logger.info(f"Dropped bins {dropped_bins}, saving {f_size(dropped_size)} of loading. "
+        cls.logger.info(f"Dropped bins {dropped_bins}, with total file size of {f_size(dropped_size)}. "
                         f"Lower parameter drop_bin_threshold to load all bins despite low number of reads in a bin.")
         return ReadToBin.outputs
 
@@ -319,7 +319,7 @@ class MockCommunity:
         else:
             bash_process(self.cmd, f"launching centrifuge classification on {fastq_input}")
             cmd2 = ["centrifuge-kreport", "-x", hash_root, out_file, ">", f"{out_path}.report"]
-            bash_process(cmd2, f"launching centrifuge kreport on {fastq_input}")
+            bash_process(" ".join(cmd2), f"launching centrifuge kreport on {fastq_input}")
 
     def kraken2(self, fastq_input, folder_hash, arg="unknown"):
         if "hash.k2d" in folder_hash: folder_hash = osp.dirname(folder_hash)
