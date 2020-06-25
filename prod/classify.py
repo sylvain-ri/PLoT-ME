@@ -130,8 +130,8 @@ class ReadToBin(SeqRecord.SeqRecord):
         cls.FASTQ_BIN_FOLDER = osp.join(folder, param)
 
         cls.total_reads = reads_in_file(cls.FASTQ_PATH)
-        # todo: skip if reads already binned
 
+        # skip if reads already binned
         if osp.isdir(cls.FASTQ_BIN_FOLDER):
             total_binned_reads = 0
             if not force_binning:
@@ -141,8 +141,8 @@ class ReadToBin(SeqRecord.SeqRecord):
                     total_binned_reads += reads_in_file(str_path)
                     _, key, _ = re.split('.bin-|.fastq', str_path)
                     cls.outputs[int(key)] = str_path
-                cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, compared to "
-                                 f"the {cls.total_reads} in the original fastq file.")
+                cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, "
+                                 f"compared to the {cls.total_reads} in the original fastq file.")
 
             if force_binning or cls.total_reads != total_binned_reads:
                 last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
@@ -155,8 +155,6 @@ class ReadToBin(SeqRecord.SeqRecord):
         create_path(cls.FASTQ_BIN_FOLDER)
 
         cls.FILEBASE = file_base
-        cls.logger.debug(f"New values: cls.FASTQ_PATH{cls.FASTQ_PATH} and cls.BASE_PATH{cls.FASTQ_BIN_FOLDER}")
-        # /home/ubuntu/data/Segmentation/4mer_s10000/clustered_by_minikm_4mer_s10000/model_miniKM_4mer_s10000.pkl
         if path_model == "full":
             cls.K = 0
         else:
@@ -299,7 +297,6 @@ class MockCommunity:
         """ Centrifuge calls
             https://ccb.jhu.edu/software/centrifuge/manual.shtml#command-line
         """
-        # todo: work in progress
         hashes_file = [osp.join(folder_hash, f"cf_index.{i}.cf") for i in range(1, 4)]
         hash_root = osp.join(folder_hash, "cf_index")
         assert osp.isfile(hashes_file[0]), FileNotFoundError(f"Hash table not found ! {hash_root}*")
@@ -318,6 +315,7 @@ class MockCommunity:
             self.logger.debug(" ".join(self.cmd))
         else:
             bash_process(self.cmd, f"launching centrifuge classification on {fastq_input}")
+            # Then do the kraken2 report
             cmd2 = ["centrifuge-kreport", "-x", hash_root, out_file, ">", f"{out_path}.report"]
             bash_process(" ".join(cmd2), f"launching centrifuge kreport on {fastq_input}")
 
