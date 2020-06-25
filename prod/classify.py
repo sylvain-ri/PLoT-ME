@@ -137,7 +137,10 @@ class ReadToBin(SeqRecord.SeqRecord):
             if not force_binning:
                 # Compute total reads count if it hasn't been forced
                 for path in Path(cls.FASTQ_BIN_FOLDER).rglob("*bin-*.fastq"):
-                    total_binned_reads += reads_in_file(path.as_posix())
+                    str_path = path.as_posix()
+                    total_binned_reads += reads_in_file(str_path)
+                    _, key, _ = re.split('.bin-|.fastq', str_path)
+                    cls.outputs[int(key)] = str_path
                 cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, compared to "
                                  f"the {cls.total_reads} in the original fastq file.")
 
