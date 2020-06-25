@@ -134,16 +134,21 @@ class ReadToBin(SeqRecord.SeqRecord):
 
         if osp.isdir(cls.FASTQ_BIN_FOLDER):
             total_binned_reads = 0
-            for path in Path(cls.FASTQ_BIN_FOLDER).rglob("*bin-*.fastq"):
-                total_binned_reads += reads_in_file(path.as_posix())
-            cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, compared to "
-                             f"the {cls.total_reads} in the original fastq file.")
+            if not force_binning:
+                # Compute total reads count if it hasn't been forced
+                for path in Path(cls.FASTQ_BIN_FOLDER).rglob("*bin-*.fastq"):
+                    total_binned_reads += reads_in_file(path.as_posix())
+                cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, compared to "
+                                 f"the {cls.total_reads} in the original fastq file.")
 
             if force_binning or cls.total_reads != total_binned_reads:
                 last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
                 save_folder = f"{cls.FASTQ_BIN_FOLDER}_{last_modif:%Y-%m-%d_%H-%M}"
                 cls.logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
                 os.rename(cls.FASTQ_BIN_FOLDER, save_folder)
+            else:
+                # Flag up if read counts are equal, and no forcing to recount
+                cls.file_has_been_binned = True
         create_path(cls.FASTQ_BIN_FOLDER)
 
         cls.FILEBASE = file_base
