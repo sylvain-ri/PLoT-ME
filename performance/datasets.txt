@@ -1,0 +1,15 @@
+/mnt/data/ONT_Mock_Communities/Mock_100000-bacteria-l1000-q10/Mock_100000-bacteria-l1000-q10.fastq
+/mnt/data/ONT_Mock_Communities/silico-50-bac-100k/50-bac-100k.fastq
+/mnt/data/ONT_Mock_Communities/silico-10-bacteria-20k-reads-500-1k/silico-10-bacteria-20k-reads-500-1k.fastq
+/mnt/data/ONT_Mock_Communities/silico-10-bacteria-20k-reads-1k-2k/silico-10-bacteria-20k-reads-1k-2k.fastq
+/mnt/data/ONT_Mock_Communities/silico-10-bacteria-20k-reads-2k-5k/silico-10-bacteria-20k-reads-2k-5k.fastq
+/mnt/data/ONT_Mock_Communities/silico-10-bacteria-20k-reads-5k-10k/silico-10-bacteria-20k-reads-5k-10k.fastq
+/mnt/data/ONT_Mock_Communities/silico-10-bacteria-100k-reads/silico-10-bacteria-100k-reads.fastq
+
+/mnt/data/ONT_Mock_Communities/silico-human-2euka-1archaea-46-bac-100k/human-2euka-1archaea-46-bac-100k.fastq
+/mnt/data/ONT_Mock_Communities/silico-human-pathogen/human-pathogen.fastq
+/mnt/data/ONT_Mock_Communities/silico-30p-human-70p-bac/silico-30p-human-70p-bac.fastq
+/mnt/data/ONT_Mock_Communities/silico-3-euka-bac-100k-reads/silico-3-euka-bac-100k-reads.fastq
+
+
+
