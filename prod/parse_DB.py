@@ -305,19 +305,37 @@ def append_genome_kmer_counts(folder_kmers, path_df):
 def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
+
+    # todo: work in progress
     # Paths
     create_path(output_pred)
     create_path(path_model)
+
+    # All variables
     k = main.k
     w = main.w
+    cols_kmers = Genome.col_kmers
+    batch_size = 1000
+    d_types = {
+        "taxon": "uint64",
+        "category": "category",
+        "start": "uint64",
+        "end": "uint64",
+        "name": "category",
+        "description": "str",
+        "fna_path": "category",
+    }
+    # Don't read all columns
+    cols_spe = list(d_types.keys())
+    for col in cols_kmers:
+        d_types[col] = "float32"
+    logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
-    # https://www.codementor.io/@guidotournois/4-strategies-to-deal-with-large-datasets-using-pandas-qdw3an95k
-    # filename = "data.csv"
-    # n = sum(1 for line in open(filename)) - 1  # Calculate number of rows in file
-    # s = n // 10  # sample size of 10%
-    # skip = sorted(random.sample(range(1, n + 1), n - s))  # n+1 to compensate for header
-    # df = pandas.read_csv(filename, skiprows=skip)
+    # ## 1 ## Scaling by length and kmers
+    logger.info(f"Model set, scaling the values to the length of the segments and feeding the data by chunks of "
+                f"{batch_size} as the file is large: {osp.getsize(path_kmer_counts) / 10 ** 9:.2f} GB.")
 
+    # Concatenating and converting .csv into pandas pkl
     path_pkl_kmer_counts = path_kmer_counts.replace(".csv", ".pd")
     if osp.isfile(path_pkl_kmer_counts):
         logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
@@ -336,31 +354,39 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
         df.description = df.description.astype('category')
         df.to_pickle(path_pkl_kmer_counts)
 
-    cols_kmers = df.columns[-4**k:]
-    cols_spe = df.columns[:-4**k]
-    logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
-
     # ## 1 ## Scaling by length and kmers
     df_mem = df.memory_usage(deep=False).sum()
     logger.info(f"Kmer counts loaded, scaling the values to the length of the segments. "
                 f"DataFrame size: {df_mem/10**9:.2f} GB - shape: {df.shape}")
 
-    # todo: save intermediate data
-    scale_df_by_length(df, cols_kmers, k, w)
+    # Training mini K-MEANS
+    ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
+    # ml_model.fit(df[cols_kmers])
 
-    # ## 2 ## Could add PCA
+    # VERSION 1
+    df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, usecols=cols_kmers)
+    for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
+        # todo: loop x times over the CSV, and take 1/10 of the chunk each time
+        #  would allow the ML algo to learn from a bit everywhere
+        chunk = batch.get_chunk(batch_size)
+        chunk = scale_df_by_length(chunk, cols_kmers, k, w)
+        ml_model.partial_fit(chunk)
 
-    # Model learning
-    logger.info(f"Data takes {df_mem/10**9:.2f} GB. Training {model_name}...")
-    if model_name == "kmeans":
-        ml_model = KMeans(n_clusters=n_clusters, n_jobs=main.cores, random_state=3)
-    elif model_name == "minikm":
-        ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
-    else:
-        logger.error(f"No model defined for {model_name}.")
-        raise NotImplementedError
+    # VERSION 2
+    added = 0
+    cols_pred = cols_spe + ["cluster"]
+    df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, )
+    for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
+        chunk = batch.get_chunk(batch_size)
+        chunk = scale_df_by_length(chunk[cols_kmers], cols_kmers, k, w)
+        predicted = ml_model.predict(chunk[cols_kmers])
+        chunk["cluster"] = predicted
 
-    ml_model.fit(df[cols_kmers])
+        if added == 0:
+            chunk[cols_pred].to_csv(output_pred, mode='w', index=False, header=True)
+        else:
+            chunk[cols_pred].to_csv(output_pred, mode='a', index=False, header=False)
+        added += 1
 
     # Model saving
     with open(path_model, 'wb') as f:
@@ -373,6 +399,15 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
 
     df[list(cols_spe) + ["cluster"]].to_pickle(output_pred)
     logger.info(f"Defined {n_clusters} clusters, assignments here: {output_pred} with ML model {model_name}.")
+
+    # todo: improvements to randomize the learning a bit more
+    # https://www.codementor.io/@guidotournois/4-strategies-to-deal-with-large-datasets-using-pandas-qdw3an95k
+    # filename = "data.csv"
+    # n = sum(1 for line in open(filename)) - 1  # Calculate number of rows in file
+    # s = n // 10  # sample size of 10%
+    # skip = sorted(random.sample(range(1, n + 1), n - s))  # n+1 to compensate for header
+    # df = pandas.read_csv(filename, skiprows=skip)
+
     return
 
 
@@ -653,6 +688,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         o_omitted = "" if len(omit_folders) == 0 else "o" + "-".join(omit_folders)
         folder_intermediate_files = osp.join(folder_output, param_k_s, "kmer_counts")
         # Parameters
+        # todo: move to global variables ?
         main.folder_database= folder_database
         main.omit_folders   = omit_folders
         main.k              = k
