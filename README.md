@@ -1,23 +1,38 @@
-# ReSPLIT-ME 
-RefSeq Segmentation for Pre-classification of Long reads : Identification of Taxonomy with high Memory Efficiency <br>
-Sylvain Riondet, NUS/SoC, GIS/Biopolis, Singapore
+# PLoT-ME
+**Pre-classification of Long-reads for Memory Efficient Taxonomic assignment <br>**
+Sylvain Riondet, Niranjan Ngarajan, NUS/SoC, GIS/Biopolis, Singapore
 
 
 ## Description
-#### Pre-processing
+#### Preparation
 - Segmentation of RefSeq into clusters
 - Building of taxonomic classifiers' indexes for each cluster
 
-#### Processing of mock communities / metagenomics fastq files
+#### Taxonomic classification of mock communities / metagenomic fastq files
 - Pre-classification of long DNA reads (Nanopore/PacBio) to each cluster
-- Classification by the classifier with a segment of RefSeq
+- Classification by the classifier with a subset of RefSeq
 
-Only Kraken2 is currently automated, but any classifier able to build its index on .fna files with a provided taxid should work
+Kraken2 _(Derrick E. Wood et al. 2019)_ and Centrifuge _(D.Kim et al. 2016)_ are currently automated, and any classifier able to build its index on a set of .fna files with a provided taxid should work
 
 ## Take-aways
-- High reduction in memory needs, defined by the number of clusters (Mini Batch K-Means)
+- High reduction in memory needs, defined by the number of clusters (Mini Batch K-Means, _Web-Scale K-Means Clustering D. Sculley 2010_)
 - Compatible with existing taxonomic classifiers
 - Over-head of the pre-classification (currently ~3-5x, improvements for future releases)
+
+
+## Requirements
+**Tested with:**
+- Python == 3.7
+- biopython==1.73
+- configparser==3.5.3
+- ete3==3.1.1
+- numpy==1.18.1
+- pandas==0.23
+- scikit-learn==0.22
+
+
+## Installation
+todo
 
 ## Usage
 #### Pre-processing
@@ -29,16 +44,6 @@ For the full help: `parse_DB.py -h`
  -i <fastq files to preclassify>` <br>
 For the full help: `classify.py -h`
 
-
-### Requirements
-**Tested with:**
-- Python == 3.7
-- biopython==1.73
-- configparser==3.5.3
-- ete3==3.1.1
-- numpy==1.18.1
-- pandas==0.23
-- scikit-learn==0.22
 
 
 ### Contact
