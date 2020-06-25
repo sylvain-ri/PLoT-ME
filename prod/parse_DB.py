@@ -36,7 +36,7 @@ as well as classifier's tmp files (for kraken2: kraken2-build --clean)
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
 Started on 2019-12-11
-ReSPLIT-ME / Reads Binning Project
+PLoT-ME / Reads Binning Project
 #############################################################################
 """
 
@@ -67,7 +67,7 @@ from tqdm import tqdm
 
 # Import paths and constants for the whole project
 from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
-    time_to_hms, ArgumentParserWithDefaults, delete_folder_if_exists, bash_process
+    time_to_hms, ArgumentParserWithDefaults, delete_folder_if_exists, bash_process, f_size
 from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
@@ -104,7 +104,7 @@ class Genome:
         """ Loop through all chromosomes/plasmids/genomes/.. and parse them into the object
             Split them into various categories (plasmids, genomes, ...)
         """
-        logger.debug(f"loading genome {self.path_fna}")
+        logger.debug(f"loading genome {f_size(self.path_fna)} {self.path_fna}")
         for record in SeqIO.parse(self.path_fna, "fasta"):
             for cat in self.categories:
                 if cat in record.description:
@@ -511,8 +511,8 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
             # Concat all .fna files in a bin into one file.
             path_fnas = osp.join(path_bins_hash, bin_id, "library.fna")
             if osp.isfile(path_fnas):
-                logger.warning(f"Library file for centrifuge exists, skipping step")
-                return
+                logger.warning(f"Library file for centrifuge exists, bin {cluster}, skipping step")
+                continue
             with open(path_fnas, 'w') as concatenated_fna:
                 for path in tqdm(Path(path_refseq_binned, bin_id).rglob("*.fna"), leave=False):
                     with open(path) as fna:
@@ -560,6 +560,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
             path_lib = osp.join(path_bin, "library.fna")
             path_cf = osp.join(path_bin, "cf_index")
 
+            # todo: if <file>.sa exist, redo bin
             if osp.isfile(f"{path_cf}.1.cf"):
                 logger.info(f"index has already been generated,  skipping this bin ({bin_id}), {path_cf}")
                 continue
@@ -579,6 +580,7 @@ def build_indexes(path_taxonomy, path_bins_hash, n_clusters, p):
 @check_step
 def kraken2_full_add_lib(path_refseq, path_output):
     """ Build the hash table with the same genomes, but without binning, for comparison """
+    # todo: adapt for centrifuge as well
     delete_folder_if_exists(path_output)
     create_path(path_output)
     add_file_with_parameters(path_output, add_description=f"no binning database for comparison")
