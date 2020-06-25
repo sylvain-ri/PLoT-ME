@@ -5,7 +5,7 @@ Script to pre-classify reads/sequences from fastq file, with a binning step
 to reduce memory consumption. Bins the reads into defined bins (parse_DB)
 and launch a classifier for each bin at the time.
 The higher the number of clusters, the lower the memory requirement.
-https://github.com/sylvain-ri/Reads_Binning
+https://github.com/sylvain-ri/PLoT-ME
 
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
@@ -27,6 +27,7 @@ from os import path as osp
 import pickle
 import shutil
 import subprocess
+from pathlib import Path
 from time import perf_counter
 import re
 
@@ -43,6 +44,15 @@ from bio import kmers_dic, seq_count_kmer
 logger = init_logger('classify')
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
 DROP_BIN_THRESHOLD = 0.1
+CLASSIFIERS        = (('kraken2', 'k35_l31_s7'),
+                      ("centrifuge", ''))
+
+
+def reads_in_file(file_path):
+    """ Find the number of reads in a file.
+        Count number of lines with bash wc -l and divide by 4 if fastq, otherwise by 2 (fasta) """
+    return round(int(subprocess.check_output(["wc", "-l", file_path]).split()[0]) /
+                     (4 if bin_classify.format == "fastq" else 2))
 
 
 # #############################################################################
@@ -50,6 +60,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
     logger = logging.getLogger('classify.ReadToBin')
     K = 0
+    BINS = 0
     KMER = {}  # kmers_dic(K)
     FASTQ_PATH = None
     FASTQ_BIN_FOLDER = None
@@ -58,6 +69,8 @@ class ReadToBin(SeqRecord.SeqRecord):
     PARAM = ""
     CORES = 1
     outputs = {}
+    total_reads = 0
+    file_has_been_binned = False
     NUMBER_BINNED = 0
 
     def __init__(self, obj):
@@ -105,20 +118,32 @@ class ReadToBin(SeqRecord.SeqRecord):
             SeqIO.write(self, f, bin_classify.format)
 
     @classmethod
-    def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores, k):
+    def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores, k, bin_nb, force_binning):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
         # todo: load the parameter file from parse_DB.py instead of parsing string.... parameters_RefSeq_binning.txt
         cls.CORES = cores
         cls.PARAM = param
+        cls.BINS = bin_nb
         cls.FASTQ_PATH = path_fastq
         folder, file_base = osp.split(osp.splitext(path_fastq)[0])
         # output folder, will host one file for each bin
         cls.FASTQ_BIN_FOLDER = osp.join(folder, param)
+
+        cls.total_reads = reads_in_file(cls.FASTQ_PATH)
+        # todo: skip if reads already binned
+
         if osp.isdir(cls.FASTQ_BIN_FOLDER):
-            last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
-            save_folder = f"{cls.FASTQ_BIN_FOLDER}_{last_modif:%Y-%m-%d_%H-%M}"
-            cls.logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
-            os.rename(cls.FASTQ_BIN_FOLDER, save_folder)
+            total_binned_reads = 0
+            for path in Path(cls.FASTQ_BIN_FOLDER).rglob("*bin-*.fastq"):
+                total_binned_reads += reads_in_file(path.as_posix())
+            cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, compared to "
+                             f"the {cls.total_reads} in the original fastq file.")
+
+            if force_binning or cls.total_reads != total_binned_reads:
+                last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
+                save_folder = f"{cls.FASTQ_BIN_FOLDER}_{last_modif:%Y-%m-%d_%H-%M}"
+                cls.logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
+                os.rename(cls.FASTQ_BIN_FOLDER, save_folder)
         create_path(cls.FASTQ_BIN_FOLDER)
 
         cls.FILEBASE = file_base
@@ -134,7 +159,12 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     @classmethod
     def bin_reads(cls):
-        """ Bin all reads from provide file """
+        """ Bin all reads from provided file """
+        # Skip binning if already done. Count total number of lines in each binned fastq
+        if cls.file_has_been_binned:
+            cls.logger.info(f"Fastq has already been binned, skipping step")
+            return
+
         cls.logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
         # todo: try to parallelize it, careful of file writing concurrency.
         #  Dask ? process to load and count kmers, single one for appending read to fastq ?
@@ -142,10 +172,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
         counter = 0
-        # Count number of lines with bash wc -l and divide by 4 if fastq, otherwise by 2 (fasta)
-        total = round(int(subprocess.check_output(["wc", "-l", cls.FASTQ_PATH]).split()[0]) /
-                      (4 if bin_classify.format == "fastq" else 2))
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=total,
+        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=cls.total_reads,
                            desc="binning and copying reads to bins", leave=True, dynamic_ncols=True):
             counter += 1
             custom_read = ReadToBin(record)
@@ -179,9 +206,9 @@ class ReadToBin(SeqRecord.SeqRecord):
             else:
                 dropped_bins.append(bin_nb)
                 dropped_size += size
-                cls.logger.debug(f"Reads in bin {bin_nb} has a size of {size/10**6:.2f} MB, and will be dropped "
-                                 f"(less than {drop_bins}% of all binned reads {full_fastq_size/10**9:.2f} GB)")
-        cls.logger.info(f"Dropped bins {dropped_bins}, saving {dropped_size/10**9:.2f} GB of loading. "
+                cls.logger.debug(f"Reads in bin {bin_nb} has a size of {f_size(size)}, and will be dropped "
+                                 f"(less than {drop_bins}% of all binned reads {f_size(full_fastq_size)})")
+        cls.logger.info(f"Dropped bins {dropped_bins}, saving {f_size(dropped_size)} of loading. "
                         f"Lower parameter drop_bin_threshold to load all bins despite low number of reads in a bin.")
         return ReadToBin.outputs
 
@@ -325,7 +352,8 @@ class MockCommunity:
 # Defaults and main method
 
 def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=False, cores=cpu_count(),
-                 f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD, skip_clas=False):
+                 f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD,
+                 skip_clas=False, force_binning=False):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
@@ -386,10 +414,10 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
             t[key] = {}
             t[key]["start"] = perf_counter()
 
-            logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {osp.getsize(file)/10**9:.2f} GB, {base_name}")
+            logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {f_size(file)}, {base_name}")
             # Binning
             if not full_DB:
-                ReadToBin.set_fastq_model_and_param(file, path_model, param, cores, k)
+                ReadToBin.set_fastq_model_and_param(file, path_model, param, cores, k, bin_nb, force_binning)
                 ReadToBin.bin_reads()
                 ReadToBin.sort_bins_by_sizes_and_drop_smalls(drop_bin_threshold)
                 t[key]["binning"] = perf_counter()
@@ -422,7 +450,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
 
             logger.info(f"timings for file {key} / binning : {t_binning}, for {t[key]['reads_nb']} reads")
             logger.info(f"timings for file {key} / classify: {t_classify}, "
-                        f"{len(hashes)} bins, total size of hashes loaded: {h_size/10**9:.2f} GB")
+                        f"{len(hashes)} bins, total size of hashes loaded: {f_size(h_size)}")
         else:
             t_binning = time_to_hms(t[key]['start'], t[key]['start'], short=True)
             t_classify = time_to_hms(t[key]['start'], t[key]['classify'], short=True)
@@ -446,7 +474,6 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     print()
 
 
-bin_classify.classifiers = ('kraken2', "centrifuge")
 bin_classify.format = "fastq"
 
 
@@ -466,8 +493,11 @@ if __name__ == '__main__':
 
     parser.add_argument('-i', '--input_fastq',  help='List of input files in fastq format, space separated.',
                                                 default=[], type=is_valid_file, nargs="+", metavar='')
-    parser.add_argument('-c', '--classifier',   help='choose which taxonomic classifier to use (default=%(default)s)',
-                                                metavar='', choices=bin_classify.classifiers, default=bin_classify.classifiers[0])
+    parser.add_argument('-c', '--classifier',   help="classifier's name and its parameters, space separated. "
+                                                     "Ex: '--classifier kraken k35_l31_s7', or '-c centrifuge'. "
+                                                     "For unsupported classifiers, you can stop after "
+                                                     "step 3, and build their index based on 'RefSeq_binned'",
+                                                default=CLASSIFIERS[0], type=str, nargs="+", metavar='')
     parser.add_argument('-f', '--full_index',   help='Use the full index', action='store_true')
     parser.add_argument('-t', '--threads',      help='Number of threads (default=%(default)d)',
                                                 default=cpu_count(), type=int, metavar='')
@@ -480,15 +510,18 @@ if __name__ == '__main__':
     parser.add_argument('--skip_classification',help='Skip the classification itself '
                                                      '(for benchmarking or to use other classifiers)',
                                                 action='store_true')
-    parser.add_argument('-s', '--clf_settings', help="detailed settings, such as 'k25_l22_s5' for kraken2",
-                                                metavar='', default='k35_l31_s7')
+    parser.add_argument('--force_binning',      help='If reads have already been binned, binning is skipped, unless '
+                                                     'this flag is activated',
+                                                action='store_true')
 
     args = parser.parse_args()
-    
+    if len(args.classifier) is 1:
+        args.classifier.append('')
+
     bin_classify(args.input_fastq, args.path_reports, args.path_clusters,
-                 classifier=args.classifier, full_DB=args.full_index, cores=args.threads, f_record=args.record,
+                 classifier=args.classifier[0], full_DB=args.full_index, cores=args.threads, f_record=args.record,
                  drop_bin_threshold=args.drop_bin_threshold, skip_clas=args.skip_classification,
-                 clf_settings=args.clf_settings)
+                 clf_settings=args.classifier[1], force_binning=args.force_binning)
 
 
 
