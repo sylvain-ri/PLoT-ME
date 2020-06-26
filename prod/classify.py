@@ -48,9 +48,12 @@ from bio import kmers_dic, seq_count_kmer
 
 logger = init_logger('classify')
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
-DROP_BIN_THRESHOLD = 0.1
+THREADS            = 1
 CLASSIFIERS        = (('kraken2', 'k35_l31_s7'),
                       ("centrifuge", ''))
+K                  = None
+BIN_NB             = None
+DROP_BIN_THRESHOLD = -1  # by default, will be set as 1% / BIN_NB
 
 
 def reads_in_file(file_path):
@@ -64,15 +67,12 @@ def reads_in_file(file_path):
 class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
     logger = logging.getLogger('classify.ReadToBin')
-    K = 0
-    BINS = 0
     KMER = {}  # kmers_dic(K)
     FASTQ_PATH = None
     FASTQ_BIN_FOLDER = None
     FILEBASE = ""
     MODEL = None
     PARAM = ""
-    CORES = 1
     outputs = {}
     total_reads = 0
     file_has_been_binned = False
@@ -95,7 +95,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     def kmer_count(self, ignore_N=True):
         """ common method """
         if self._kmer_count is None:
-            self._kmer_count = seq_count_kmer(self.seq, self.KMER.copy(), self.K, ignore_N=ignore_N)
+            self._kmer_count = seq_count_kmer(self.seq, self.KMER.copy(), K, ignore_N=ignore_N)
         return self._kmer_count
 
     @property
@@ -104,8 +104,8 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def scale(self):
         self.logger.log(5, "scaling the read by it's length and k-mer")
-        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**self.K),
-                                         None, k=self.K, w=len(self.seq), single_row=True)  # Put into 2D one row
+        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**K),
+                                         None, k=K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
@@ -123,12 +123,10 @@ class ReadToBin(SeqRecord.SeqRecord):
             SeqIO.write(self, f, bin_classify.format)
 
     @classmethod
-    def set_fastq_model_and_param(cls, path_fastq, path_model, param, cores, k, bin_nb, force_binning):
+    def set_fastq_model_and_param(cls, path_fastq, path_model, param, force_binning):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
         # todo: load the parameter file from parse_DB.py instead of parsing string.... parameters_RefSeq_binning.txt
-        cls.CORES = cores
         cls.PARAM = param
-        cls.BINS = bin_nb
         cls.FASTQ_PATH = path_fastq
         folder, file_base = osp.split(osp.splitext(path_fastq)[0])
         # output folder, will host one file for each bin
@@ -160,11 +158,8 @@ class ReadToBin(SeqRecord.SeqRecord):
         create_path(cls.FASTQ_BIN_FOLDER)
 
         cls.FILEBASE = file_base
-        if path_model == "full":
-            cls.K = 0
-        else:
-            cls.K = int(k)
-            cls.KMER = kmers_dic(cls.K)
+        if not path_model == "full":
+            cls.KMER = kmers_dic(K)
             with open(path_model, 'rb') as f:
                 cls.MODEL = pickle.load(f)
 
@@ -199,7 +194,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         return cls.outputs
 
     @classmethod
-    def sort_bins_by_sizes_and_drop_smalls(cls, drop_bins=DROP_BIN_THRESHOLD):
+    def sort_bins_by_sizes_and_drop_smalls(cls):
         """ Sort the fastq bins by their size. drop_bins is the *percentage* below which a bin is ignored """
         bin_size = {}
         for f in os.scandir(cls.FASTQ_BIN_FOLDER):
@@ -207,7 +202,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             size = osp.getsize(f)
             bin_size[size] = bin_nb
         full_fastq_size = osp.getsize(cls.FASTQ_PATH)
-        minimum_size = full_fastq_size * drop_bins / 100
+        minimum_size = full_fastq_size * DROP_BIN_THRESHOLD / 100
 
         # make a copy first, then empty the dic, and rewrite it in the correct order
         fastq_outputs = ReadToBin.outputs.copy()
@@ -221,7 +216,7 @@ class ReadToBin(SeqRecord.SeqRecord):
                 dropped_bins.append(bin_nb)
                 dropped_size += size
                 cls.logger.debug(f"Reads in bin {bin_nb} has a size of {f_size(size)}, and will be dropped "
-                                 f"(less than {drop_bins}% of all binned reads {f_size(full_fastq_size)})")
+                                 f"(less than {DROP_BIN_THRESHOLD}% of all binned reads {f_size(full_fastq_size)})")
         cls.logger.info(f"Dropped bins {dropped_bins}, with total file size of {f_size(dropped_size)}. "
                         f"Lower parameter drop_bin_threshold to load all bins despite low number of reads in a bin.")
         return ReadToBin.outputs
@@ -240,8 +235,8 @@ def pll_binning(record):
 class MockCommunity:
     """ For a fastq file, bin reads, classify them, and compare results """
     
-    def __init__(self, path_original_fastq, db_path, full_DB, folder_report, path_binned_fastq={}, bin_nb=10,
-                 classifier_name="kraken2", param="", cores=1, clf_settings="default", dry_run=False, verbose=False):
+    def __init__(self, path_original_fastq, db_path, full_DB, folder_report, path_binned_fastq={},
+                 classifier_name="kraken2", param="", clf_settings="default", dry_run=False, verbose=False):
         self.logger = logging.getLogger('classify.MockCommunity')
 
         assert osp.isfile(path_original_fastq), FileNotFoundError(f"Didn't find original fastq {path_original_fastq}")
@@ -257,11 +252,9 @@ class MockCommunity:
         self.db_path         = db_path    # location of the hash table for the classifier
         self.db_type         = "full" if full_DB else "bins"    # Either full or bins
         self.hash_size      = {}
-        self.bin_nb          = bin_nb
         self.folder_out      = osp.join(self.folder_report, self.file_name)
         self.path_out        = osp.join(self.folder_out, f"{param}.{classifier_name}.{clf_settings}.{self.db_type}")
 
-        self.cores           = cores
         self.dry_run         = dry_run
         self.verbose         = verbose
         self.cmd             = None
@@ -317,7 +310,7 @@ class MockCommunity:
         self.cmd = [
             "centrifuge", "-x", hash_root, "-U", fastq_input,
             "-S", out_file, "--report-file", f"{out_path}.centrifuge-report.tsv",
-            "--time", "--threads", f"{self.cores}",
+            "--time", "--threads", f"{THREADS}",
         ]
         if self.dry_run:
             self.logger.debug(" ".join(self.cmd))
@@ -337,7 +330,7 @@ class MockCommunity:
         formatted_out = f"{self.path_out}.{arg}" if self.db_type == "bins" else f"{self.path_out}"
         self.logger.info(f'output is {formatted_out}.out')
         self.cmd = [
-            "kraken2", "--threads", f"{self.cores}",
+            "kraken2", "--threads", f"{THREADS}",
             "--db", folder_hash,
             fastq_input,
             "--output", f"{formatted_out}.out",
@@ -365,13 +358,15 @@ class MockCommunity:
 # #############################################################################
 # Defaults and main method
 
-def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=False, cores=cpu_count(),
+def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=False, threads=cpu_count(),
                  f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD,
                  skip_clas=False, force_binning=False):
     """ Should load a file, do all the processing """
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     logger.info(f"Script {__file__} called with {args}")
+    global THREADS
+    THREADS = threads
 
     # preparing csv record file
     if not osp.isfile(f_record):
@@ -383,9 +378,11 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     logger.info("let's classify reads!")
 
     # Find the model
+    global K, BIN_NB, DROP_BIN_THRESHOLD
     if full_DB:
         path_model = "full"
-        bin_nb = 1
+        K          = 0
+        BIN_NB     = 1
         # clusterer, bin_nb, k, w, omitted = (None, 1, None, None, None)
         path_to_hash = path_database
         if "hash.k2d" in path_to_hash:
@@ -403,9 +400,12 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
         # Parse the model name to find parameters:
         basename = path_model.split("/model.")[1]
         clusterer, bin_nb, k, w, omitted, _ = re.split('_b|_k|_s|_o|.pkl', basename)
+        K      = int(k)
+        BIN_NB = int(bin_nb)
+        DROP_BIN_THRESHOLD = drop_bin_threshold if drop_bin_threshold != -1 else 1. / BIN_NB
         path_to_hash = osp.join(path_database, classifier, clf_settings)
         logger.debug(f"path_to_hash: {path_to_hash}")
-        logger.debug(f"Found parameters: clusterer={clusterer}, bin number={bin_nb}, k={k}, w={w}, omitted={omitted}")
+        logger.debug(f"Found parameters: clusterer={clusterer}, bin number={BIN_NB}, k={K}, w={w}, omitted={omitted}")
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
@@ -431,16 +431,16 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
             logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {f_size(file)}, {base_name}")
             # Binning
             if not full_DB:
-                ReadToBin.set_fastq_model_and_param(file, path_model, param, cores, k, bin_nb, force_binning)
+                ReadToBin.set_fastq_model_and_param(file, path_model, param, force_binning)
                 ReadToBin.bin_reads()
-                ReadToBin.sort_bins_by_sizes_and_drop_smalls(drop_bin_threshold)
+                ReadToBin.sort_bins_by_sizes_and_drop_smalls()
                 t[key]["binning"] = perf_counter()
                 t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
 
             if not skip_clas:
                 fastq_classifier = MockCommunity(
                     path_original_fastq=file, db_path=path_to_hash, full_DB=full_DB, folder_report=path_report,
-                    path_binned_fastq=ReadToBin.outputs, bin_nb=bin_nb, classifier_name=classifier, param=param, cores=cores)
+                    path_binned_fastq=ReadToBin.outputs, classifier_name=classifier, param=param)
 
                 fastq_classifier.classify()
                 t[key]["classify"] = perf_counter()
@@ -517,7 +517,7 @@ if __name__ == '__main__':
                                                 default=cpu_count(), type=int, metavar='')
     parser.add_argument('-d', '--drop_bin_threshold', help='Drop fastq bins smaller than x percent of the initial '
                                                            'fastq. Helps to avoid loading hash tables for very few '
-                                                           'reads (default=%(default)f)',
+                                                           'reads (default = 1% / <number of bins>)',
                                                 default=DROP_BIN_THRESHOLD, type=float, metavar='')
     parser.add_argument('-r', '--record',       help='Record the time spent for each run in CSV format (default=%(default)s)',
                                                 default="/home/ubuntu/classify_records.csv", type=str, metavar='')
@@ -533,7 +533,7 @@ if __name__ == '__main__':
         args.classifier.append('')
 
     bin_classify(args.input_fastq, args.path_reports, args.path_clusters,
-                 classifier=args.classifier[0], full_DB=args.full_index, cores=args.threads, f_record=args.record,
+                 classifier=args.classifier[0], full_DB=args.full_index, threads=args.threads, f_record=args.record,
                  drop_bin_threshold=args.drop_bin_threshold, skip_clas=args.skip_classification,
                  clf_settings=args.classifier[1], force_binning=args.force_binning)
 
