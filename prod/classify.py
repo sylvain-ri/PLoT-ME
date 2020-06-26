@@ -43,12 +43,12 @@ from bio import kmers_dic, seq_count_kmer
 
 logger = init_logger('classify')
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
-THREADS            =   1
-DROP_BIN_THRESHOLD = 0.1
+THREADS            = 1
 CLASSIFIERS        = (('kraken2', 'k35_l31_s7'),
                       ("centrifuge", ''))
 K                  = None
 BIN_NB             = None
+DROP_BIN_THRESHOLD = -1  # by default, will be set as 1% / BIN_NB
 
 
 def reads_in_file(file_path):
@@ -186,7 +186,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         return cls.outputs
 
     @classmethod
-    def sort_bins_by_sizes_and_drop_smalls(cls, drop_bins=DROP_BIN_THRESHOLD):
+    def sort_bins_by_sizes_and_drop_smalls(cls):
         """ Sort the fastq bins by their size. drop_bins is the *percentage* below which a bin is ignored """
         bin_size = {}
         for f in os.scandir(cls.FASTQ_BIN_FOLDER):
@@ -194,7 +194,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             size = osp.getsize(f)
             bin_size[size] = bin_nb
         full_fastq_size = osp.getsize(cls.FASTQ_PATH)
-        minimum_size = full_fastq_size * drop_bins / 100
+        minimum_size = full_fastq_size * DROP_BIN_THRESHOLD / 100
 
         # make a copy first, then empty the dic, and rewrite it in the correct order
         fastq_outputs = ReadToBin.outputs.copy()
@@ -208,7 +208,7 @@ class ReadToBin(SeqRecord.SeqRecord):
                 dropped_bins.append(bin_nb)
                 dropped_size += size
                 cls.logger.debug(f"Reads in bin {bin_nb} has a size of {f_size(size)}, and will be dropped "
-                                 f"(less than {drop_bins}% of all binned reads {f_size(full_fastq_size)})")
+                                 f"(less than {DROP_BIN_THRESHOLD}% of all binned reads {f_size(full_fastq_size)})")
         cls.logger.info(f"Dropped bins {dropped_bins}, with total file size of {f_size(dropped_size)}. "
                         f"Lower parameter drop_bin_threshold to load all bins despite low number of reads in a bin.")
         return ReadToBin.outputs
@@ -370,7 +370,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     logger.info("let's classify reads!")
 
     # Find the model
-    global K, BIN_NB
+    global K, BIN_NB, DROP_BIN_THRESHOLD
     if full_DB:
         path_model = "full"
         K          = 0
@@ -394,6 +394,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
         clusterer, bin_nb, k, w, omitted, _ = re.split('_b|_k|_s|_o|.pkl', basename)
         K      = int(k)
         BIN_NB = int(bin_nb)
+        DROP_BIN_THRESHOLD = drop_bin_threshold if drop_bin_threshold != -1 else 1. / BIN_NB
         path_to_hash = osp.join(path_database, classifier, clf_settings)
         logger.debug(f"path_to_hash: {path_to_hash}")
         logger.debug(f"Found parameters: clusterer={clusterer}, bin number={BIN_NB}, k={K}, w={w}, omitted={omitted}")
@@ -424,7 +425,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
             if not full_DB:
                 ReadToBin.set_fastq_model_and_param(file, path_model, param, force_binning)
                 ReadToBin.bin_reads()
-                ReadToBin.sort_bins_by_sizes_and_drop_smalls(drop_bin_threshold)
+                ReadToBin.sort_bins_by_sizes_and_drop_smalls()
                 t[key]["binning"] = perf_counter()
                 t[key]["reads_nb"] = ReadToBin.NUMBER_BINNED
 
@@ -508,7 +509,7 @@ if __name__ == '__main__':
                                                 default=cpu_count(), type=int, metavar='')
     parser.add_argument('-d', '--drop_bin_threshold', help='Drop fastq bins smaller than x percent of the initial '
                                                            'fastq. Helps to avoid loading hash tables for very few '
-                                                           'reads (default=%(default)f)',
+                                                           'reads (default = 1% / <number of bins>)',
                                                 default=DROP_BIN_THRESHOLD, type=float, metavar='')
     parser.add_argument('-r', '--record',       help='Record the time spent for each run in CSV format (default=%(default)s)',
                                                 default="/home/ubuntu/classify_records.csv", type=str, metavar='')
