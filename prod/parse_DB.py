@@ -60,7 +60,7 @@ import traceback
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 # from Bio.Seq import Seq
-from sklearn.cluster import KMeans, MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans
 # from sklearn.decomposition import PCA
 
 from tqdm import tqdm
@@ -72,8 +72,23 @@ from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
 logger = init_logger('parse_DB')
+K               = None
+W               = None
+N_CLUSTERS      = None
+OMIT            = ("plant", "vertebrate")
+THREADS         = 1
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
+
+FOLDER_GENOME_DB = ""
+# Set all columns name and type for kmer counts
+COLS_DTYPES = {
+    "taxon": int, "category": 'category',
+    "start": int, "end": int,
+    "name": 'category', "description": 'category', "fna_path": 'category',
+}
+for key in kmers_dic(K).keys():
+    COLS_DTYPES[key] = float32
 
 
 class Genome:
@@ -82,17 +97,14 @@ class Genome:
     """
     categories = ["plasmid", "chloroplast", "scaffold", "contig",
                   "chromosome", "complete genome", "whole genome shotgun sequence", ]
-    K = 0
     col_kmers = []
-    col_types = {}
     kmer_count_zeros = {}
 
-    def __init__(self, fna_file, taxon, window_size, k=-1):
+    def __init__(self, fna_file, taxon, window_size):
         logger.log(0, "Created genome object")
         self.path_fna    = fna_file
         self.taxon       = taxon
         self.window_size = window_size
-        self.k           = Genome.K if k < 0 else k
         # records is a dict of SeqRecord
         self.records = {cat: [] for cat in self.categories}
         # self.splits  = {cat: [] for cat in self.categories}
@@ -136,11 +148,11 @@ class Genome:
 
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
-            kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k)
+            kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=K)
             for_csv.append((taxon, cat, start, end, segment.name, segment.description, self.path_fna,
                             *kmer_count.values() ))
         # kmer_keys = list(self.kmer_count_zeros.keys())
-        df = pd.DataFrame(for_csv, columns=main.cols_types)
+        df = pd.DataFrame(for_csv, columns=COLS_DTYPES)
         df.taxon       = df.taxon.astype('category')
         df.category    = df.category.astype('category')
         df.name        = df.name.astype('category')
@@ -151,10 +163,9 @@ class Genome:
         logger.debug(f"saved kmer count to {path_kmers}")
 
     @classmethod
-    def set_k_kmers(cls, k):
-        cls.K = k
-        cls.col_kmers = combinaisons(nucleotides, k)
-        cls.kmer_count_zeros = kmers_dic(k)
+    def set_k_kmers(cls):
+        cls.col_kmers = combinaisons(nucleotides, K)
+        cls.kmer_count_zeros = kmers_dic(K)
 
 
 def create_n_folders(path, n, delete_existing=False):
@@ -174,9 +185,9 @@ def add_file_with_parameters(folder, add_description=""):
     #  signature inside.
     with open(path, 'w') as f:
         f.write(f"script = {__file__} \n"
-                f"From RefSeq located at: {main.folder_database} \n"
-                f"k={main.k}, w={main.w} (segments size), \n"
-                f"folders *containing* these strings have been omitted: " + ", ".join(main.omit_folders) + ". \n"
+                f"From RefSeq located at: {FOLDER_GENOME_DB} \n"
+                f"k={K}, w={W} (segments size), \n"
+                f"folders *containing* these strings have been omitted: " + ", ".join(OMIT) + ". \n"
                 f"{add_description}")
 
 
@@ -233,7 +244,7 @@ def parallel_kmer_counting(fastq, ):
         return
     with open(fastq.path_check) as f:
         taxon = int(f.read())
-    genome = Genome(fastq.path_abs, taxon, window_size=main.w, k=main.k)
+    genome = Genome(fastq.path_abs, taxon, window_size=W, k=K)
     genome.load_genome()
     genome.count_kmers_to_df(fastq.path_target)
 
@@ -247,13 +258,13 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1):
     # scanning folder Class set up:
     ScanFolder.set_folder_scan_options(scanning=scanning, target=folder_kmers,
                                        ext_find=(".fastq", ".fq", ".fna"), ext_check=".taxon",
-                                       ext_create=f".{main.k}mer_count.pd", skip_folders=main.omit_folders)
+                                       ext_create=f".{K}mer_count.pd", skip_folders=OMIT)
 
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
 
     # Count in parallel. islice() to take a part of an iterable
-    Genome.set_k_kmers(main.k)
-    with Pool(main.cores) as pool:
+    Genome.set_k_kmers(K)
+    with Pool(THREADS) as pool:
         results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
                                                                      stop if stop>0 else None)),
                             total=ScanFolder.count_root_files(), dynamic_ncols=True))
@@ -267,12 +278,12 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
     logger.info("loading all kmer frequencies into a single file from " + folder_kmers)
     dfs = []
     added = 0
-    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{main.k}mer_count.pd", ),
-                                       ext_check="", ext_create="", skip_folders=main.omit_folders)
+    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{K}mer_count.pd", ),
+                                       ext_check="", ext_create="", skip_folders=OMIT)
     for file in ScanFolder.tqdm_scan():
         dfs.append(pd.read_pickle(file.path_abs))
         added += 1
-    logger.info(f"{added} {main.k}-mer distributions have been added. now concatenating")
+    logger.info(f"{added} {K}-mer distributions have been added. now concatenating")
     df = pd.concat(dfs, ignore_index=True)
     # Need to set again as categories
     df.taxon       = df.taxon.astype('category')
@@ -289,8 +300,8 @@ def append_genome_kmer_counts(folder_kmers, path_df):
     """ Combine single dataframes into one. Might need high memory """
     logger.info(f"Appending all kmer frequencies from {folder_kmers} into a single file {path_df}")
     added = 0
-    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{main.k}mer_count.pd", ),
-                                       ext_check="", ext_create="", skip_folders=main.omit_folders)
+    ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{K}mer_count.pd", ),
+                                       ext_check="", ext_create="", skip_folders=OMIT)
     # Append all the df. Don't write the index. Write the header only for the first frame
     for file in ScanFolder.tqdm_scan():
         if added == 0:
@@ -298,24 +309,59 @@ def append_genome_kmer_counts(folder_kmers, path_df):
         else:
             pd.read_pickle(file.path_abs).to_csv(path_df, mode='a', index=False, header=False)
         added += 1
-    logger.info(f"Combined file of {added} {main.k}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
+    logger.info(f"Combined file of {added} {K}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
+
+
+def counts_buffer(path_counts, chunk_size=10000, find_ext="mer_count.pd", omit=OMIT):
+    """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them """
+    buffer = []
+    rows_buffer = 0
+    total_rows = 0
+    total_files = 0
+
+    for path in Path(path_counts).rglob(f"*{find_ext}"):
+        str_path = path.as_posix()
+        if omit != [] and any([o in str_path for o in omit]):
+            continue
+
+        # load each (pandas) file
+        df = pd.read_pickle(str_path)
+        total_files += 1
+        rows_new_df = df.shape[0]
+
+        # if the total number of rows reach chunk_size, yield one chunk. Does it until that file has been entirely split
+        while rows_buffer + rows_new_df > chunk_size:
+            split_row = chunk_size - rows_buffer
+            buffer.append(df.iloc[:split_row, :])
+            total_rows += chunk_size
+            yield pd.concat(buffer, ignore_index=True)
+
+            df = df.iloc[split_row:, :]
+            rows_new_df = df.shape[0]
+            buffer = []
+            rows_buffer = 0
+
+        # else append to the buffer
+        buffer.append(df)
+        rows_buffer += rows_new_df
+
+    # last part
+    total_rows += rows_buffer
+    logger.debug(f"Yielded {total_files} files, with a total of {total_rows} rows.")
+    yield pd.concat(buffer, ignore_index=True)
 
 
 @check_step
-def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
+def clustering_segments(folder_kmers, output_pred, path_model, model_name="minikm", batch_size=10000, omit=OMIT):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
 
-    # todo: work in progress
     # Paths
     create_path(output_pred)
     create_path(path_model)
 
     # All variables
-    k = main.k
-    w = main.w
     cols_kmers = Genome.col_kmers
-    batch_size = 1000
     d_types = {
         "taxon": "uint64",
         "category": "category",
@@ -331,75 +377,43 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
         d_types[col] = "float32"
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
-    # ## 1 ## Scaling by length and kmers
-    logger.info(f"Model set, scaling the values to the length of the segments and feeding the data by chunks of "
-                f"{batch_size} as the file is large: {osp.getsize(path_kmer_counts) / 10 ** 9:.2f} GB.")
-
-    # Concatenating and converting .csv into pandas pkl
-    path_pkl_kmer_counts = path_kmer_counts.replace(".csv", ".pd")
-    if osp.isfile(path_pkl_kmer_counts):
-        logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
-                    f"(file size: {osp.getsize(path_pkl_kmer_counts)/10**9:.2f} GB) ...")
-        df = pd.read_pickle(path_pkl_kmer_counts)
-    else:
-        logger.info(f"Clustering the genomes' segments into {n_clusters} bins. Loading combined kmer counts "
-                    f"(file size: {osp.getsize(path_kmer_counts)/10**9:.2f} GB) ...")
-        df = pd.read_csv(path_kmer_counts, dtype=main.cols_types)
-        logger.info(f"save pickle copy for faster loading {path_pkl_kmer_counts}")
-        # Soon DEPRECATED, set my the loading type
-        # (Need to set again as categories)
-        df.category    = df.category.astype('category')
-        df.name        = df.name.astype('category')
-        df.fna_path    = df.fna_path.astype('category')
-        df.description = df.description.astype('category')
-        df.to_pickle(path_pkl_kmer_counts)
-
-    # ## 1 ## Scaling by length and kmers
-    df_mem = df.memory_usage(deep=False).sum()
-    logger.info(f"Kmer counts loaded, scaling the values to the length of the segments. "
-                f"DataFrame size: {df_mem/10**9:.2f} GB - shape: {df.shape}")
-
-    # Training mini K-MEANS
-    ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
-    # ml_model.fit(df[cols_kmers])
-
-    # VERSION 1
-    df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, usecols=cols_kmers)
-    for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
-        # todo: loop x times over the CSV, and take 1/10 of the chunk each time
-        #  would allow the ML algo to learn from a bit everywhere
-        chunk = batch.get_chunk(batch_size)
-        chunk = scale_df_by_length(chunk, cols_kmers, k, w)
-        ml_model.partial_fit(chunk)
-
-    # VERSION 2
-    added = 0
-    cols_pred = cols_spe + ["cluster"]
-    df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, )
-    for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
-        chunk = batch.get_chunk(batch_size)
-        chunk = scale_df_by_length(chunk[cols_kmers], cols_kmers, k, w)
-        predicted = ml_model.predict(chunk[cols_kmers])
-        chunk["cluster"] = predicted
-
-        if added == 0:
-            chunk[cols_pred].to_csv(output_pred, mode='w', index=False, header=True)
-        else:
-            chunk[cols_pred].to_csv(output_pred, mode='a', index=False, header=False)
-        added += 1
+    # ## Reading EACH kmer count file ##
+    logger.info(f"Loading each kmer count file by batches of {batch_size} rows, scaling values by the length of the "
+                f"segments, and train {model_name}. Will take lots of time...")
+    ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
+    for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, )):
+        # ## 1 ## Scaling by length and kmers
+        scaled = scale_df_by_length(partial_df[cols_kmers], cols_kmers, K, W)
+        # Training mini K-MEANS
+        ml_model.partial_fit(scaled)
 
     # Model saving
     with open(path_model, 'wb') as f:
         pickle.dump(ml_model, f)
-    logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}, now predicting bins for each segment...")
+    logger.info(f"{model_name} model saved for k={K} s={W} at {path_model}, now predicting bins for each segment...")
 
-    # ## 3 ##
-    predicted = ml_model.predict(df[cols_kmers])
-    df["cluster"] = predicted
+    # Predictions per batch
+    added = 0
+    cols_pred = cols_spe + ["cluster"]
 
-    df[list(cols_spe) + ["cluster"]].to_pickle(output_pred)
-    logger.info(f"Defined {n_clusters} clusters, assignments here: {output_pred} with ML model {model_name}.")
+    for path in Path(folder_kmers).rglob(f"*mer_count.pd"):
+        str_path = path.as_posix()
+        if omit != [] and any([o in str_path for o in omit]):
+            continue
+        df = pd.read_pickle(str_path)
+        scaled = scale_df_by_length(df[cols_kmers], cols_kmers, K, W)
+        df["cluster"] = ml_model.predict(scaled)
 
+        if added == 0:
+            df[cols_pred].to_csv(output_pred, mode='w', index=False, header=True)
+        else:
+            df[cols_pred].to_csv(output_pred, mode='a', index=False, header=False)
+        added += 1
+
+    logger.info(f"Defined {N_CLUSTERS} clusters, assignments here: {output_pred} with ML model {model_name}.")
+
+    # todo: loop x times over the CSV, and take 1/10 of the chunk each time
+    #  would allow the ML algo to learn from a bit everywhere
     # todo: improvements to randomize the learning a bit more
     # https://www.codementor.io/@guidotournois/4-strategies-to-deal-with-large-datasets-using-pandas-qdw3an95k
     # filename = "data.csv"
@@ -408,10 +422,20 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     # skip = sorted(random.sample(range(1, n + 1), n - s))  # n+1 to compensate for header
     # df = pandas.read_csv(filename, skiprows=skip)
 
+    # VERSION ONE file
+    # df_iterator = pd.read_csv(path_kmer_counts, dtype=d_types, iterator=True, usecols=cols_kmers)
+    # for batch in tqdm(df_iterator, total=append_genome_kmer_counts.total_rows / batch_size):
+    #     chunk = batch.get_chunk(batch_size)
+    #     chunk = scale_df_by_length(chunk, cols_kmers, K, W)
+    #     ml_model.partial_fit(chunk)
+    # # ## 3 ##
+    # predicted = ml_model.predict(df[cols_kmers])
+    # df["cluster"] = predicted
+
     return
 
 
-clustering_segments.models = ("minikm", "kmeans")
+clustering_segments.models = ("minikm", )
 
 
 def pll_copy_segments_to_bin(df):
@@ -426,7 +450,7 @@ def pll_copy_segments_to_bin(df):
                  f"for the genome {osp.split(genome_path)[1]}")
 
     # Load the entire genome
-    genome = Genome(genome_path, taxon, window_size=main.w, k=main.k)
+    genome = Genome(genome_path, taxon, window_size=W, k=K)
     genome.load_genome()
     # todo: probably memory or integer size issue somewhere here
     # First get the real segmentation depending on cluster continuity of the segments
@@ -450,7 +474,7 @@ def pll_copy_segments_to_bin(df):
         for seq in genome.records[category]:
             if seq.name == name:
                 logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
-                              f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
+                              f"from {(end-start)/W} seqs, to bin {cluster_id}, file: {path_bin_segment}")
 
                 segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
                                     seq.features, seq.annotations, seq.letter_annotations)
@@ -466,14 +490,14 @@ pll_copy_segments_to_bin.path_db_bins = ""
 
 
 @check_step
-def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters):
+def split_genomes_to_bins(path_bins_assignments, path_db_bins):
     """ Write .fna files from the clustering into n bins """
     logger.info(f"deleting existing sub-folders to avoid duplicates by append to existing files at: {path_db_bins}")
-    create_n_folders(path_db_bins, clusters, delete_existing=True)
+    create_n_folders(path_db_bins, N_CLUSTERS, delete_existing=True)
 
     # Load bin assignment of each segment
     logger.info(f"loading cluster/bin assignment for each genomes' window "
-                f"({osp.getsize(path_bins_assignments)/10**9:.2f} GB): {path_bins_assignments}")
+                f"({f_size(path_bins_assignments)}): {path_bins_assignments}")
     df = pd.read_pickle(path_bins_assignments)
 
     # Split it per file to allow parallel processing
@@ -482,12 +506,12 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters):
 
     # Copy in parallel
     pll_copy_segments_to_bin.path_db_bins = path_db_bins
-    add_file_with_parameters(path_db_bins, add_description=f"cluster number = {clusters}")
+    add_file_with_parameters(path_db_bins, add_description=f"cluster number = {N_CLUSTERS}")
 
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
-    Genome.set_k_kmers(main.k)
+    Genome.set_k_kmers()
     try:
-        with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
+        with Pool(THREADS) as pool:  # file copy don't need many cores (THREADS)
             results = list(tqdm(pool.imap(pll_copy_segments_to_bin, df_per_fna), total=len(df_per_fna), dynamic_ncols=True))
     except:
         logger.warning(f"Multiprocessing failed, launching single core version")
@@ -514,15 +538,15 @@ def classifier_param_checker(l_param):
 
 
 @check_step
-def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
+def add_library(path_refseq_binned, path_bins_hash, classifier):
     """ launch kraken2-build add-to-library. DELETE EXISTING FOLDER !!
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
     """
-    create_n_folders(path_bins_hash, n_clusters)
-    add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {n_clusters}")
+    create_n_folders(path_bins_hash, N_CLUSTERS)
+    add_file_with_parameters(path_bins_hash, add_description=f"cluster number = {N_CLUSTERS}")
 
-    logger.info(f"{classifier} add_to_library, {n_clusters} clusters, under {path_bins_hash} ")
-    for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
+    logger.info(f"{classifier} add_to_library, {N_CLUSTERS} clusters, under {path_bins_hash} ")
+    for cluster in tqdm(range(N_CLUSTERS), dynamic_ncols=True):
         bin_id = f"{cluster}/"
 
         if "kraken2" in classifier:
@@ -538,7 +562,7 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
                 os.symlink(existing_lib[0], path_new_lib)
             else:
                 cmd = ["find", osp.join(path_refseq_binned, bin_id), "-name", "'*.fna'", "-print0", "|",
-                       "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+                       "xargs", "-P", f"{THREADS}", "-0", "-I{}", "-n1",
                        "kraken2-build", "--add-to-library", "{}", "--db", osp.join(path_bins_hash, bin_id)]
                 bash_process(" ".join(cmd), "Adding genomes to kraken2 library")
 
@@ -558,16 +582,16 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
 
 
 @check_step
-def build_indexes(path_taxonomy, path_classifier, n_clusters, p):
+def build_indexes(path_taxonomy, path_classifier, p):
     """ launch kraken build on each bin
         https://htmlpreview.github.io/?https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.html#custom-databases
         Skip skipping by checking if folder exists: **check_step NO FOLDER CHECK** (DON'T REMOVE)
     """
     assert osp.isdir(path_taxonomy), logger.error(f"Path to taxonomy doesn't seem to be a directory: {path_taxonomy}")
-    add_file_with_parameters(path_classifier, add_description=f"cluster = {n_clusters} \ntaxonomy = {path_taxonomy}")
+    add_file_with_parameters(path_classifier, add_description=f"cluster = {N_CLUSTERS} \ntaxonomy = {path_taxonomy}")
 
-    logger.info(f"{p['name']} build its {n_clusters} indexes, will take lots of time. Under: {path_classifier}")
-    for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
+    logger.info(f"{p['name']} build its {N_CLUSTERS} indexes, will take lots of time. Under: {path_classifier}")
+    for cluster in tqdm(range(N_CLUSTERS), dynamic_ncols=True):
         bin_id = f"{cluster}/"
 
         if "kraken2" in p['name']:
@@ -586,7 +610,7 @@ def build_indexes(path_taxonomy, path_classifier, n_clusters, p):
             os.symlink(path_taxonomy, taxon_in_cluster)
 
             # Build
-            cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_kraken2,
+            cmd = ["kraken2-build", "--build", "--threads", f"{THREADS}", "--db", path_kraken2,
                    "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
             bash_process(cmd, "launching kraken2-build")
 
@@ -602,7 +626,7 @@ def build_indexes(path_taxonomy, path_classifier, n_clusters, p):
                 logger.info(f"index has already been generated, skipping bin {cluster}")
                 continue
 
-            cmd = ["centrifuge-build", "-p", f"{main.cores}",
+            cmd = ["centrifuge-build", "-p", f"{THREADS}",
                    "--conversion-table", p_seqtxid,
                    "--taxonomy-tree", osp.join(path_taxonomy, "nodes.dmp"),
                    "--name-table", osp.join(path_taxonomy, "names.dmp"),
@@ -627,12 +651,12 @@ def kraken2_full_add_lib(path_refseq, path_output):
     for folder in os.scandir(path_refseq):
         if not osp.isdir(folder.path):
             continue
-        if any([to_omit in folder.name for to_omit in main.omit_folders]):
+        if any([to_omit in folder.name for to_omit in OMIT]):
             logger.info(f"skipping {folder.name}")
             continue
         else:
             cmd = ["find", folder.path, "-name", "'*.fna'", "-print0", "|",
-                   "xargs", "-P", f"{main.cores}", "-0", "-I{}", "-n1",
+                   "xargs", "-P", f"{THREADS}", "-0", "-I{}", "-n1",
                    "kraken2-build", "--add-to-library", "{}", "--db", path_output]
             bash_process(" ".join(cmd), "adding genomes for kraken2 libraries")
 
@@ -646,31 +670,31 @@ def kraken2_full_build_hash(taxonomy, path_output, p):
         logger.debug(f"removing existing link at {taxon_link}")
         os.unlink(taxon_link)
     os.symlink(taxonomy, taxon_link)
-    cmd = ["kraken2-build", "--build", "--threads", f"{main.cores}", "--db", path_output,
+    cmd = ["kraken2-build", "--build", "--threads", f"{THREADS}", "--db", path_output,
            "--kmer-len", p['k'], "--minimizer-len", p['l'], "--minimizer-spaces", p['s'], ]
     bash_process(cmd, f"Launching CMD to build KRAKEN2 Hash, will take lots of time and memory: ")
 
 
-def kraken2_clean(path_bins_hash, n_clusters):
+def kraken2_clean(path_bins_hash):
     """ Use of kraken2-build --clean option to remove temporary files.
         No cleaning by default because the library is the same for various values of k, l and s
     """
-    if n_clusters <= 1:
+    if N_CLUSTERS <= 1:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
-        cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", path_bins_hash]
+        cmd = ["kraken2-build", "--clean", "--threads", f"{THREADS}", "--db", path_bins_hash]
         bash_process(cmd, "Launching cleaning with kraken2-build --clean")
 
     else:
         logger.info(f"kraken2-build --clean, for all the hashes under {path_bins_hash}")
-        for cluster in tqdm(range(n_clusters), dynamic_ncols=True):
+        for cluster in tqdm(range(N_CLUSTERS), dynamic_ncols=True):
             bin_id = f"{cluster}/"
-            cmd = ["kraken2-build", "--clean", "--threads", f"{main.cores}", "--db", osp.join(path_bins_hash, bin_id)]
+            cmd = ["kraken2-build", "--clean", "--threads", f"{THREADS}", "--db", osp.join(path_bins_hash, bin_id)]
             bash_process(cmd, "Launching cleaning with kraken2-build --clean")
     logger.info(f"Cleaning done")
 
 
 #   **************************************************    MAIN   **************************************************   #
-def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
+def main(folder_genome_DB, folder_output, n_clusters, k, window, threads=cpu_count(), skip_existing="111110",
          early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", full_DB=False, k2_clean=False,
          ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0]):
@@ -683,27 +707,19 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     try:
+        global K, W, N_CLUSTERS, OMIT, THREADS, FOLDER_GENOME_DB
+        K               = int(k)
+        W               = int(window)
+        N_CLUSTERS      = int(n_clusters)
+        OMIT            = omit_folders
+        THREADS         = threads
+        FOLDER_GENOME_DB = folder_genome_DB
         # Common folder name keeping parameters
-        param_k_s = f"k{k}_s{window}"
-        o_omitted = "" if len(omit_folders) == 0 else "o" + "-".join(omit_folders)
+        param_k_s = f"k{K}_s{W}"
+        o_omitted = "oAllRefSeq" if len(OMIT) == 0 else "o" + "-".join(OMIT)
         folder_intermediate_files = osp.join(folder_output, param_k_s, "kmer_counts")
-        # Parameters
-        # todo: move to global variables ?
-        main.folder_database= folder_database
-        main.omit_folders   = omit_folders
-        main.k              = k
-        main.w              = window
-        main.cores          = cores
-        # Set all columns type
-        cols_types = {
-            "taxon": int, "category": 'category',
-            "start": int, "end": int,
-            "name": 'category', "description": 'category', "fna_path": 'category',
-        }
-        for key in kmers_dic(main.k).keys():
-            cols_types[key] = float32
-        main.cols_types = cols_types
 
+        # Timings
         check_step.timings    = [perf_counter(), ]  # log time spent
         check_step.step_nb    = 0         # For decorator to know which steps has been
         check_step.early_stop = early_stop
@@ -717,42 +733,42 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         if full_DB:
             # Run kraken2 on the full RefSeq, without binning, for reference
             path_full_hash = osp.join(folder_output, "no-binning", o_omitted, param['name'], s_param)
-            kraken2_full_add_lib(folder_database, path_full_hash)
+            kraken2_full_add_lib(folder_genome_DB, path_full_hash)
             kraken2_full_build_hash(path_taxonomy, path_full_hash, param)
             if k2_clean: kraken2_clean(path_full_hash, 1)
 
         else:
             #    KMER COUNTING
             # get kmer distribution for each window of each genome, parallel folder with same structure
-            path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts.k{k}_s{window}")
-            scan_RefSeq_kmer_counts(folder_database, path_individual_kmer_counts)
+            path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts.k{K}_s{W}")
+            scan_RefSeq_kmer_counts(folder_genome_DB, path_individual_kmer_counts)
 
             # combine all kmer distributions into one single file
-            path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"all-counts.k{k}_s{window}_{o_omitted}.csv")
+            path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"all-counts.k{K}_s{W}_{o_omitted}.csv")
             append_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
             #    CLUSTERING
             # From kmer distributions, use clustering to set the bins per segment
-            string_param = f"{ml_model}_b{n_clusters}_k{main.k}_s{main.w}_{o_omitted}"
+            string_param = f"{ml_model}_b{N_CLUSTERS}_k{K}_s{W}_{o_omitted}"
             folder_by_model = osp.join(folder_output, param_k_s, string_param)
             path_model = osp.join(folder_by_model, f"model.{string_param}.pkl")
             path_segments_clustering = osp.join(folder_by_model, f"segments-clustered.{string_param}.pd")
-            clustering_segments(path_stacked_kmer_counts, path_segments_clustering, path_model, n_clusters, ml_model)
+            clustering_segments(folder_intermediate_files, path_segments_clustering, path_model, ml_model)
 
             #    CREATING THE DATABASES
             # create the DB for each bin (copy parts of each .fna genomes into a folder with taxonomy id)
             path_refseq_binned = osp.join(folder_by_model, f"RefSeq_binned")
-            split_genomes_to_bins(path_segments_clustering, path_refseq_binned, n_clusters)
+            split_genomes_to_bins(path_segments_clustering, path_refseq_binned)
 
             # Run kraken2-build add libray
             path_bins_hash = osp.join(folder_by_model, param['name'], s_param)
-            add_library(path_refseq_binned, path_bins_hash, n_clusters, param['name'])
+            add_library(path_refseq_binned, path_bins_hash, param['name'])
 
             # Run kraken2-build make hash tables
-            build_indexes(path_taxonomy, path_bins_hash, n_clusters, param)
+            build_indexes(path_taxonomy, path_bins_hash, param)
 
             # Cleaning
-            if k2_clean and "kraken2" in param['name']: kraken2_clean(path_bins_hash, n_clusters)
+            if k2_clean and "kraken2" in param['name']: kraken2_clean(path_bins_hash)
 
     except KeyboardInterrupt:
         logger.error("User interrupted")
@@ -769,14 +785,6 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             logger.info(f"timing for STEP {i} - {time_to_hms(times[i], times[i+1])}")
         logger.info(f"Script ended, total time of {time_to_hms(times[0], perf_counter())}.")
         print()
-
-
-main.folder_database = ""
-main.omit_folders    = ""
-main.k               = 0
-main.w               = 0
-main.cores           = 0
-main.cols_types      = {}
 
 
 if __name__ == '__main__':
@@ -803,8 +811,8 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--early',    help="Early stop. Index of last step to run. "
                                                  "Use -1 to display all steps and paths (DRY RUN)",
                                             default=len(check_step.can_skip)-1, type=int, metavar='',)
-    parser.add_argument('-o', '--omit',     help='Omit some folder/families containing these names. '
-                                                 'Write names with spaces (defaults=plant vertebrate)',
+    parser.add_argument('-o', '--omit',     help='Omit some folder/families containing these names. Write names with '
+                                                 'spaces (defaults=plant vertebrate), or AllRefSeq for the whole DB.',
                                             default=("plant", "vertebrate"), nargs="+", type=str, metavar='')
     parser.add_argument('-s', '--skip_existing', help="By default, skip already existing files/folders. 1100000 means "
                                                       "that steps 0 and 1 will be skipped if file/folders exist. "
@@ -830,8 +838,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logger.info(f"Script {__file__} called with {args}")
-    main(folder_database=args.path_database, folder_output=args.path_clustered, n_clusters=args.bins,
-         k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
+    main(folder_genome_DB=args.path_database, folder_output=args.path_clustered, n_clusters=args.bins,
+         k=args.kmer, window=args.window, threads=args.threads, skip_existing=args.skip_existing,
          early_stop=args.early, omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy,
          full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean)
 
