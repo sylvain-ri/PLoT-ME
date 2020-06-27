@@ -88,8 +88,6 @@ COLS_DTYPES = {
     "start": int, "end": int,
     "name": 'category', "description": 'category', "fna_path": 'category',
 }
-for key in kmers_dic(K).keys():
-    COLS_DTYPES[key] = float32
 
 
 class Genome:
@@ -264,7 +262,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1):
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
 
     # Count in parallel. islice() to take a part of an iterable
-    Genome.set_k_kmers(K)
+    Genome.set_k_kmers()
     with Pool(THREADS) as pool:
         results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
                                                                      stop if stop>0 else None)),
@@ -313,7 +311,7 @@ def append_genome_kmer_counts(folder_kmers, path_df):
     logger.info(f"Combined file of {added} {K}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
 
 
-def counts_buffer(path_counts, chunk_size=10000, find_ext="mer_count.pd", omit=OMIT):
+def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd", omit=OMIT):
     """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them """
     buffer = []
     rows_buffer = 0
@@ -326,7 +324,10 @@ def counts_buffer(path_counts, chunk_size=10000, find_ext="mer_count.pd", omit=O
             continue
 
         # load each (pandas) file
-        df = pd.read_pickle(str_path)
+        if cols == []:
+            df = pd.read_pickle(str_path)
+        else:
+            df = pd.read_pickle(str_path)[cols]
         total_files += 1
         rows_new_df = df.shape[0]
 
@@ -362,6 +363,7 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
     create_path(path_model)
 
     # All variables
+    Genome.set_k_kmers()
     cols_kmers = Genome.col_kmers
     d_types = {
         "taxon": "uint64",
@@ -382,11 +384,11 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
     logger.info(f"Loading each kmer count file by batches of {batch_size} rows, scaling values by the length of the "
                 f"segments, and train {model_name}. Will take lots of time...")
     ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
-    for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, )):
+    for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, cols=cols_kmers)):
         # ## 1 ## Scaling by length and kmers
-        scaled = scale_df_by_length(partial_df[cols_kmers], cols_kmers, K, W)
+        scale_df_by_length(partial_df, cols_kmers, K, W)
         # Training mini K-MEANS
-        ml_model.partial_fit(scaled)
+        ml_model.partial_fit(partial_df)
 
     # Model saving
     with open(path_model, 'wb') as f:
@@ -402,8 +404,8 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
         if omit != [] and any([o in str_path for o in omit]):
             continue
         df = pd.read_pickle(str_path)
-        scaled = scale_df_by_length(df[cols_kmers], cols_kmers, K, W)
-        df["cluster"] = ml_model.predict(scaled)
+        scale_df_by_length(df, cols_kmers, K, W)
+        df["cluster"] = ml_model.predict(df[cols_kmers])
 
         if added == 0:
             df[cols_pred].to_csv(output_pred, mode='w', index=False, header=True)
@@ -705,13 +707,16 @@ def main(folder_genome_DB, folder_output, n_clusters, k, window, threads=cpu_cou
     print("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     try:
-        global K, W, N_CLUSTERS, OMIT, THREADS, FOLDER_GENOME_DB
+        global K, W, N_CLUSTERS, OMIT, THREADS, FOLDER_GENOME_DB, COLS_DTYPES
         K               = int(k)
         W               = int(window)
         N_CLUSTERS      = int(n_clusters)
         OMIT            = omit_folders
         THREADS         = threads
         FOLDER_GENOME_DB = folder_genome_DB
+        for key in kmers_dic(K).keys():
+            COLS_DTYPES[key] = float32
+
         # Common folder name keeping parameters
         param_k_s = f"k{K}_s{W}"
         o_omitted = "oAllRefSeq" if len(OMIT) == 0 else "o" + "-".join(OMIT)
