@@ -296,7 +296,7 @@ def combine_genome_kmer_counts(folder_kmers, path_df):
 
 @check_step
 def append_genome_kmer_counts(folder_kmers, path_df):
-    """ Combine single dataframes into one. Might need high memory """
+    """ DEPRECATED. Combine single dataframes into one. Might need high memory """
     logger.info(f"Appending all kmer frequencies from {folder_kmers} into a single file {path_df}")
     added = 0
     ScanFolder.set_folder_scan_options(scanning=folder_kmers, target="", ext_find=(f".{K}mer_count.pd", ),
@@ -311,7 +311,7 @@ def append_genome_kmer_counts(folder_kmers, path_df):
     logger.info(f"Combined file of {added} {K}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
 
 
-def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd", omit=OMIT):
+def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd"):
     """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them """
     buffer = []
     rows_buffer = 0
@@ -320,7 +320,7 @@ def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd
 
     for path in Path(path_counts).rglob(f"*{find_ext}"):
         str_path = path.as_posix()
-        if omit != [] and any([o in str_path for o in omit]):
+        if OMIT != [] and any([o in str_path for o in OMIT]):
             continue
 
         # load each (pandas) file
@@ -329,8 +329,11 @@ def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd
             df = pd.read_pickle(str_path)
         else:
             df = pd.read_pickle(str_path)[cols]
-        total_files += 1
         rows_new_df = df.shape[0]
+        if rows_new_df == 0:
+            logger.error(f"this kmer count is empty: {str_path}")
+            continue
+        total_files += 1
 
         # if the total number of rows reach chunk_size, yield one chunk. Does it until that file has been entirely split
         while rows_buffer + rows_new_df > chunk_size:
@@ -355,7 +358,7 @@ def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd
 
 
 @check_step
-def clustering_segments(folder_kmers, output_pred, path_model, model_name="minikm", batch_size=10000, omit=OMIT, k_ext="mer_count.pd"):
+def clustering_segments(folder_kmers, output_pred, path_model, model_name="minikm", batch_size=10000, k_ext="mer_count.pd"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     assert model_name in CLUSTER_MODELS, f"model {model_name} is not implemented"
 
@@ -381,33 +384,44 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
         d_types[col] = "float32"
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
-    # ## Reading EACH kmer count file ##
-    logger.info(f"Loading each kmer count file by batches of {batch_size} rows, scaling values by the length of the "
-                f"segments, and train {model_name}. Will take lots of time...")
-    ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
-    for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext)):
-        # ## 1 ## Scaling by length and kmers
-        scale_df_by_length(partial_df, cols_kmers, K, W)
-        # Training mini K-MEANS
-        ml_model.partial_fit(partial_df)
-        logger.debug("", )
+    if osp.isfile(path_model):
+        logger.warning(f"Found existing model, loading it. To re-train it, delete or rename it: {path_model}")
+        with open(path_model, 'rb') as f:
+            ml_model = pickle.load(f)
+    else:
+        # ## Reading EACH kmer count file ##
+        logger.info(f"Loading each kmer count file by batches of {batch_size} rows, scaling values by the length of the "
+                    f"segments, and train {model_name}. Skipping folders containing {OMIT}. Will take lots of time...")
+        ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
+        for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext)):
+            # ## 1 ## Scaling by length and kmers
+            scale_df_by_length(partial_df, cols_kmers, K, W)
+            # Training mini K-MEANS
+            ml_model.partial_fit(partial_df)
+            logger.debug("", )
 
-    # Model saving
-    with open(path_model, 'wb') as f:
-        pickle.dump(ml_model, f)
-    logger.info(f"{model_name} model saved for k={K} s={W} at {path_model}, now predicting bins for each segment...")
+        # Model saving
+        with open(path_model, 'wb') as f:
+            pickle.dump(ml_model, f)
+        logger.info(f"{model_name} model saved for k={K} s={W} at {path_model}, now predicting bins for each segment...")
 
     # Predictions per batch
     added = 0
     cols_pred = cols_spe + ["cluster"]
 
-    for path in Path(folder_kmers).rglob(f"*{k_ext}"):
+    for path in tqdm(Path(folder_kmers).rglob(f"*{k_ext}")):
         str_path = path.as_posix()
-        if omit != [] and any([o in str_path for o in omit]):
+        if OMIT != [] and any([o in str_path for o in OMIT]):
             continue
         df = pd.read_pickle(str_path)
+        logger.debug(f"loaded {str_path}, shape {df.shape}, predicting segments' cluster")
+        if df.shape[0] == 0:
+            logger.error(f"empty dataframe !! kmer count skipped: {df.shape}, {str_path}")
+            continue
         scale_df_by_length(df, cols_kmers, K, W)
         df["cluster"] = ml_model.predict(df[cols_kmers])
+
+        # todo: compact the segments here, instead of later, in pll_copy_segments_to_bin()
 
         if added == 0:
             df[cols_pred].to_csv(output_pred, mode='w', index=False, header=True)
@@ -452,7 +466,7 @@ def pll_copy_segments_to_bin(df):
                  f"for the genome {osp.split(genome_path)[1]}")
 
     # Load the entire genome
-    genome = Genome(genome_path, taxon, window_size=W, k=K)
+    genome = Genome(genome_path, taxon, window_size=W)
     genome.load_genome()
     # todo: probably memory or integer size issue somewhere here
     # First get the real segmentation depending on cluster continuity of the segments
@@ -697,8 +711,7 @@ def kraken2_clean(path_bins_hash):
 
 #   **************************************************    MAIN   **************************************************   #
 def main(folder_genome_DB, folder_output, n_clusters, k, window, threads=cpu_count(), skip_existing="111110",
-         early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
-         path_taxonomy="", full_DB=False, k2_clean=False,
+         early_stop=len(check_step.can_skip)-1, omit_folders=OMIT, path_taxonomy="", full_DB=False, k2_clean=False,
          ml_model=CLUSTER_MODELS[0], classifier_param=CLASSIFIERS[0]):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
@@ -753,7 +766,7 @@ def main(folder_genome_DB, folder_output, n_clusters, k, window, threads=cpu_cou
             string_param = f"{ml_model}_b{N_CLUSTERS}_k{K}_s{W}_{o_omitted}"
             folder_by_model = osp.join(folder_output, param_k_s, string_param)
             path_model = osp.join(folder_by_model, f"model.{string_param}.pkl")
-            path_segments_clustering = osp.join(folder_by_model, f"segments-clustered.{string_param}.pd")
+            path_segments_clustering = osp.join(folder_by_model, f"segments-clustered.{string_param}.csv")
             clustering_segments(folder_intermediate_files, path_segments_clustering, path_model, ml_model)
 
             #    CREATING THE DATABASES
