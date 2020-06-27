@@ -116,11 +116,17 @@ class Genome:
             Split them into various categories (plasmids, genomes, ...)
         """
         logger.debug(f"loading genome {f_size(self.path_fna)} {self.path_fna}")
+        first_line = ""
         for record in SeqIO.parse(self.path_fna, "fasta"):
+            if first_line == "":
+                first_line = record.description
             for cat in self.categories:
-                if cat in record.description:
+                if cat in record.description.lower():
                     self.records[cat].append(record)
                     break
+        else:
+            logger.warning(f"no complete genome has been found in (printing first line of the file) "
+                           f"{first_line} for file: {self.path_fna}")
 
     def yield_genome_split(self):
         """ Split a genome/plasmid into multiple segments, to count the k-mer
@@ -152,6 +158,8 @@ class Genome:
                             *kmer_count.values() ))
         # kmer_keys = list(self.kmer_count_zeros.keys())
         df = pd.DataFrame(for_csv, columns=COLS_DTYPES)
+        if df.shape[0] == 0:
+            logger.error(f"kmer counting went wrong, no counts. DataFrame: {df}. File: {self.path_fna}")
         df.taxon       = df.taxon.astype('category')
         df.category    = df.category.astype('category')
         df.name        = df.name.astype('category')
@@ -241,9 +249,10 @@ def parallel_kmer_counting(fastq, ):
     if osp.isfile(fastq.path_target):
         logger.debug(f"File already existing, skipping ({fastq.path_target})")
         return
+    logger.debug(f"Counting kmers in: {fastq.path_target}, {f_size(fastq.path_target)}")
     with open(fastq.path_check) as f:
         taxon = int(f.read())
-    genome = Genome(fastq.path_abs, taxon, window_size=W, k=K)
+    genome = Genome(fastq.path_abs, taxon, window_size=W)
     genome.load_genome()
     genome.count_kmers_to_df(fastq.path_target)
 
