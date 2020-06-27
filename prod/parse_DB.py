@@ -324,6 +324,7 @@ def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd
             continue
 
         # load each (pandas) file
+        logger.debug(f"loading kmer count before yielding chunk of {chunk_size}, {str_path}")
         if cols == []:
             df = pd.read_pickle(str_path)
         else:
@@ -354,7 +355,7 @@ def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd
 
 
 @check_step
-def clustering_segments(folder_kmers, output_pred, path_model, model_name="minikm", batch_size=10000, omit=OMIT):
+def clustering_segments(folder_kmers, output_pred, path_model, model_name="minikm", batch_size=10000, omit=OMIT, k_ext="mer_count.pd"):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     assert model_name in CLUSTER_MODELS, f"model {model_name} is not implemented"
 
@@ -384,11 +385,12 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
     logger.info(f"Loading each kmer count file by batches of {batch_size} rows, scaling values by the length of the "
                 f"segments, and train {model_name}. Will take lots of time...")
     ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
-    for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, cols=cols_kmers)):
+    for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext)):
         # ## 1 ## Scaling by length and kmers
         scale_df_by_length(partial_df, cols_kmers, K, W)
         # Training mini K-MEANS
         ml_model.partial_fit(partial_df)
+        logger.debug("", )
 
     # Model saving
     with open(path_model, 'wb') as f:
@@ -399,7 +401,7 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
     added = 0
     cols_pred = cols_spe + ["cluster"]
 
-    for path in Path(folder_kmers).rglob(f"*mer_count.pd"):
+    for path in Path(folder_kmers).rglob(f"*{k_ext}"):
         str_path = path.as_posix()
         if omit != [] and any([o in str_path for o in omit]):
             continue

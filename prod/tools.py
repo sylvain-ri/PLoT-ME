@@ -233,7 +233,7 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
         return data * ratio
     else:
         logger.debug(f"Scaling the dataframe {data.shape}")
-        logger.debug(5, f"{data.head(3)}")
+        logger.log(5, f"{data.head(3)}")
 
         pll_scaling.ratio = ratio
 
