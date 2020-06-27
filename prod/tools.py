@@ -223,21 +223,22 @@ def pll_scaling(serie):
 pll_scaling.ratio = 0
 
 
-def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count()):
+def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
     divider = w - k + 1
     ratio = 4**k / divider if divider > 1 else 4**k  # avoid divide by 0
     ratio = np.float32(ratio)
+    logger.debug(f"scaling ratio is {ratio}, from w={w} and k={k}")
     if single_row:
         return data * ratio
     else:
-        logger.info(f"Scaling the dataframe {data.shape}, converting to float32")
-        logger.debug(f"{data}")
+        logger.debug(f"Scaling the dataframe {data.shape}")
+        logger.debug(5, f"{data.head(3)}")
 
         pll_scaling.ratio = ratio
 
         # Mono thread version (extremely slow for some reasons)
-        for col in tqdm(kmer_cols):
+        for col in kmer_cols:
             data[col] *= ratio
 
         # with Pool(cores) as pool:
@@ -248,8 +249,6 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count(
         # for i, col in tqdm(enumerate(kmer_cols), total=len(kmer_cols), desc="Assigning results back to DataFrame"):
         #     data.assign[col] = results[i]
         #     data[col] = results[i]
-
-        logger.debug(f"{data}")
         # data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
 
 
