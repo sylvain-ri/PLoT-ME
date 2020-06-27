@@ -95,7 +95,7 @@ class Genome:
         SET K BEFORE ANY INSTANCE IS CREATED, with set_k_kmers()
     """
     categories = ["plasmid", "chloroplast", "scaffold", "contig",
-                  "chromosome", "complete genome", "whole genome shotgun sequence", ]
+                  "chromosome", "complete genome", "whole genome shotgun sequence", "genome"]
     col_kmers = []
     kmer_count_zeros = {}
 
@@ -320,7 +320,7 @@ def append_genome_kmer_counts(folder_kmers, path_df):
     logger.info(f"Combined file of {added} {K}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
 
 
-def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd"):
+def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd", assemblies=("genome", )):
     """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them """
     buffer = []
     rows_buffer = 0
@@ -334,11 +334,13 @@ def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd
 
         # load each (pandas) file
         logger.debug(f"loading kmer count before yielding chunk of {chunk_size}, {str_path}")
+        df = pd.read_pickle(str_path)
         if cols == []:
-            df = pd.read_pickle(str_path)
-        else:
-            df = pd.read_pickle(str_path)[cols]
+            df = df.loc[:, cols]
+        # Only take complete genomes.
+        df = df.loc[df.category.str.contains("|".join(assemblies), case=False, regex=True)]
         rows_new_df = df.shape[0]
+
         if rows_new_df == 0:
             logger.error(f"this kmer count is empty: {str_path}")
             continue
