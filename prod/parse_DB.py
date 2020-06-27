@@ -79,6 +79,7 @@ OMIT            = ("plant", "vertebrate")
 THREADS         = 1
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
+CLUSTER_MODELS  = ("minikm",)
 
 FOLDER_GENOME_DB = ""
 # Set all columns name and type for kmer counts
@@ -354,7 +355,7 @@ def counts_buffer(path_counts, chunk_size=10000, find_ext="mer_count.pd", omit=O
 @check_step
 def clustering_segments(folder_kmers, output_pred, path_model, model_name="minikm", batch_size=10000, omit=OMIT):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
-    assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
+    assert model_name in CLUSTER_MODELS, f"model {model_name} is not implemented"
 
     # Paths
     create_path(output_pred)
@@ -433,9 +434,6 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
     # df["cluster"] = predicted
 
     return
-
-
-clustering_segments.models = ("minikm", )
 
 
 def pll_copy_segments_to_bin(df):
@@ -697,7 +695,7 @@ def kraken2_clean(path_bins_hash):
 def main(folder_genome_DB, folder_output, n_clusters, k, window, threads=cpu_count(), skip_existing="111110",
          early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", full_DB=False, k2_clean=False,
-         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0]):
+         ml_model=CLUSTER_MODELS[0], classifier_param=CLASSIFIERS[0]):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -742,10 +740,6 @@ def main(folder_genome_DB, folder_output, n_clusters, k, window, threads=cpu_cou
             # get kmer distribution for each window of each genome, parallel folder with same structure
             path_individual_kmer_counts = osp.join(folder_intermediate_files, f"counts.k{K}_s{W}")
             scan_RefSeq_kmer_counts(folder_genome_DB, path_individual_kmer_counts)
-
-            # combine all kmer distributions into one single file
-            path_stacked_kmer_counts = osp.join(folder_intermediate_files, f"all-counts.k{K}_s{W}_{o_omitted}.csv")
-            append_genome_kmer_counts(path_individual_kmer_counts, path_stacked_kmer_counts)
 
             #    CLUSTERING
             # From kmer distributions, use clustering to set the bins per segment
@@ -833,8 +827,8 @@ if __name__ == '__main__':
                                                    "step 3, and build their index based on 'RefSeq_binned'",
                                             default=CLASSIFIERS[0], type=str, nargs="+", metavar='')
     # parser.add_argument('-m', '--ml_model', help='name of the model to use for clustering',
-    #                                         choices=clustering_segments.models, type=str, metavar='',
-    #                                         default=clustering_segments.models[0])
+    #                                         choices=CLUSTER_MODELS, type=str, metavar='',
+    #                                         default=CLUSTER_MODELS[0])
     args = parser.parse_args()
 
     logger.info(f"Script {__file__} called with {args}")
