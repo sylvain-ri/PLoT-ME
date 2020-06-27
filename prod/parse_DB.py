@@ -249,7 +249,7 @@ def parallel_kmer_counting(fastq, ):
     if osp.isfile(fastq.path_target):
         logger.debug(f"File already existing, skipping ({fastq.path_target})")
         return
-    logger.debug(f"Counting kmers in: {fastq.path_target}, {f_size(fastq.path_target)}")
+    logger.debug(f"Counting kmers in: {fastq.path_abs}, {f_size(fastq.path_abs)}")
     with open(fastq.path_check) as f:
         taxon = int(f.read())
     genome = Genome(fastq.path_abs, taxon, window_size=W)
