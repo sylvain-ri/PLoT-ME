@@ -209,7 +209,7 @@ class ReadToBin(SeqRecord.SeqRecord):
                 dropped_size += size
                 cls.logger.debug(f"Reads in bin {bin_nb} has a size of {f_size(size)}, and will be dropped "
                                  f"(less than {DROP_BIN_THRESHOLD}% of all binned reads {f_size(full_fastq_size)})")
-        cls.logger.info(f"Dropped bins {dropped_bins}, with total file size of {f_size(dropped_size)}. "
+        cls.logger.warning(f"Dropped bins {dropped_bins}, with total file size of {f_size(dropped_size)}. "
                         f"Lower parameter drop_bin_threshold to load all bins despite low number of reads in a bin.")
         return ReadToBin.outputs
 
@@ -441,7 +441,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
 
         except Exception as e:
             logger.exception(e)
-            logger.warning(f"script crashed for file: {file}")
+            logger.error(f"script crashed for file: {file}")
 
     records = []
     for key in t.keys():
