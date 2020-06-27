@@ -428,7 +428,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
             t[key] = {}
             t[key]["start"] = perf_counter()
 
-            logger.info(f"Opening fastq file ({i+1}/{len(list_fastq)}) {f_size(file)}, {base_name}")
+            logger.info(f" *** Opening fastq file {i+1}/{len(list_fastq)} *** {f_size(file)} : {base_name}")
             # Binning
             if not full_DB:
                 ReadToBin.set_fastq_model_and_param(file, path_model, param, force_binning)
