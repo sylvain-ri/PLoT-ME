@@ -124,7 +124,7 @@ def f_size(path_or_size):
         assert osp.isfile(path_or_size), FileNotFoundError(f"checking for file size, but file not found: {path_or_size}")
         size = osp.getsize(path_or_size)
     elif isinstance(path_or_size, (int, float)):
-        assert path_or_size > 0, ValueError(f"this function doesn't work with non positive value: {path_or_size}. supposed to be a file size")
+        assert path_or_size >= 0, ValueError(f"this function doesn't work with non positive value: {path_or_size}. supposed to be a file size")
         size = path_or_size
     else:
         raise NotImplementedError(f"Received neither a path (string) nor a number: {path_or_size}, can't return a file size")
@@ -132,6 +132,8 @@ def f_size(path_or_size):
     for threshold in f_size.splits.keys():
         if size > threshold:
             return f"{size/threshold:.2f} {f_size.splits[threshold]}"
+        elif size == 0:
+            return "0 B"
     raise
 
 
