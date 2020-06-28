@@ -214,7 +214,7 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
         super().add_argument(*args, **kwargs)
 
 
-def scale_df_by_length(df, kmer_cols, k, w, single_row=False, ):
+def scale_df_by_length(df, kmer_cols, k, w, single_row=False, drop_row_threshold=0.):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
     if single_row:
         divider = w - k + 1
@@ -232,17 +232,19 @@ def scale_df_by_length(df, kmer_cols, k, w, single_row=False, ):
         logger.debug(f"scaling ratio is {ratio.iloc[0]}, from w={w} and k={k}")
         # Remove rows where more than 10% of the counts are missing
         norm_ratio = 4**k / (w-k+1)
-        df = df[ratio < norm_ratio / 0.8]
+        # drop rows that have less counts than x % of the expected counts (= window -k +1)
+        if drop_row_threshold > 0:
+            df = df[ratio * drop_row_threshold < norm_ratio]
 
         # Scale by column
+        # todo: using .loc, became very slow :/
         for col in kmer_cols:
-            df[col] *= ratio
+            df.loc[:, col] *= ratio
 
         if df[kmer_cols].isnull().any(axis=1).any():
             df.dropna(axis='index', inplace=True)
-            # data[kmer_cols].interpolate(axis='columns', inplace=True)
-            # data[kmer_cols].fillna(method="ffill", axis='columns', inplace=True)
-            # data[kmer_cols].fillna(method="bfill", axis='columns', inplace=True)
+
+        return df
 
 
 class ScanFolder:
