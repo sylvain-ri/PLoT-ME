@@ -214,30 +214,35 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
         super().add_argument(*args, **kwargs)
 
 
-def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
+def scale_df_by_length(df, kmer_cols, k, w, single_row=False, ):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
     if single_row:
         divider = w - k + 1
         ratio = 4**k / divider if divider > 1 else 4**k  # avoid divide by 0
         ratio = np.float32(ratio)
-        return data * ratio
+        return df * ratio
 
     # For dataframes, summing the total counts actually gives the length of the sequences (last window is never a full 10k segment)
     else:
-        logger.debug(f"Scaling the dataframe {data.shape}")
-        logger.log(5, f"{data.head(3)}")
+        logger.debug(f"Scaling the dataframe {df.shape}")
+        logger.log(5, f"{df.head(3)}")
 
         # Vertical vector of ratios
-        ratio = 4**k / data[kmer_cols].sum(axis=1)
+        ratio = 4 ** k / df[kmer_cols].sum(axis=1)
         logger.debug(f"scaling ratio is {ratio.iloc[0]}, from w={w} and k={k}")
+        # Remove rows where more than 10% of the counts are missing
+        norm_ratio = 4**k / (w-k+1)
+        df = df[ratio < norm_ratio / 0.8]
 
         # Scale by column
         for col in kmer_cols:
-            data[col] *= ratio
+            df[col] *= ratio
 
-        if data[kmer_cols].isnull().any(axis=1).any():
-            data[kmer_cols].interpolate(axis='columns', inplace=True)
-            data[kmer_cols].fillna(method="ffill", inplace=True).fillna(method="bfill", inplace=True)
+        if df[kmer_cols].isnull().any(axis=1).any():
+            df.dropna(axis='index', inplace=True)
+            # data[kmer_cols].interpolate(axis='columns', inplace=True)
+            # data[kmer_cols].fillna(method="ffill", axis='columns', inplace=True)
+            # data[kmer_cols].fillna(method="bfill", axis='columns', inplace=True)
 
 
 class ScanFolder:
