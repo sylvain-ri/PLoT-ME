@@ -88,6 +88,7 @@ COLS_DTYPES = {
     "start": int, "end": int,
     "name": 'category', "description": 'category', "fna_path": 'category',
 }
+MIN_KMER_COUNTS_PER_W_THRESHOLD = 0.8
 
 
 class Genome:
@@ -376,7 +377,7 @@ def yield_filtered_df(path_counts, chunk_size=10000, cols=[], find_ext="mer_coun
             logger.debug(f"loading kmer count: {str_path}")
             df = pd.read_pickle(str_path)
             # Just take all. Could filter on assemblies later on.
-            df = df.loc[df["category"].str.contains("|".join(assemblies), case=False, regex=True)]
+            # df = df.loc[df["category"].str.contains("|".join(assemblies), case=False, regex=True)]
             if cols != []:
                 df = df.loc[:, cols]
             # Only take complete genomes.
@@ -445,7 +446,7 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
         ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
         for partial_df in tqdm(yield_filtered_df(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext), total=total):
             # ## 1 ## Scaling by length and kmers
-            scale_df_by_length(partial_df, cols_kmers, K, W)
+            scale_df_by_length(partial_df, cols_kmers, K, W, drop_row_threshold=MIN_KMER_COUNTS_PER_W_THRESHOLD)
             # Training mini K-MEANS
             ml_model.partial_fit(partial_df)
             logger.debug("", )
