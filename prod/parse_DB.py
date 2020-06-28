@@ -350,19 +350,21 @@ def append_genome_kmer_counts(folder_kmers, path_df):
 
 
 def yield_filtered_df(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd",
-                      assemblies=("genome", "complete sequence")):
+                      assemblies=Genome.categories, yield_one=True):
     """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them
         Only select complete genomes (param 'assemblies')
         Use chunk_size=-1 to yield each DataFrame with the same settings
+        If yield_df=False, yields 1. Useful to count UPPER BOUND matching files.
     """
     buffer = []
     rows_buffer = 0
     total_rows = 0
     total_files = 0
-    if chunk_size > 0:
-        logger.info(f"yielding chunk of {chunk_size} from all genomes fna, omitting {OMIT}")
-    else:
-        logger.info(f"yielding dataframes after filtering with {OMIT} and {cols}")
+    if not yield_one:
+        if chunk_size > 0:
+            logger.info(f"yielding chunk of {chunk_size} from all genomes fna, omitting {OMIT}")
+        else:
+            logger.info(f"yielding dataframes after filtering with {OMIT} and {cols}")
 
     for path in Path(path_counts).rglob(f"*{find_ext}"):
         str_path = path.as_posix()
@@ -370,20 +372,24 @@ def yield_filtered_df(path_counts, chunk_size=10000, cols=[], find_ext="mer_coun
             continue
 
         # load each (pandas) file
-        logger.debug(f"loading kmer count: {str_path}")
-        df = pd.read_pickle(str_path)
-        if cols != []:
-            df = df.loc[:, cols]
-        # Only take complete genomes.
-        df = df.loc[df.category.str.contains("|".join(assemblies), case=False, regex=True)]
-        rows_new_df = df.shape[0]
+        if not yield_one:
+            logger.debug(f"loading kmer count: {str_path}")
+            df = pd.read_pickle(str_path)
+            # Just take all. Could filter on assemblies later on.
+            df = df.loc[df["category"].str.contains("|".join(assemblies), case=False, regex=True)]
+            if cols != []:
+                df = df.loc[:, cols]
+            # Only take complete genomes.
+            rows_new_df = df.shape[0]
 
-        if rows_new_df == 0:
-            logger.warning(f"after filters, this kmer count is empty: {str_path}")
-            continue
+            if rows_new_df == 0:
+                logger.warning(f"after filters, this kmer count is empty: {str_path}")
+                continue
 
         total_files += 1
-        if chunk_size < 0:
+        if yield_one:
+            yield 1
+        elif chunk_size < 0:
             yield df
         else:
             # if the total number of rows reach chunk_size, yield one chunk. Does it until that file has been entirely split
@@ -426,6 +432,8 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
     cols_kmers = Genome.col_kmers
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
+    total = sum(yield_filtered_df(folder_kmers, yield_one=True))
+
     if osp.isfile(path_model):
         logger.warning(f"Found existing model, loading it. To re-train it, delete or rename it: {path_model}")
         with open(path_model, 'rb') as f:
@@ -435,7 +443,7 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
         logger.info(f"Loading each kmer count file by batches of {batch_size} rows, scaling values by the length of the "
                     f"segments, and train {model_name}. Skipping folders containing {OMIT}. Will take lots of time...")
         ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
-        for partial_df in tqdm(yield_filtered_df(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext)):
+        for partial_df in tqdm(yield_filtered_df(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext), total=total):
             # ## 1 ## Scaling by length and kmers
             scale_df_by_length(partial_df, cols_kmers, K, W)
             # Training mini K-MEANS
@@ -448,9 +456,9 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
         logger.info(f"{model_name} model saved for k={K} s={W} at {path_model}, now predicting bins for each segment...")
 
     # Predictions per batch
-    cols_pred = cols_spe + ["cluster"]
+    cols_pred = Genome.cols_spe + ["cluster"]
     added = 0
-    for df in tqdm(yield_filtered_df(folder_kmers, chunk_size=-1, cols=[], find_ext=k_ext)):
+    for df in tqdm(yield_filtered_df(folder_kmers, chunk_size=-1, cols=[], find_ext=k_ext), total=total):
         scale_df_by_length(df, cols_kmers, K, W)
         df["cluster"] = ml_model.predict(df[cols_kmers])
 
