@@ -350,7 +350,7 @@ def append_genome_kmer_counts(folder_kmers, path_df):
 
 
 def yield_filtered_df(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd",
-                      assemblies=Genome.categories, yield_one=True):
+                      assemblies=Genome.categories, yield_one=False):
     """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them
         Only select complete genomes (param 'assemblies')
         Use chunk_size=-1 to yield each DataFrame with the same settings
@@ -409,13 +409,13 @@ def yield_filtered_df(path_counts, chunk_size=10000, cols=[], find_ext="mer_coun
             rows_buffer += rows_new_df
 
     # last part
-    if chunk_size > 0:
-        total_rows += rows_buffer
-        logger.debug(f"Yielded {total_files} files, with a total of {total_rows} rows.")
-        yield pd.concat(buffer, ignore_index=True)
-    else:
-        logger.debug(f"Yielded {total_files} files.")
-
+    if not yield_one:
+        if chunk_size > 0:
+            total_rows += rows_buffer
+            logger.debug(f"Yielded {total_files} files, with a total of {total_rows} rows.")
+            yield pd.concat(buffer, ignore_index=True)
+        else:
+            logger.debug(f"Yielded {total_files} files.")
 
 
 @check_step
