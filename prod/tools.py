@@ -229,7 +229,7 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
 
         # Vertical vector of ratios
         ratio = 4**k / data[kmer_cols].sum(axis=1)
-        logger.debug(f"scaling ratio is {ratio.iloc[0,0]}, from w={w} and k={k}")
+        logger.debug(f"scaling ratio is {ratio.iloc[0]}, from w={w} and k={k}")
 
         # Scale by column
         for col in kmer_cols:
