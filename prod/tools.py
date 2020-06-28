@@ -214,42 +214,26 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
         super().add_argument(*args, **kwargs)
 
 
-def pll_scaling(serie):
-    serie = pd.to_numeric(serie, downcast='float')
-    serie *= pll_scaling.ratio
-    return serie
-
-
-pll_scaling.ratio = 0
-
-
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
-    divider = w - k + 1
-    ratio = 4**k / divider if divider > 1 else 4**k  # avoid divide by 0
-    ratio = np.float32(ratio)
-    logger.debug(f"scaling ratio is {ratio}, from w={w} and k={k}")
     if single_row:
+        divider = w - k + 1
+        ratio = 4**k / divider if divider > 1 else 4**k  # avoid divide by 0
+        ratio = np.float32(ratio)
         return data * ratio
+
+    # For dataframes, summing the total counts actually gives the length of the sequences (last window is never a full 10k segment)
     else:
         logger.debug(f"Scaling the dataframe {data.shape}")
         logger.log(5, f"{data.head(3)}")
 
-        pll_scaling.ratio = ratio
+        # Vertical vector of ratios
+        ratio = 4**k / data[kmer_cols].sum(axis=1)
+        logger.debug(f"scaling ratio is {ratio}, from w={w} and k={k}")
 
-        # Mono thread version (extremely slow for some reasons)
+        # Scale by column
         for col in kmer_cols:
             data[col] *= ratio
-
-        # with Pool(cores) as pool:
-        #     results = list(tqdm(pool.imap(pll_scaling, (data.loc[:, col] for col in kmer_cols)),
-        #                         total=len(kmer_cols), desc="scaling each Series"))
-        # # much faster, but let's see if there an even faster assignment
-        # # todo: build a new DataFrame from scratch ?
-        # for i, col in tqdm(enumerate(kmer_cols), total=len(kmer_cols), desc="Assigning results back to DataFrame"):
-        #     data.assign[col] = results[i]
-        #     data[col] = results[i]
-        # data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
 
 
 class ScanFolder:
