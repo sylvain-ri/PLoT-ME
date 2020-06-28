@@ -94,19 +94,32 @@ class Genome:
     """ Genome from RefSeq. Methods to split it into plasmid/genome and into segments
         SET K BEFORE ANY INSTANCE IS CREATED, with set_k_kmers()
     """
-    categories = ["plasmid", "chloroplast", "scaffold", "contig",
-                  "chromosome", "complete genome", "whole genome shotgun sequence", "genome"]
+    categories = ["plasmid", "chloroplast", "scaffold", "contig", "chromosome",
+                  "complete genome", "whole genome shotgun sequence", "complete sequence", "genome"]
     col_kmers = []
+    d_types = {
+        "taxon"       : "uint64",
+        "category"    : "category",
+        "start"       : "uint64",
+        "end"         : "uint64",
+        "name"        : "category",
+        "description" : "str",
+        "fna_path"    : "category",
+    }
+    # Don't read all columns
+    cols_spe = list(d_types.keys())
     kmer_count_zeros = {}
 
     def __init__(self, fna_file, taxon, window_size):
         logger.log(0, "Created genome object")
-        self.path_fna    = fna_file
-        self.taxon       = taxon
-        self.window_size = window_size
+        self.path_fna = fna_file
+        self.taxon    = taxon
+        self.w        = window_size
         # records is a dict of SeqRecord
-        self.records = {cat: [] for cat in self.categories}
+        self.records  = {cat: [] for cat in self.categories}
         # self.splits  = {cat: [] for cat in self.categories}
+        self.seq_added= 0
+        self.descriptions = []
 
     def __repr__(self):
         return f"Genome object from {osp.split(self.path_fna)[1]}"
@@ -116,17 +129,17 @@ class Genome:
             Split them into various categories (plasmids, genomes, ...)
         """
         logger.debug(f"loading genome {f_size(self.path_fna)} {self.path_fna}")
-        first_line = ""
+        self.seq_added = 0
         for record in SeqIO.parse(self.path_fna, "fasta"):
-            if first_line == "":
-                first_line = record.description
+            self.descriptions.append(record.description)
             for cat in self.categories:
                 if cat in record.description.lower():
                     self.records[cat].append(record)
+                    self.seq_added += 1
                     break
-        else:
-            logger.warning(f"no complete genome has been found in (printing first line of the file) "
-                           f"{first_line} for file: {self.path_fna}")
+        if self.seq_added == 0:
+            logger.info(f"skipping file as no complete genome has been found in the descriptions: "
+                           f">>{self.descriptions}<< for file: {self.path_fna}")
 
     def yield_genome_split(self):
         """ Split a genome/plasmid into multiple segments, to count the k-mer
@@ -134,11 +147,15 @@ class Genome:
         """
         for cat in self.categories:
             for record in self.records[cat]:
-
                 full_seq = record.seq
                 len_genome = len(full_seq)
-                for start in range(0, len_genome - self.window_size, self.window_size):
-                    end = min(start + self.window_size, len_genome - 1)
+                # Loop conditions are tricky to fit the entire genome when smaller than the window, and when the last window can't fit
+                start = 0
+                end   = self.w
+                while True:
+                    # In case the entire genome in smaller than 1 window, or smaller than 2 windows
+                    if end + self.w > len_genome:
+                        end = len_genome
                     # Include the taxonomy id, start and end of the segment into the description
                     description = f"|kraken:taxid|{self.taxon}|s:{start}-e:{end-1}|{record.description}"
                     segment = SeqRecord(full_seq[start:end],
@@ -146,10 +163,21 @@ class Genome:
                                         record.features, record.annotations, record.letter_annotations)
                     yield (segment, self.taxon, cat, start, end)
 
+                    # Loop increments and conditions
+                    start += self.w
+                    end   += self.w
+                    if end > len_genome:
+                        break
+                    elif end + self.w > len_genome:
+                        end = len_genome
+
     def count_kmers_to_df(self, path_kmers):
         """ Take all splits, count the kmer distribution and save to the kmer folder as pandas DataFrame """
         # todo: consider combining forward and backward kmers as well as complements.
         #  Single counter for AAAT, TAAA, TTTA and ATTT
+        if self.seq_added == 0:
+            logger.debug(f"No sequence has been marked as 'complete' or genomic in this fna file")
+            return
 
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
@@ -159,13 +187,12 @@ class Genome:
         # kmer_keys = list(self.kmer_count_zeros.keys())
         df = pd.DataFrame(for_csv, columns=COLS_DTYPES)
         if df.shape[0] == 0:
-            logger.error(f"kmer counting went wrong, no counts. DataFrame: {df}. File: {self.path_fna}")
-        df.taxon       = df.taxon.astype('category')
-        df.category    = df.category.astype('category')
-        df.name        = df.name.astype('category')
-        df.fna_path    = df.fna_path.astype('category')
-        for col in self.col_kmers:
-            df[col] = df[col].astype("uint16")
+            logger.error(f"kmer counting went wrong, no counts. File: {self.path_fna}")
+            return
+
+        for col, dtype in self.d_types.items():
+            df[col] = df[col].astype(dtype)
+
         df.to_pickle(path_kmers)
         logger.debug(f"saved kmer count to {path_kmers}")
 
@@ -173,6 +200,8 @@ class Genome:
     def set_k_kmers(cls):
         cls.col_kmers = combinaisons(nucleotides, K)
         cls.kmer_count_zeros = kmers_dic(K)
+        for col in cls.col_kmers:
+            cls.d_types[col] = "uint16"
 
 
 def create_n_folders(path, n, delete_existing=False):
@@ -320,12 +349,20 @@ def append_genome_kmer_counts(folder_kmers, path_df):
     logger.info(f"Combined file of {added} {K}-mer counts ({osp.getsize(path_df)/10**9:.2f} GB) save at {path_df}")
 
 
-def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd", assemblies=("genome", )):
-    """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them """
+def yield_filtered_df(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd",
+                      assemblies=("genome", "complete sequence")):
+    """ Load pandas files in a directory, concatenate them into chunks of <chunk size>, yield them
+        Only select complete genomes (param 'assemblies')
+        Use chunk_size=-1 to yield each DataFrame with the same settings
+    """
     buffer = []
     rows_buffer = 0
     total_rows = 0
     total_files = 0
+    if chunk_size > 0:
+        logger.info(f"yielding chunk of {chunk_size} from all genomes fna, omitting {OMIT}")
+    else:
+        logger.info(f"yielding dataframes after filtering with {OMIT} and {cols}")
 
     for path in Path(path_counts).rglob(f"*{find_ext}"):
         str_path = path.as_posix()
@@ -333,39 +370,46 @@ def counts_buffer(path_counts, chunk_size=10000, cols=[], find_ext="mer_count.pd
             continue
 
         # load each (pandas) file
-        logger.debug(f"loading kmer count before yielding chunk of {chunk_size}, {str_path}")
+        logger.debug(f"loading kmer count: {str_path}")
         df = pd.read_pickle(str_path)
-        if cols == []:
+        if cols != []:
             df = df.loc[:, cols]
         # Only take complete genomes.
         df = df.loc[df.category.str.contains("|".join(assemblies), case=False, regex=True)]
         rows_new_df = df.shape[0]
 
         if rows_new_df == 0:
-            logger.error(f"this kmer count is empty: {str_path}")
+            logger.warning(f"after filters, this kmer count is empty: {str_path}")
             continue
+
         total_files += 1
+        if chunk_size < 0:
+            yield df
+        else:
+            # if the total number of rows reach chunk_size, yield one chunk. Does it until that file has been entirely split
+            while rows_buffer + rows_new_df > chunk_size:
+                split_row = chunk_size - rows_buffer
+                buffer.append(df.iloc[:split_row, :])
+                total_rows += chunk_size
+                yield pd.concat(buffer, ignore_index=True)
 
-        # if the total number of rows reach chunk_size, yield one chunk. Does it until that file has been entirely split
-        while rows_buffer + rows_new_df > chunk_size:
-            split_row = chunk_size - rows_buffer
-            buffer.append(df.iloc[:split_row, :])
-            total_rows += chunk_size
-            yield pd.concat(buffer, ignore_index=True)
+                df = df.iloc[split_row:, :]
+                rows_new_df = df.shape[0]
+                buffer = []
+                rows_buffer = 0
 
-            df = df.iloc[split_row:, :]
-            rows_new_df = df.shape[0]
-            buffer = []
-            rows_buffer = 0
-
-        # else append to the buffer
-        buffer.append(df)
-        rows_buffer += rows_new_df
+            # else append to the buffer
+            buffer.append(df)
+            rows_buffer += rows_new_df
 
     # last part
-    total_rows += rows_buffer
-    logger.debug(f"Yielded {total_files} files, with a total of {total_rows} rows.")
-    yield pd.concat(buffer, ignore_index=True)
+    if chunk_size > 0:
+        total_rows += rows_buffer
+        logger.debug(f"Yielded {total_files} files, with a total of {total_rows} rows.")
+        yield pd.concat(buffer, ignore_index=True)
+    else:
+        logger.debug(f"Yielded {total_files} files.")
+
 
 
 @check_step
@@ -380,19 +424,6 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
     # All variables
     Genome.set_k_kmers()
     cols_kmers = Genome.col_kmers
-    d_types = {
-        "taxon": "uint64",
-        "category": "category",
-        "start": "uint64",
-        "end": "uint64",
-        "name": "category",
-        "description": "str",
-        "fna_path": "category",
-    }
-    # Don't read all columns
-    cols_spe = list(d_types.keys())
-    for col in cols_kmers:
-        d_types[col] = "float32"
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
     if osp.isfile(path_model):
@@ -404,7 +435,7 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
         logger.info(f"Loading each kmer count file by batches of {batch_size} rows, scaling values by the length of the "
                     f"segments, and train {model_name}. Skipping folders containing {OMIT}. Will take lots of time...")
         ml_model = MiniBatchKMeans(n_clusters=N_CLUSTERS, random_state=3, batch_size=batch_size, max_iter=100)
-        for partial_df in tqdm(counts_buffer(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext)):
+        for partial_df in tqdm(yield_filtered_df(folder_kmers, chunk_size=batch_size, cols=cols_kmers, find_ext=k_ext)):
             # ## 1 ## Scaling by length and kmers
             scale_df_by_length(partial_df, cols_kmers, K, W)
             # Training mini K-MEANS
@@ -417,18 +448,9 @@ def clustering_segments(folder_kmers, output_pred, path_model, model_name="minik
         logger.info(f"{model_name} model saved for k={K} s={W} at {path_model}, now predicting bins for each segment...")
 
     # Predictions per batch
-    added = 0
     cols_pred = cols_spe + ["cluster"]
-
-    for path in tqdm(Path(folder_kmers).rglob(f"*{k_ext}")):
-        str_path = path.as_posix()
-        if OMIT != [] and any([o in str_path for o in OMIT]):
-            continue
-        df = pd.read_pickle(str_path)
-        logger.debug(f"loaded {str_path}, shape {df.shape}, predicting segments' cluster")
-        if df.shape[0] == 0:
-            logger.error(f"empty dataframe !! kmer count skipped: {df.shape}, {str_path}")
-            continue
+    added = 0
+    for df in tqdm(yield_filtered_df(folder_kmers, chunk_size=-1, cols=[], find_ext=k_ext)):
         scale_df_by_length(df, cols_kmers, K, W)
         df["cluster"] = ml_model.predict(df[cols_kmers])
 
