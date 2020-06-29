@@ -163,7 +163,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         """ Bin all reads from provided file """
         # Skip binning if already done. Count total number of lines in each binned fastq
         if cls.file_has_been_binned:
-            cls.logger.info(f"Fastq has already been binned, skipping step")
+            cls.logger.info(f"Fastq has already been binned, skipping reads binning: {cls.FASTQ_PATH}")
             return
 
         cls.logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
