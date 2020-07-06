@@ -11,8 +11,7 @@ PLoT-ME / Reads Binning Project
 
 import setuptools
 
-import plot_me
-
+__version__  = "0.8.5"
 REQUIREMENTS = "requirements.txt"
 
 
@@ -21,19 +20,19 @@ with open("README.md", "r") as fh:
 
 
 def parse_requirements(path):
-    pkgs = []
+    list_pkg = []
     with open(path) as f:
         for line in f.readlines():
             if len(line) < 5 or "#" in line[:4]:
                 continue
             else:
-                pkgs.append(line.replace(" ", "").replace("\n", ""))
-    return pkgs
+                list_pkg.append(line.replace(" ", "").replace("\n", ""))
+    return list_pkg
 
 
 setuptools.setup(
     name="PLoT-ME",
-    version=plot_me.__version__,
+    version=__version__,
     author="Sylvain Riondet",
     author_email="sylvainrionder@gmail.com",
     description="Memory Reduction for Taxonomic Classifiers (pre-classifying long reads to clusters)",

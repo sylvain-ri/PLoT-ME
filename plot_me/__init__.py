@@ -12,23 +12,15 @@ Reads Binning Project
 #############################################################################
 """
 
-__version__ = "0.9"
-
+from setup import __version__
 
 from plot_me import parse_DB, classify
 
-# todo: need to check the imports and logging things
+# todo: need to check the imports and
+# todo: logging things
 # todo: Should define global variables here ! like paths
-
+# todo: config.txt for basic paths etc
 
 if __name__ == '__main__':
-    # Need to test here 
-    pass
-
-
-
-
-
-
-
+    print(f"PLoT-ME version {__version__}")
 
