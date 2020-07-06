@@ -11,7 +11,7 @@ https://github.com/sylvain-ri/PLoT-ME
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
 Started on 2019-12-11
-Reads Binning Project
+PLoT-ME: Pre-classification of Long-reads for Memory Efficient Taxonomic assignment
 #############################################################################
 """
 
@@ -36,9 +36,9 @@ from Bio import SeqRecord, SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
-    ArgumentParserWithDefaults, time_to_hms, f_size, bash_process
-from bio import kmers_dic, seq_count_kmer
+from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
+    time_to_hms, f_size, bash_process
+from plot_me.bio import kmers_dic, seq_count_kmer
 
 
 logger = init_logger('classify')
@@ -354,9 +354,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
                  f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD,
                  skip_clas=False, force_binning=False):
     """ Should load a file, do all the processing """
-    print("\n*********************************************************************************************************")
+    logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
-    logger.info(f"Script {__file__} called with {args}")
     global THREADS
     THREADS = threads
 
@@ -476,8 +475,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
         csv_writer = csv.writer(csv_file, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         csv_writer.writerows(records)
 
-    logger.info(f"Script ended, {len(t)} files processed")
-    print()
+    logger.info(f"Script ended, {len(t)} files processed \n")
 
 
 bin_classify.format = "fastq"
@@ -489,7 +487,7 @@ def test_classification():
     raise NotImplementedError
 
     
-if __name__ == '__main__':
+def arg_parser():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('path_clusters',        help='Folder with the hash table for the classifier, named '
                                                      '"minikm_<param>" with sub-folders "RefSeq/<bins> '
@@ -521,6 +519,7 @@ if __name__ == '__main__':
                                                 action='store_true')
 
     args = parser.parse_args()
+    logger.debug(f"Script {__file__} called with {args}")
     if len(args.classifier) is 1:
         args.classifier.append('')
 
@@ -530,5 +529,6 @@ if __name__ == '__main__':
                  clf_settings=args.classifier[1], force_binning=args.force_binning)
 
 
-
+if __name__ == '__main__':
+    arg_parser()
 

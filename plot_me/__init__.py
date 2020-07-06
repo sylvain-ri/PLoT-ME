@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 #############################################################################
 Package script, testing who python works
@@ -11,7 +12,10 @@ Reads Binning Project
 #############################################################################
 """
 
-import classify, parse_DB, tools
+__version__ = "0.9"
+
+
+from plot_me import parse_DB, classify
 
 # todo: need to check the imports and logging things
 # todo: Should define global variables here ! like paths

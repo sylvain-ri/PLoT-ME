@@ -36,7 +36,7 @@ as well as classifier's tmp files (for kraken2: kraken2-build --clean)
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
 Started on 2019-12-11
-PLoT-ME / Reads Binning Project
+PLoT-ME: Pre-classification of Long-reads for Memory Efficient Taxonomic assignment
 #############################################################################
 """
 
@@ -66,9 +66,9 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
-    time_to_hms, ArgumentParserWithDefaults, delete_folder_if_exists, bash_process, f_size
-from bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
+from plot_me.tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
+    time_to_hms, delete_folder_if_exists, bash_process, f_size
+from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
 
 logger = init_logger('parse_DB')
@@ -645,7 +645,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         folder_database : RefSeq root folder
         folder_output   : empty root folder to store kmer counts
     """
-    print("\n*********************************************************************************************************")
+    logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     try:
         # Common folder name keeping parameters
@@ -731,8 +731,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         times = check_step.timings
         for i in range(len(times)-1):
             logger.info(f"timing for STEP {i} - {time_to_hms(times[i], times[i+1])}")
-        logger.info(f"Script ended, total time of {time_to_hms(times[0], perf_counter())}.")
-        print()
+        logger.info(f"Script ended, total time of {time_to_hms(times[0], perf_counter())}. \n")
 
 
 main.folder_database = ""
@@ -743,7 +742,7 @@ main.cores           = 0
 main.cols_types      = {}
 
 
-if __name__ == '__main__':
+def arg_parser():
     # Option to display default values, metavar='' to remove ugly capitalized option's names
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 
@@ -800,8 +799,11 @@ if __name__ == '__main__':
          full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean)
 
 
-# python ~/Scripts/Reads_Binning/prod/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
+# python ~/Scripts/Reads_Binning/plot_me/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
 
+
+if __name__ == '__main__':
+    arg_parser()
 
 
 #
