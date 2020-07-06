@@ -13,31 +13,47 @@ import setuptools
 
 import plot_me
 
+REQUIREMENTS = "requirements.txt"
+
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
+
+
+def parse_requirements(path):
+    pkgs = []
+    with open(path) as f:
+        for line in f.readlines():
+            if len(line) < 5 or "#" in line[:4]:
+                continue
+            else:
+                pkgs.append(line.replace(" ", "").replace("\n", ""))
+    return pkgs
+
 
 setuptools.setup(
     name="PLoT-ME",
     version=plot_me.__version__,
     author="Sylvain Riondet",
     author_email="sylvainrionder@gmail.com",
-    description="PLoT-ME: Pre-Classification of Long reads for Memory Efficient Taxonomic Assignment",
+    description="Memory Reduction for Taxonomic Classifiers (pre-classifying long reads to clusters)",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/sylvain-ri/PLoT-ME",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3.7",
-        "License :: MIT License",
-        "Operating System :: Unix",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: POSIX :: Linux",
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
     python_requires='>=3.7',
-    # todo: parse the requirements.txt
-    install_requires=[],
-
+    install_requires=parse_requirements(REQUIREMENTS),
     entry_points={
         'console_scripts': [
-            'proclame-sm = sm_lib.core:proclamer',
+            'plot-me-parse = plot_me.parse_DB:arg_parser',
+            'plot-me-classify = plot_me.classify:arg_parser',
         ],
     },
 )
