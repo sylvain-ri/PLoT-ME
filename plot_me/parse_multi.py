@@ -25,7 +25,7 @@ def main(k, cores, skip_existing):
     """ record which param have been done
         date	cluster	k	w	clf_param	omit
     """
-    history = "/home/ubuntu/Scripts/Reads_Binning/prod/tried_param.tsv"
+    history = "/home/ubuntu/Scripts/Reads_Binning/plot_me/tried_param.tsv"
 
     # with Pool(8) as pool:  # file copy don't need many cores (main.cores)
     #     results = list(tqdm(pool.imap(pll_copy_segments_to_bin, islice(df_per_fna, stop if stop > 0 else None)),

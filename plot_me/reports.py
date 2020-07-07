@@ -19,8 +19,8 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import auc
 
-from prod.bio import ncbi, get_list_rank
-from prod.tools import PATHS
+from plot_me.bio import ncbi, get_list_rank
+from plot_me.tools import PATHS
 
 
 pd.set_option('precision', 5)
