@@ -12,9 +12,9 @@ Reads Binning Project
 #############################################################################
 """
 
-from setup import __version__
+__version__ = "0.8.5"
 
-from plot_me import parse_DB, classify
+# from plot_me import parse_DB, classify
 
 # todo: need to check the imports and
 # todo: logging things
