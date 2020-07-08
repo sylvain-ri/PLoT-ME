@@ -29,12 +29,15 @@ Kraken2 _(Derrick E. Wood et al. 2019)_ and Centrifuge _(D.Kim et al. 2016)_ are
 - Taxonomic classifier
     - Kraken2 or Centrifuge (feel free to request support for more)
 - Python >= 3.7
-    - biopython    >= 1.72
-    - ete3         >= 3.1.1
-    - numpy        >= 1.17.3
-    - pandas       >= 0.23
-    - scikit-learn >= 0.18
-    - tqdm         >= 4.24.0
+
+    Package | Version
+     --- | --- 
+    biopython   | \>= 1.72
+    ete3        | \>= 3.1.1
+    numpy       | \>= 1.17.3
+    pandas      | \>= 0.23
+    scikit-learn| \>= 0.18
+    tqdm        | \>= 4.24.0
 
 
 ## Installation
