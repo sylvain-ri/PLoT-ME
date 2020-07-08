@@ -60,6 +60,7 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
+from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
@@ -714,12 +715,13 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             if k2_clean and "kraken2" in param['name']: kraken2_clean(path_bins_hash, n_clusters)
 
     except KeyboardInterrupt:
+        check_step.timings.append(perf_counter())  # log time for the last step that has been interrupted
         logger.error("User interrupted")
         logger.error(traceback.format_exc())
-        check_step.timings.append(perf_counter())  # log time for the last step that has been interrupted
     except Exception as e:
-        logger.exception(e)
         check_step.timings.append(perf_counter())  # log time for the last step that has been interrupted
+        logger.error(f"Trace the log file there: {LOGS}")
+        logger.exception(e)
 
     finally:
         # End
