@@ -11,7 +11,8 @@ PLoT-ME / Reads Binning Project
 
 import setuptools
 
-__version__  = "0.8.5"
+from plot_me import __version__
+
 REQUIREMENTS = "requirements.txt"
 
 
@@ -51,8 +52,8 @@ setuptools.setup(
     install_requires=parse_requirements(REQUIREMENTS),
     entry_points={
         'console_scripts': [
-            'plot-me-parse = plot_me.parse_DB:arg_parser',
-            'plot-me-classify = plot_me.classify:arg_parser',
+            'plot-me.parse = plot_me.parse_DB:arg_parser',
+            'plot-me.classify = plot_me.classify:arg_parser',
         ],
     },
 )
