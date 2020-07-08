@@ -12,7 +12,7 @@ Reads Binning Project
 #############################################################################
 """
 
-__version__ = "0.8.5"
+__version__ = "0.8.3"
 
 # from plot_me import parse_DB, classify, tools, bio
 
