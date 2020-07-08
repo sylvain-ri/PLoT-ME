@@ -36,11 +36,11 @@ setuptools.setup(
     version=__version__,
     author="Sylvain Riondet",
     author_email="sylvainrionder@gmail.com",
-    description="Memory Reduction for Taxonomic Classifiers (pre-classifying long reads to clusters)",
+    description="Pre-classification of Long-reads for Memory Efficient Taxonomic assignment",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/sylvain-ri/PLoT-ME",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=("tests", "work_in_progress")),
     classifiers=[
         "Intended Audience :: Developers",
         "Intended Audience :: Healthcare Industry",
