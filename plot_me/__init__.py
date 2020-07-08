@@ -14,7 +14,7 @@ Reads Binning Project
 
 __version__ = "0.8.3"
 
-# from plot_me import parse_DB, classify, tools, bio
+from plot_me import parse_DB, classify, tools, bio
 
 # todo: need to check the imports and
 # todo: logging things
