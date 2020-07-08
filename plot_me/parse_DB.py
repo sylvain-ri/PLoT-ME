@@ -60,7 +60,7 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
-from plot_me.tools import PATHS, ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
+from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
 
@@ -854,6 +854,6 @@ def kmer_pkl_path(kmer_folder, fna_path, taxo_ext="gff"):
     # bacteria_name = query.name.iat[0]
 
     formatted_bacteria = re.sub('[^A-Za-z0-9]+', '_', bacteria_name)
-    out_path = osp.join(PATHS.RefSeq_4mer_freq, kmer_folder, f"{taxo}__{fna_name}__{formatted_bacteria}.pd")
+    out_path = osp.join(".", kmer_folder, f"{taxo}__{fna_name}__{formatted_bacteria}.pd")
     return taxo, bacteria_name, fna_name, out_path
 

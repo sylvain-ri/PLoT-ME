@@ -5,9 +5,9 @@ common resources for multiple scripts
 
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
-Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
-Started on 2019-12-11
-Reads Binning Project
+Sylvain RIONDET <sylvainriondet@gmail.com>
+PLoT-ME: Pre-classification of Long-reads for Memory Efficient Taxonomic assignment
+https://github.com/sylvain-ri/PLoT-ME
 #############################################################################
 """
 import argparse
@@ -24,24 +24,7 @@ import shutil
 import subprocess
 from tqdm import tqdm
 
-# import sys
-# print('I am being imported by', sys._getframe(1).f_globals.get('__name__'))
-# print(sys.argv[0])
-
-
-# #############################################################################
-# Paths
-class ProjectPaths:
-    def __init__(self):
-        self.home = str(Path.home())
-        self.data = f"{self.home}/Data"
-        n = datetime.now()
-        self.LOGS = f"{self.home}/logs/{n:%Y-%m-%d_%H-%M}.log"  # short for f"{n:%Y}-{n:%m}-{n:%d}_{n:%H}-{n:%M}.log"
-
-        self.folder_reports = f"{self.data}/Reports"
-        
-
-PATHS = ProjectPaths()
+from plot_me import LOGS
 
 
 # #############################################################################
@@ -50,7 +33,7 @@ def init_logger(logger_name='reads_binning', verbose=True):
     # create formatter for the handlers
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # create file handler which logs even debug messages
-    fh = logging.FileHandler(PATHS.LOGS)
+    fh = logging.FileHandler(LOGS)
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
     # create console handler with a higher log level

@@ -12,14 +12,16 @@ Reads Binning Project
 #############################################################################
 """
 
+from datetime import datetime
+from pathlib import Path
+
 __version__ = "0.8.3"
+PLOT_ME_ROOT = Path.home().joinpath("PLoT-ME")
+LOGS = PLOT_ME_ROOT.joinpath(f"logs/{datetime.now():%Y-%m-%d_%H-%M}.log")
+LOGS.parent.mkdir(parents=True, exist_ok=True)
+RECORDS = PLOT_ME_ROOT.joinpath(f"logs/classify_timings.tsv")
 
 from plot_me import parse_DB, classify, tools, bio
-
-# todo: need to check the imports and
-# todo: logging things
-# todo: Should define global variables here ! like paths
-# todo: config.txt for basic paths etc
 
 if __name__ == '__main__':
     print(f"PLoT-ME version {__version__}. "

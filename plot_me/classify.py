@@ -38,6 +38,7 @@ from Bio import SeqRecord, SeqIO
 from tqdm import tqdm
 
 # Import paths and constants for the whole project
+from plot_me import RECORDS
 from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
     time_to_hms, f_size, bash_process
 from plot_me.bio import kmers_dic, seq_count_kmer
@@ -513,7 +514,7 @@ def arg_parser():
                                                            'reads (default = 1%% / <number of bins>)',
                                                 default=DROP_BIN_THRESHOLD, type=float, metavar='')
     parser.add_argument('-r', '--record',       help='Record the time spent for each run in CSV format (default=%(default)s)',
-                                                default="/home/ubuntu/classify_records.csv", type=str, metavar='')
+                                                default=RECORDS, type=str, metavar='')
     parser.add_argument('--skip_classification',help='Skip the classification itself '
                                                      '(for benchmarking or to use other classifiers)',
                                                 action='store_true')
