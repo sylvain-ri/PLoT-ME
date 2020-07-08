@@ -14,7 +14,7 @@ Reads Binning Project
 
 __version__ = "0.8.5"
 
-# from plot_me import parse_DB, classify
+# from plot_me import parse_DB, classify, tools, bio
 
 # todo: need to check the imports and
 # todo: logging things
@@ -22,5 +22,6 @@ __version__ = "0.8.5"
 # todo: config.txt for basic paths etc
 
 if __name__ == '__main__':
-    print(f"PLoT-ME version {__version__}")
+    print(f"PLoT-ME version {__version__}. "
+          f"Information in the readme file and on https://github.com/sylvain-ri/PLoT-ME. ")
 
