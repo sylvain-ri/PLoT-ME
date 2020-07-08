@@ -29,8 +29,8 @@ Using large k (5+) and small s (10000-) yield very large kmer counts, costing
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain RIONDET <sylvainriondet@gmail.com>
-Started on 2019-12-11
 PLoT-ME: Pre-classification of Long-reads for Memory Efficient Taxonomic assignment
+https://github.com/sylvain-ri/PLoT-ME
 #############################################################################
 """
 

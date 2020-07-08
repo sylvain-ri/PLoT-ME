@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
 #############################################################################
-Script to pre-classify reads/sequences from fastq file, with a binning step
-to reduce memory consumption. Bins the reads into defined bins (parse_DB)
-and launch a classifier for each bin at the time.
+Project to divide a Database of Genomes (RefSeq) according to their
+ k-mer frequency, for a lower RAM requirement of taxonomic classifiers.
+This script pre-classifies reads/sequences from a fastq file, and calls a
+ classifier (kraken2/centrifuge) with an index built on a subset of the
+ entire database, for a lower memory need.
+Clusters are defined by plot-me.pre-process / plot-me/parse_DB.py
 The higher the number of clusters, the lower the memory requirement.
-https://github.com/sylvain-ri/PLoT-ME
 
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
-Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
-Started on 2019-12-11
+Sylvain RIONDET <sylvainriondet@gmail.com>
 PLoT-ME: Pre-classification of Long-reads for Memory Efficient Taxonomic assignment
+https://github.com/sylvain-ri/PLoT-ME
 #############################################################################
 """
 
@@ -21,7 +23,7 @@ from datetime import datetime as dt
 from glob import glob
 import logging
 from multiprocessing import cpu_count
-from multiprocessing.pool import Pool
+# from multiprocessing.pool import Pool
 import os
 from os import path as osp
 import pickle
