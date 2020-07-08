@@ -489,7 +489,7 @@ def test_classification():
     
 def arg_parser():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('path_clusters',        help='Folder with the hash table for the classifier, named '
+    parser.add_argument('path_plot_me',        help='Folder with the hash table for the classifier, named '
                                                      '"minikm_<param>" with sub-folders "RefSeq/<bins> '
                                                      'and "model_<name>.pkl". If using the ful_index, provide the path '
                                                      'up to .../no-binning/o<omitted>.')
@@ -507,7 +507,7 @@ def arg_parser():
                                                 default=cpu_count(), type=int, metavar='')
     parser.add_argument('-d', '--drop_bin_threshold', help='Drop fastq bins smaller than x percent of the initial '
                                                            'fastq. Helps to avoid loading hash tables for very few '
-                                                           'reads (default = 1% / <number of bins>)',
+                                                           'reads (default = 1%% / <number of bins>)',
                                                 default=DROP_BIN_THRESHOLD, type=float, metavar='')
     parser.add_argument('-r', '--record',       help='Record the time spent for each run in CSV format (default=%(default)s)',
                                                 default="/home/ubuntu/classify_records.csv", type=str, metavar='')
@@ -523,7 +523,7 @@ def arg_parser():
     if len(args.classifier) is 1:
         args.classifier.append('')
 
-    bin_classify(args.input_fastq, args.path_reports, args.path_clusters,
+    bin_classify(args.input_fastq, args.path_reports, args.path_plot_me,
                  classifier=args.classifier[0], full_DB=args.full_index, threads=args.threads, f_record=args.record,
                  drop_bin_threshold=args.drop_bin_threshold, skip_clas=args.skip_classification,
                  clf_settings=args.classifier[1], force_binning=args.force_binning)
