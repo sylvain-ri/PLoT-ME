@@ -52,7 +52,7 @@ setuptools.setup(
     install_requires=parse_requirements(REQUIREMENTS),
     entry_points={
         'console_scripts': [
-            'plot-me.parse = plot_me.parse_DB:arg_parser',
+            'plot-me.preprocess = plot_me.parse_DB:arg_parser',
             'plot-me.classify = plot_me.classify:arg_parser',
         ],
     },
