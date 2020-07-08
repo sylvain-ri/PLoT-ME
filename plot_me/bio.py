@@ -58,7 +58,7 @@ def seq_count_kmer(seq, kmer_count=None, k=4, ignore_N=True):
     kmer_count[wrong_base] = 0.0
 
     try:
-        for kmer in seq_to_window(str(seq), k):
+        for kmer in seq_to_window(str(seq).upper(), k):
             try:
                 kmer_count[kmer] += 1
             except:
