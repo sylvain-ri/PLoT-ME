@@ -1,40 +1,34 @@
 #!/usr/bin/env python3
 """
 #############################################################################
-Script to divide a Database of genomes (RefSeq), split them into segments and
-cluster them into bins according to their k-mer frequency.
+Project to divide a Database of Genomes (RefSeq) according to their
+ k-mer frequency, for a lower RAM requirement of taxonomic classifiers
 Needs a lot of disk space, and RAM according to the largest genome to process.
+
 *** STEPS ***
 0 -> Scan the given RefSeq, count kmer frequencies per segment for each genome
-1 -> Combine these counts into a single file (RAM intensive)
+1 -> Combine these counts into a single file
 2 -> Scale the values by the length of segments and combination of kmers,
      and apply a clustering algorithm (KMean, mini batch KMeans)
-     to find the cluster association of each segment
+     to find the cluster association of each segment (RAM intensive)
 3 -> Copy these segments of genomes into bins (DISK intensive)
 4 -> kraken2-build --add-to-library
 5 -> kraken2-build --build
-f -> Building the hash for the full refseq, for comparison bins vs no binning
 
 *** FULL Index ***
--> with option --full_index, builds the comparable index without the clustering.
-  Good for comparison and benchmarking. skip_existing only takes the first 2,
-  such as "00", with character for kraken2 --add_library and --build respectively.
+-f/--full_index -> Building the hash for the full refseq, for comparison
+  builds the index for the same classifier, same database, but without PLoT-ME.
+  Good for comparison and benchmarking. --skip_existing and --early
+  then refers to library preparation and index building
+  (kraken2 --add_library and --build respectively).
 
-For 17GB file of combined kmer counts, combining counts took up to 55GB,
-loading the file up to 35GB, and KMeans crashed when reaching the 60GB RAM.
-Using AWS R4.2XLarge instance with 60GB RAM
-
-** kmer counts DataFrames are under this format:
-taxon	category	start	end	name	description	fna_path	AAAA .... TTTT
-** cluster/bin assignments trade the nucleotides columns to a "cluster" column
-
-Once the bins created, tmp files (kmer counts) can be removed (read_binning_tmp/),
-"segments_clustered.<settings>.pd" in "clustered_by..." can be deleted,
-as well as classifier's tmp files (for kraken2: kraken2-build --clean)
+Using large k (5+) and small s (10000-) yield very large kmer counts, costing
+ high amounts of RAM (esp. when combining all kmer counts together,
+ RAM needs to reach ~30GB or more). Currently working on this (July 2020)
 
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
-Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
+Sylvain RIONDET <sylvainriondet@gmail.com>
 Started on 2019-12-11
 PLoT-ME: Pre-classification of Long-reads for Memory Efficient Taxonomic assignment
 #############################################################################
@@ -245,6 +239,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1):
     """
     create_path(folder_kmers)
     # scanning folder Class set up:
+    # todo: change the kmer_count into the k_s_ notation
     ScanFolder.set_folder_scan_options(scanning=scanning, target=folder_kmers,
                                        ext_find=(".fastq", ".fq", ".fna"), ext_check=".taxon",
                                        ext_create=f".{main.k}mer_count.pd", skip_folders=main.omit_folders)
@@ -746,11 +741,13 @@ def arg_parser():
     # Option to display default values, metavar='' to remove ugly capitalized option's names
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    parser.add_argument('path_database',    help='Database root folder. Support format: RefSeq 2019',
+    parser.add_argument('path_database',    help='Database root folder. Supported format: RefSeq 2019',
                                             type=is_valid_directory)
     parser.add_argument('taxonomy',         help='path to taxonomy (absolute path)',    type=is_valid_directory)
-    parser.add_argument('path_plot_me',     help="Folder for the k-mer counts, bins with genomes'segments, ML models "
-                                                 "and final hash tables",               type=is_valid_directory)
+    parser.add_argument('path_plot_me',     help="Data folder for PLoT-ME. For each setting (k, s, b), will store the "
+                                                 "k-mer counts, bins with genomes'segments, ML models and hash tables "
+                                                 "of the classifiers. Allocate around twice as much space as NCBI RefSeq. ",
+                                            type=is_valid_directory)
 
     parser.add_argument('-k', '--kmer',     help='Size of the kmers (default=%(default)d)',
                                             default=4,          type=int, metavar='')
@@ -767,23 +764,25 @@ def arg_parser():
     parser.add_argument('-o', '--omit',     help='Omit some folder/families containing these names. '
                                                  'Write names with spaces (defaults=plant vertebrate)',
                                             default=("plant", "vertebrate"), nargs="+", type=str, metavar='')
-    parser.add_argument('-s', '--skip_existing', help="By default, skip already existing files/folders. 1100000 means "
-                                                      "that steps 0 and 1 will be skipped if file/folders exist. "
-                                                      "If the script has been stopped in the middle, use 0 to redo "
-                                                      "that step. (default=%(default)s)'",
+    parser.add_argument('-s', '--skip_existing', help="By default, skip already existing files/folders (1:skip, 0:no skipping). "
+                                                      "111110 means that steps 0 to 4 will be skipped if file/folders "
+                                                      "exist. If the script has been stopped in the middle, use 0 to "
+                                                      "redo that step. (default=%(default)s)'",
                                             default=check_step.can_skip, type=str, metavar='')
 
     parser.add_argument('--clean',          help='Make use of kraken2-build --clean to remove temporary files '
                                                  '(library/added/ and others)',
                                             action='store_true',)
-    parser.add_argument('-f', '--full_index', help='Build the full RefSeq database, without binning, omitting the '
-                                                   'directories set by --omit. Skips all the other steps/processes '
+    parser.add_argument('-f', '--full_index', help='Build the index with the full RefSeq database for the chosen '
+                                                   'classifier, without binning, omitting the directories set by '
+                                                   '--omit. Skips all the other steps/processes '
                                                    '(unused: -e, -n, -s). Used for comparison/benchmarking',
                                             action='store_true')
     parser.add_argument('-c', '--classifier', help="classifier's name and its parameters, space separated. "
-                                                   "Ex: '--classifier kraken k 35 l 31 s 7', or '-c centrifuge'. "
-                                                   "For unsupported classifiers, you can stop after "
-                                                   "step 3, and build their index based on 'RefSeq_binned'",
+                                                   "Ex: '--classifier kraken k 35 l 31 s 7' (default), or "
+                                                   "'-c centrifuge'. For unsupported classifiers, you can stop after "
+                                                   "step 3 (--early), and build their index based on the .fna files "
+                                                   "in PLoT-ME/<param>/'RefSeq_binned'",
                                             default=CLASSIFIERS[0], type=str, nargs="+", metavar='')
     # parser.add_argument('-m', '--ml_model', help='name of the model to use for clustering',
     #                                         choices=clustering_segments.models, type=str, metavar='',
