@@ -749,10 +749,8 @@ def arg_parser():
     parser.add_argument('path_database',    help='Database root folder. Support format: RefSeq 2019',
                                             type=is_valid_directory)
     parser.add_argument('path_clustered',   help="Folder for the k-mer counts, bins with genomes'segments, ML models "
-                                                 "and final hash tables",
-                                            type=is_valid_directory)
-    parser.add_argument('taxonomy',         help='path to taxonomy (absolute path)',
-                                            type=is_valid_directory, metavar='')
+                                                 "and final hash tables",               type=is_valid_directory)
+    parser.add_argument('taxonomy',         help='path to taxonomy (absolute path)',    type=is_valid_directory)
 
     parser.add_argument('-k', '--kmer',     help='Size of the kmers (default=%(default)d)',
                                             default=4,          type=int, metavar='')
