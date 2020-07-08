@@ -748,9 +748,9 @@ def arg_parser():
 
     parser.add_argument('path_database',    help='Database root folder. Support format: RefSeq 2019',
                                             type=is_valid_directory)
-    parser.add_argument('path_clustered',   help="Folder for the k-mer counts, bins with genomes'segments, ML models "
-                                                 "and final hash tables",               type=is_valid_directory)
     parser.add_argument('taxonomy',         help='path to taxonomy (absolute path)',    type=is_valid_directory)
+    parser.add_argument('path_plot_me',     help="Folder for the k-mer counts, bins with genomes'segments, ML models "
+                                                 "and final hash tables",               type=is_valid_directory)
 
     parser.add_argument('-k', '--kmer',     help='Size of the kmers (default=%(default)d)',
                                             default=4,          type=int, metavar='')
@@ -791,7 +791,7 @@ def arg_parser():
     args = parser.parse_args()
 
     logger.info(f"Script {__file__} called with {args}")
-    main(folder_database=args.path_database, folder_output=args.path_clustered, n_clusters=args.bins,
+    main(folder_database=args.path_database, folder_output=args.path_plot_me, n_clusters=args.bins,
          k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
          early_stop=args.early, omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy,
          full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean)
