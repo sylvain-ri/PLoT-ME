@@ -39,6 +39,7 @@ setuptools.setup(
     description="Pre-classification of Long-reads for Memory Efficient Taxonomic assignment",
     long_description=long_description,
     long_description_content_type="text/markdown",
+    include_package_data=True,
     url="https://github.com/sylvain-ri/PLoT-ME",
     packages=setuptools.find_packages(exclude=("tests", "work_in_progress")),
     classifiers=[
