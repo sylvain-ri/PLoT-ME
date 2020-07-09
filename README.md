@@ -25,19 +25,23 @@ Kraken2 _(Derrick E. Wood et al. 2019)_ and Centrifuge _(D.Kim et al. 2016)_ are
 \* Mini Batch K-Means, _Web-Scale K-Means Clustering D. Sculley 2010_
 
 ## Requirements
+- Database of Genomes, in .fna / .fasta format, with an associated taxonomy id. 
+Tested with [NCBI RefSeq](https://www.ncbi.nlm.nih.gov/refseq/) ([ftp server](ftp://ftp.ncbi.nlm.nih.gov/refseq/release/))
+- Taxonomic classifier, must be installed and added to PATH. Currently supported:
+    - [Kraken2](https://github.com/DerrickWood/kraken2/wiki/Manual)
+    - [Centrifuge](https://ccb.jhu.edu/software/centrifuge/manual.shtml) 
+    - (feel free to request support for more)
 - Linux (tested on Ubuntu 18.04)
-- Taxonomic classifier
-    - Kraken2 or Centrifuge (feel free to request support for more)
-- Python >= 3.7
+- [Python](https://www.python.org/) >= 3.7 
 
-    Package | Version
-     --- | --- 
-    biopython   | \>= 1.72
-    ete3        | \>= 3.1.1
-    numpy       | \>= 1.17.3
-    pandas      | \>= 0.23
-    scikit-learn| \>= 0.18
-    tqdm        | \>= 4.24.0
+Package | Version
+ --- | --- 
+biopython   | \>= 1.72
+ete3        | \>= 3.1.1
+numpy       | \>= 1.17.3
+pandas      | \>= 0.23
+scikit-learn| \>= 0.18
+tqdm        | \>= 4.24.0
 
 
 ## Installation
