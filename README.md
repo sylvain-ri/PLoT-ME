@@ -1,7 +1,7 @@
 # PLoT-ME
-**Pre-classification of Long-reads for Memory Efficient Taxonomic assignment <br>**
-Sylvain Riondet, Niranjan Ngarajan, NUS/SoC, GIS/Biopolis, Singapore
-
+**Pre-classification of Long-reads for Memory Efficient Taxonomic assignment** <br>
+Sylvain Riondet, K. Križanović, J. Marić and M, Šikić, Niranjan Nagarajan <br>
+NUS/SoC, Biopolis/GIS, Singapore
 
 ## Description
 #### Pre-Processing
@@ -138,4 +138,5 @@ _As of July 2020:_
 **Lab:** Genome Institute of Singapore / National University of Singapore<br>
 **Supervisors:** Niranjan Nagarajan & Martin Henz <br>
 
-
+## Thanks
+Thanks for your support and supervision all along my PhD and this project: Martin Henz, Chenhao Li, Rafael Peres, D. Bertrand and the whole [MTMS lab](https://csb5.github.io/)
