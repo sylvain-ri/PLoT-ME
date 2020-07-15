@@ -3,6 +3,8 @@
 Sylvain Riondet, K. Križanović, J. Marić and M, Šikić, Niranjan Nagarajan <br>
 NUS/SoC, Biopolis/GIS, Singapore
 
+_Tool in active development, any feedback or bug report is welcome, either through [github](https://github.com/sylvain-ri/PLoT-ME) or on [twitter](https://twitter.com/Sylvain14518009)_
+
 ## Description
 #### Pre-Processing
 - Segmentation of NCBI RefSeq into clusters
