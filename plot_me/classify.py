@@ -26,6 +26,7 @@ from multiprocessing import cpu_count
 # from multiprocessing.pool import Pool
 import os
 from os import path as osp
+import pandas as pd
 import pickle
 import shutil
 import subprocess
@@ -59,6 +60,37 @@ def reads_in_file(file_path):
         Count number of lines with bash wc -l and divide by 4 if fastq, otherwise by 2 (fasta) """
     return round(int(subprocess.check_output(["wc", "-l", file_path]).split()[0]) /
                      (4 if bin_classify.format == "fastq" else 2))
+
+
+class Binner:
+    """ Direct binner of reads, for dev purposes. """
+
+    def __init__(self, _f_model, k=4, w=10**4):
+        """ load a clustering model for the read binner """
+        self.model     = None
+        self.k         = k
+        self.w         = w
+        self.kmer_cols = []
+        self._f_model  = _f_model
+
+        self._load_model()
+        self._set_cols()
+
+    def _load_model(self):
+        with open(self._f_model, 'rb') as f:
+            self.model = pickle.load(f)
+
+    def _set_cols(self):
+        self.kmer_cols = list(kmers_dic(self.k).keys())
+
+    def scale(self, df):
+        divider = df[self.kmer_cols].sum(1) - self.k + 1
+        ratio = 4.0 ** self.k / divider
+        return df[self.kmer_cols] * ratio
+
+    def classify_df(self, df):
+        assert isinstance(df, pd.DataFrame), TypeError("Only Pandas DataFrame data type supported at the moment")
+        return self.model.predict(self.scale(df))
 
 
 # #############################################################################
