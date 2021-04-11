@@ -123,8 +123,12 @@ Data is saved as pickle `.pkl` or Pandas DataFrame `.pd` <br>
 #### Final files
 The `model*.pkl` and the folder `kraken2` or `centrifuge` are needed for PLoT-ME to work. Folder tree needs to remain intact. 
 
-#### Work in progress
-_As of July 2020:_
+## Work in progress
+_April 2021_
+- Implementation of Cython version of the kmer counter
+- Adding reverse complement to forward strand
+
+_July 2020:_
 - `pre-process` Using large k (5+) and small s (10000-) yield very large kmer counts, costing
  high amounts of RAM (esp. when combining all kmer counts together,
  RAM needs to reach ~30GB or more). 

@@ -15,7 +15,7 @@ Reads Binning Project
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "0.8.3"
+__version__ = "0.9.0"
 PLOT_ME_ROOT = Path.home().joinpath("PLoT-ME")
 LOGS = PLOT_ME_ROOT.joinpath(f"logs/{datetime.now():%Y-%m-%d_%H-%M}.log")
 LOGS.parent.mkdir(parents=True, exist_ok=True)
