@@ -42,9 +42,9 @@ logger = init_logger("cyt_ext")
 cdef:
     unsigned int k = 4
     str nucleotides = "ACGT"
-    const float [::1] codon_k4 = np.zeros(256, dtype=np.float32)  # [float 0. for _ in range(256)]
-    const nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
-    const unordered_map [unsigned char, unsigned int] nucl_val
+    float [::1] codon_k4 = np.zeros(256, dtype=np.float32)  # [float 0. for _ in range(256)]
+    dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
+    unordered_map [unsigned char, unsigned int] nucl_val
 nucl_val[b"A"] = 0
 nucl_val[b"a"] = 0
 nucl_val[b"C"] = 1
@@ -192,7 +192,7 @@ cdef float [::1] kmer_counter_list(const unsigned char [:] stream, debug=0):
     return codons  #, fails
 
 def pycy_kmer_counter_list(sequence):
-    cdef char[:] chaine = <char*> sequence
+    cdef char[:] chaine = sequence
     return kmer_counter_list(chaine)
 
 
