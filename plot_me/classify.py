@@ -207,6 +207,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
+        # TODO Cyt: use Cython file reader, k-mer counter and binner, fallback on Python otherwise
         counter = 0
         for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=cls.total_reads,
                            desc="binning and copying reads to bins", leave=True, dynamic_ncols=True):

@@ -131,6 +131,7 @@ class Genome:
 
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
+            # TODO Cyt: use Cython kmer counter if possible, fallback on Python otherwise
             kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k)
             for_csv.append((taxon, cat, start, end, segment.name, segment.description, self.path_fna,
                             *kmer_count.values() ))
