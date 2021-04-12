@@ -10,6 +10,7 @@ PLoT-ME / Reads Binning Project
 """
 
 import setuptools
+from Cython.Build import cythonize
 
 from plot_me import __version__
 
@@ -30,6 +31,8 @@ def parse_requirements(path):
                 list_pkg.append(line.replace(" ", "").replace("\n", ""))
     return list_pkg
 
+
+cython_module = setuptools.Extension('cyt_ext', sources=['cyt_ext.cyt_ext.pyx'])
 
 setuptools.setup(
     name="PLoT-ME",
@@ -63,4 +66,5 @@ setuptools.setup(
             'plot-me.classify = plot_me.classify:arg_parser',
         ],
     },
+    ext_modules=cythonize([cython_module], language_level="3", ),
 )
