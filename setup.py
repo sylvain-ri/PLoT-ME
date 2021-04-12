@@ -32,7 +32,7 @@ def parse_requirements(path):
     return list_pkg
 
 
-cython_module = setuptools.Extension('cyt_ext', sources=['cyt_ext.cyt_ext.pyx'])
+cython_module = setuptools.Extension('cyt_ext', sources=['plot_me/cyt_ext/cyt_ext.pyx'])
 
 setuptools.setup(
     name="PLoT-ME",
