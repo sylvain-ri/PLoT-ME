@@ -9,8 +9,10 @@ PLoT-ME / Reads Binning Project
 #############################################################################
 """
 
-import setuptools
-from Cython.Build import cythonize
+from distutils.core import setup
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
+from setuptools import find_packages
 
 from plot_me import __version__
 
@@ -32,9 +34,9 @@ def parse_requirements(path):
     return list_pkg
 
 
-cython_module = setuptools.Extension('cyt_ext', sources=['plot_me/cyt_ext/cyt_ext.pyx'])
+cython_module = Extension('cyt_ext', sources=['plot_me/cyt_ext/cyt_ext.pyx'])
 
-setuptools.setup(
+setup(
     name="PLoT-ME",
     version=__version__,
     author="Sylvain Riondet",
@@ -44,7 +46,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     include_package_data=True,
     url="https://github.com/sylvain-ri/PLoT-ME",
-    packages=setuptools.find_packages(exclude=("tests", "work_in_progress")),
+    packages=find_packages(exclude=("tests", "work_in_progress")),
     classifiers=[
         "Intended Audience :: Developers",
         "Intended Audience :: Healthcare Industry",
@@ -66,5 +68,6 @@ setuptools.setup(
             'plot-me.classify = plot_me.classify:arg_parser',
         ],
     },
-    ext_modules=cythonize([cython_module], language_level="3", ),
+    ext_modules=[cython_module],
+    cmdclass={'build_ext': build_ext},
 )
