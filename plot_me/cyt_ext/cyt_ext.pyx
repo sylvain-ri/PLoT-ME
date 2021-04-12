@@ -41,7 +41,7 @@ logger = init_logger("cyt_ext")
 # Related to DNA
 cdef:
     unsigned int k = 4
-    str nucleotides = "ACGT"
+    list nucleotides = [b"A", b"C", b"G", b"T"]
     float [::1] codon_k4 = np.zeros(256, dtype=np.float32)  # [float 0. for _ in range(256)]
     dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
     unordered_map [unsigned char, unsigned int] nucl_val
@@ -68,7 +68,7 @@ cdef:
 
 # ##########################             UTILITIES             ##########################
 
-cdef combinations(str combi, unsigned int n, str instances=nucleotides):
+cdef combinations(list combi, unsigned int n, list instances=nucleotides):
     """ Return combinations from the char in instances. Using for finding possible k-mers, for a given n/k """
     if n == 1:
         return combi
@@ -95,11 +95,10 @@ cdef unsigned int codon_addr(str codon):
         total += nucl_val[codon_char] * 4 ** (length-1 - i)
     return total
 
-cdef combine_counts_with_reverse_complement_2(float[:] counts):
+cdef combine_counts_with_reverse_complement(float[:] counts):
     """ Combine the forward and reverse complement in the k-mer profile  """
     cdef:
-         # res = np.zeros(len(codons_combined))
-         res = np.zeros(codons_combined.shape[0], dtype=np.float32)
+         res = np.empty(dim_combined_codons, dtype=np.float32)
          unsigned int i
     for i in range(dim_combined_codons):
         res[i] = counts[codons_orig_indexes[i]] + counts[codons_kept_indexes[i]]
@@ -133,17 +132,18 @@ cdef init_variables():
             codons_orig_indexes[counter] = rc_address
         counter += 1
 
+init_variables()
+
 
 # ##########################           MAIN  FUNCTIONS         ##########################
 
 # @cython.boundscheck(False)  # Deactivate bounds checking
 # @cython.wraparound(False)   # Deactivate negative indexing.
 # todo try with char [:] instead of bytes
-cdef float [::1] kmer_counter_list(const unsigned char [:] stream, debug=0):
+cdef float [::1] kmer_counter_list(const unsigned char [:] stream):
     """
     Counting k-mers for one line/sequence/read. Return an array counts, alphabetically ordered
     :param stream: one line of a fastq/fast file
-    :param debug: 
     :return: array of length n_dim_rc_combined(k)
     """
     # stream = str(stream)
@@ -192,7 +192,7 @@ cdef float [::1] kmer_counter_list(const unsigned char [:] stream, debug=0):
     return codons  #, fails
 
 def pycy_kmer_counter_list(sequence):
-    cdef char[:] chaine = sequence
+    cdef unsigned char[:] chaine = sequence
     return kmer_counter_list(chaine)
 
 
