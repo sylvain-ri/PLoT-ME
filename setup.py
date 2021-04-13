@@ -8,11 +8,12 @@ Started on 2019-12-11
 PLoT-ME / Reads Binning Project
 #############################################################################
 """
-
-from distutils.core import setup
-from distutils.extension import Extension
+# Apparently setuptools is the news standard:
+# https://stackoverflow.com/questions/32528560/
+from setuptools import find_packages, setup
+# setuptools MUST be imported first. https://stackoverflow.com/questions/21594925/
+from Cython.Build import cythonize
 from Cython.Distutils import build_ext
-from setuptools import find_packages
 
 from plot_me import __version__
 
@@ -24,6 +25,7 @@ with open("README.md", "r") as fh:
 
 
 def parse_requirements(path):
+    """ Get the list of dependencies from the requirements file """
     list_pkg = []
     with open(path) as f:
         for line in f.readlines():
@@ -34,7 +36,8 @@ def parse_requirements(path):
     return list_pkg
 
 
-cython_module = Extension('cyt_ext', sources=['plot_me/cyt_ext/cyt_ext.pyx'])
+cython_module = cythonize(['plot_me/cyt_ext/cyt_ext.pyx'])
+# Can use Extension()
 
 setup(
     name="PLoT-ME",
@@ -68,6 +71,6 @@ setup(
             'plot-me.classify = plot_me.classify:arg_parser',
         ],
     },
-    ext_modules=[cython_module],
+    ext_modules=cython_module,
     cmdclass={'build_ext': build_ext},
 )
