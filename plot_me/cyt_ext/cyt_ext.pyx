@@ -112,9 +112,10 @@ cdef combine_counts_with_reverse_complement(float[:] counts):
 cdef _init_variables(unsigned int k, unsigned int logging_level=30):
     """ Initialize k and indexes for fast processing """
     # Build the mapping to convert fast
-    if verbosity <= 30: logger.debug("Initializing Indexes for k-mer counting ")
+    if verbosity <= 20: logger.debug("Initializing Indexes for k-mer counting ")
     global verbosity
     verbosity = logging_level
+    logger.setLevel(logging_level)
 
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
@@ -145,8 +146,8 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
             codons_orig_indexes[counter] = rc_address
             counter += 1
 
-def init_variables(unsigned int k=4):
-    _init_variables(k)
+def init_variables(unsigned int k=4, unsigned int logging_level=30):
+    _init_variables(k, logging_level)
 
 init_variables()
 
@@ -156,35 +157,43 @@ init_variables()
 # @cython.boundscheck(False)  # Deactivate bounds checking
 # @cython.wraparound(False)   # Deactivate negative indexing.
 # Bytes Faster than char [:]
-cdef float [::1] kmer_counter(bytes stream):
+cdef float [::1] kmer_counter(bytes stream, size_t stream_len, unsigned int k_value=4):
     """
     Counting k-mers for one line/sequence/read. Return an array counts, alphabetically ordered
     :param stream: one line of a fastq/fast file
+    :param stream_len: length of the stream
+    :param k_value: value of k (k-mer)
     :return: array of length n_dim_rc_combined(k)
     """
     # stream = str(stream)
     # codons = codon_template.copy()
     # if debug >= 2: print(len(stream), flush=True)
-    if verbosity <= 20: logger.debug("comes to the kmer counter")
+    if verbosity <= 10: logger.debug("comes to the kmer counter")
+
     cdef:
         float [::1] kmer_counts = template_kmer_counts.copy()
         unsigned int last_failed = 0
         unsigned int recover_addr = 0
         unsigned int fails = 0
-        unsigned long counter
-        unsigned char lettre
-    if verbosity <= 20: logger.debug(f"codons[0]{kmer_counts[0]}, stream[:10]{stream[:10]}")
+        unsigned long long counter = k_value
+        unsigned char letter = b'N'  # initializing the while loop
+
+    if verbosity <= 10: logger.debug(f"empty codons counts[0]{kmer_counts[0]}, stream[:10]{stream[:10]}")
+    if stream_len <= k_value:
+        if verbosity <= 30: logger.warning("Sequence was shorter than the k used")
+        if verbosity <= 20: logger.warning(stream)
+        return kmer_counts
 
     cdef unsigned int addr = nucl_val[stream[0]] + 4*nucl_val[stream[1]] + 16*nucl_val[stream[2]] + 64*nucl_val[stream[3]]
-    if verbosity <= 20: logger.debug(f"addr for the kmer counter: {addr}")
+    if verbosity <= 10: logger.debug(f"addr for the kmer counter: {addr}")
     kmer_counts[addr] += 1
     counter = 4
-    if verbosity <= 20: logger.debug(f"Starting loop")
+    if verbosity <= 10: logger.debug(f"Starting loop")
 
-    while lettre != b'\0':
-        lettre = stream[counter]
+    for counter in range(k_value, stream_len):
+        letter = stream[counter]
         try:
-            addr = addr // 4 + nucl_val[lettre] * 64
+            addr = addr // 4 + nucl_val[letter] * 64
             kmer_counts[addr] += 1
         except:
             if last_failed == 0:
@@ -194,21 +203,21 @@ cdef float [::1] kmer_counter(bytes stream):
 
             elif last_failed <= 2:
                 addr = 1024
-                recover_addr = recover_addr // 4 + nucl_val[lettre] * 64
+                recover_addr = recover_addr // 4 + nucl_val[letter] * 64
                 last_failed += 1
 
             else:  # last_failed reached 3
                 addr = recover_addr
                 last_failed = 0
                 fails += 1
-        counter += 1
+        # counter += 1
 
     if verbosity <= 20: logger.info(f"stream length:{counter}, fails:{fails}")
     return kmer_counts  #, fails
 
-def py_kmer_counter(sequence):
+def py_kmer_counter(sequence, k=4):
     """ Python interface for the Cython k-mer counter """
-    return kmer_counter(sequence)
+    return kmer_counter(sequence, len(sequence), k)
 
 
 # Related to the file reader. Can be replaced by from libc.stdio cimport fopen, flcose, getline ; +10% time
@@ -224,6 +233,7 @@ cdef extern from "stdio.h":
 def read_file(filename):
     """ Fast Cython file reader 
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
+        yields the line AND its length !
     """
     filename_byte_string = filename.encode("UTF-8")
     cdef char* fname = filename_byte_string
@@ -234,16 +244,18 @@ def read_file(filename):
         raise FileNotFoundError(2, "No such file or directory: '%s'" % filename)
 
     cdef char * line = NULL
-    cdef size_t l = 0
+    cdef size_t l_length
     cdef ssize_t read
 
     while True:
-        read = getline(&line, &l, cfile)
+        read = getline(&line, &l_length, cfile)
         if read == -1: break
-        yield line
+        if line[l_length-2:] == b"\n":
+            l_length -= 2
+        yield line, l_length
 
     fclose(cfile)
-    return b""
+    return (b"", 0)
 
 
 cdef process_file(str filename, str file_format="fastq"):
@@ -251,11 +263,13 @@ cdef process_file(str filename, str file_format="fastq"):
     cdef:
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
+        size_t length
+        char * line = NULL
         list kmer_counts = []
 
-    for line in read_file(filename):
+    for line, length in read_file(filename):
         if line_nb % modulo == 1:
-            kmer_counts.append(kmer_counter(line))
+            kmer_counts.append(kmer_counter(line, length))
         line_nb+= 1
     return kmer_counts
 
@@ -267,11 +281,12 @@ cdef process_file2(str filename, str file_format="fastq"):
     cdef:
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
+        size_t length
         float [::1] counts
 
     for line in read_file(filename):
         if line_nb % modulo == 1:
-            counts = kmer_counter(line)
+            counts = kmer_counter(line, length)
         line_nb+= 1
     return counts
 
@@ -292,17 +307,17 @@ cdef process_file3(str filename, str file_format="fastq"):
 
     cdef:
         char * line = NULL
-        size_t l = 0
+        size_t length = 0
         ssize_t read
         float [::1] counts
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
 
     while True:
-        read = getline(&line, &l, cfile)
+        read = getline(&line, &length, cfile)
         if read == -1: break
         if line_nb % modulo == 1:
-            counts = kmer_counter(line)
+            counts = kmer_counter(line, length)
         line_nb += 1
 
     fclose(cfile)
