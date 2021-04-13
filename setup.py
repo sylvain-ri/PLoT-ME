@@ -7,6 +7,10 @@ Sylvain Jun-Zhe RIONDET <Riondet_Sylvain_from.tp@gis.a-star.edu.sg>
 Started on 2019-12-11
 PLoT-ME / Reads Binning Project
 #############################################################################
+
+Setup to build python files, with Cython
+CMD: python3 setup.py build_ext --inplace
+For each new Cython file, with extension .pyx, add the header lines (see cyt_ext.pyx as example)
 """
 # Apparently setuptools is the news standard:
 # https://stackoverflow.com/questions/32528560/
@@ -36,7 +40,7 @@ def parse_requirements(path):
     return list_pkg
 
 
-cython_module = cythonize(['plot_me/cyt_ext/cyt_ext.pyx'])
+cython_module = cythonize(['plot_me/cyt_ext/cyt_ext.pyx'], language_level="3", language="c++")
 # Can use Extension()
 
 setup(
