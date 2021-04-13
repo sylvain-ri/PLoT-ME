@@ -41,7 +41,7 @@ logger = init_logger("cyt_ext")
 # Related to DNA
 cdef:
     unsigned int k = 4
-    list nucleotides = [b"A", b"C", b"G", b"T"]
+    str nucleotides = "ACGT"
     float [::1] codon_k4 = np.zeros(256, dtype=np.float32)  # [float 0. for _ in range(256)]
     dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
     unordered_map [unsigned char, unsigned int] nucl_val
@@ -68,12 +68,12 @@ cdef:
 
 # ##########################             UTILITIES             ##########################
 
-cdef combinations(list combi, unsigned int n, list instances=nucleotides):
+cdef combinations(str combi, unsigned int k):
     """ Return combinations from the char in instances. Using for finding possible k-mers, for a given n/k """
-    if n == 1:
+    if k == 1:
         return combi
     else:
-        return [f"{a}{k}" for a in combinations(combi, n - 1) for k in instances]
+        return [f"{a}{b}" for a in combinations(combi, k - 1) for b in combi]
 
 cdef conversion_table_rc = str.maketrans("ACTG", "TGAC")
 cdef reverse_complement_string(str seq):
