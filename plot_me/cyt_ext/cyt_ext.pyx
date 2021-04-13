@@ -47,7 +47,7 @@ cdef:
     str nucleotides = "ACGT"
     float [::1] template_kmer_counts
     # dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
-    unordered_map [unsigned char, unsigned int] nucl_val
+    unordered_map [char, unsigned int] nucl_val
 nucl_val[b"A"] = 0
 nucl_val[b"a"] = 0
 nucl_val[b"C"] = 1
@@ -92,9 +92,9 @@ cdef unsigned int codon_addr(str codon):
     cdef unsigned int length = len(codon)  # todo replace len() by class.k
     cdef unsigned int i
     cdef unsigned int total = 0
-    cdef unsigned char codon_char
+    cdef char codon_char
     for i in range(length):
-        codon_char = <unsigned char>codon[i]  # todo: needed ?
+        codon_char = <char>codon[i]  # todo: needed ?
         total += nucl_val[codon_char] * 4 ** (length-1 - i)
     return total
 
@@ -161,7 +161,6 @@ cdef float [::1] kmer_counter(char *stream, unsigned int k_value=4):
     """
     Counting k-mers for one line/sequence/read. Return an array counts, alphabetically ordered
     :param stream: one line of a fastq/fast file
-    :param stream_len: length of the stream
     :param k_value: value of k (k-mer)
     :return: array of length n_dim_rc_combined(k)
     """
@@ -178,7 +177,7 @@ cdef float [::1] kmer_counter(char *stream, unsigned int k_value=4):
         unsigned int recover_addr = 0
         unsigned int fails = 0
         unsigned long long counter = 4
-        unsigned char letter = b'N'  # initializing the while loop
+        char letter = b'N'  # initializing the while loop
 
     if verbosity <= 10: logger.debug(f"empty codons counts[0]{kmer_counts[0]}, stream[:10]{stream[:10]}")
     if stream_len <= k_value:
@@ -290,22 +289,6 @@ cdef process_file(str filename, str file_format="fastq"):
 def py_process_file(filename, file_format="fastq"):
     return process_file(filename, file_format)
 
-# cdef process_file2(str filename, str file_format="fastq"):
-#     """ Read a file and return the k-mer count """
-#     cdef:
-#         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
-#         unsigned long long line_nb = 0
-#         size_t length
-#         float [::1] counts
-#
-#     for line, length in read_file(filename):
-#         if line_nb % modulo == 1:
-#             counts = kmer_counter(line, length)
-#         line_nb+= 1
-#     return counts
-#
-# def py_process_file2(filename, file_format="fastq"):
-#     return process_file(filename, file_format)
 #
 cdef process_file3(str filename, str file_format="fastq"):
     """ Fast Cython file reader
@@ -344,7 +327,7 @@ def py_process_file3(filename, file_format="fastq"):
 from tqdm import tqdm
 def python_process(filename, file_format="fastq"):
 
-    cdef long long  modulo = 4 if file_format.lower() == "fastq" else 2
+    cdef long long modulo = 4 if file_format.lower() == "fastq" else 2
     cdef long long line_nb = 0
     cdef char * line
     cdef float [:] counts
