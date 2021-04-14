@@ -35,6 +35,7 @@ https://github.com/sylvain-ri/PLoT-ME
 """
 
 import argparse
+from cython import compiled as cython_is_there
 from glob import glob
 import shutil
 from copy import deepcopy
@@ -64,6 +65,7 @@ from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
+from plot_me import cyt_ext
 
 
 logger = init_logger('parse_DB')
@@ -132,7 +134,10 @@ class Genome:
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
             # TODO Cyt: use Cython kmer counter if possible, fallback on Python otherwise
-            kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k)
+            if cython_is_there:
+                kmer_count = cyt_ext.kmer_counter(str.encode(str(segment.seq)), k=self.k)
+            else:
+                kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k)
             for_csv.append((taxon, cat, start, end, segment.name, segment.description, self.path_fna,
                             *kmer_count.values() ))
         # kmer_keys = list(self.kmer_count_zeros.keys())
@@ -147,10 +152,13 @@ class Genome:
         logger.debug(f"saved kmer count to {path_kmers}")
 
     @classmethod
-    def set_k_kmers(cls, k):
+    def initialize_set_k_mers(cls, k):
         cls.K = k
         cls.col_kmers = combinaisons(nucleotides, k)
         cls.kmer_count_zeros = kmers_dic(k)
+        if cython_is_there:
+            logger.info(f"Cython is available, initializing variables")
+            cyt_ext.init_variables(k, logger.INFO)
 
 
 def create_n_folders(path, n, delete_existing=False):
@@ -249,7 +257,7 @@ def scan_RefSeq_kmer_counts(scanning, folder_kmers, stop=-1):
     logger.info("scanning through all genomes in refseq to count kmer distributions " + scanning)
 
     # Count in parallel. islice() to take a part of an iterable
-    Genome.set_k_kmers(main.k)
+    Genome.initialize_set_k_mers(main.k)
     with Pool(main.cores) as pool:
         results = list(tqdm(pool.imap(parallel_kmer_counting, islice(ScanFolder.tqdm_scan(with_tqdm=False),
                                                                      stop if stop>0 else None)),
@@ -447,7 +455,7 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters):
     add_file_with_parameters(path_db_bins, add_description=f"cluster number = {clusters}")
 
     logger.info(f"Copy genomes segments to their respective bin into {path_db_bins}")
-    Genome.set_k_kmers(main.k)
+    Genome.initialize_set_k_mers(main.k)
     try:
         with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
             results = list(tqdm(pool.imap(pll_copy_segments_to_bin, df_per_fna), total=len(df_per_fna), dynamic_ncols=True))
