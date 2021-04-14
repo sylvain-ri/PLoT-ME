@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 # coding: utf-8
 # cython: language_level=3, infer_types=True, boundscheck=True, profile=True, wraparound=False
-# distutils: language=c++
+# distutils: language=c
 # unused args: wraparound=False, cdivision=True
 # defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
@@ -31,7 +31,6 @@ from plot_me.tools import init_logger
 # Lib for Cython
 import numpy as np
 cimport numpy as np
-from libcpp.unordered_map cimport unordered_map
 from libc.stdio cimport FILE
 
 
