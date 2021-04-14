@@ -44,7 +44,7 @@ def parse_requirements(path):
 cython_module = cythonize(Extension("cyt_ext", ['plot_me/cyt_ext/cyt_ext.pyx'],
                                     extra_compile_args=['-fopenmp'],
                                     extra_link_args=['-fopenmp'],),
-                          language_level="3", language="c++")
+                          language_level="3")
 # Can use Extension()
 
 setup(
