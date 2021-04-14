@@ -15,7 +15,7 @@ Cython FAQ : https://github.com/cython/cython/wiki/FAQ
 """
 # Apparently setuptools is the news standard:
 # https://stackoverflow.com/questions/32528560/
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup, Extension
 # setuptools MUST be imported first. https://stackoverflow.com/questions/21594925/
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
@@ -41,7 +41,10 @@ def parse_requirements(path):
     return list_pkg
 
 
-cython_module = cythonize(['plot_me/cyt_ext/cyt_ext.pyx'], language_level="3", language="c++")
+cython_module = cythonize(Extension("cyt_ext", ['plot_me/cyt_ext/cyt_ext.pyx'],
+                                    extra_compile_args=['-fopenmp'],
+                                    extra_link_args=['-fopenmp'],),
+                          language_level="3", language="c++")
 # Can use Extension()
 
 setup(
