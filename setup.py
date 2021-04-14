@@ -12,6 +12,8 @@ Setup to build python files, with Cython
 CMD: python3 setup.py build_ext --inplace    (add for Windows: --compiler=mingw32)
 For each new Cython file, with extension .pyx, add the header lines (see cyt_ext.pyx as example)
 Cython FAQ : https://github.com/cython/cython/wiki/FAQ
+If Pure Python is needed, then create .pxd file for each.py file
+https://cython.readthedocs.io/en/latest/src/tutorial/pure.html
 """
 # Apparently setuptools is the news standard:
 # https://stackoverflow.com/questions/32528560/
