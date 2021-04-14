@@ -29,13 +29,15 @@ def fib_pure_python(n):
 from plot_me.tools import init_logger
 
 # Lib for Cython
-import cython
-cimport cython
 import numpy as np
 cimport numpy as np
 from libcpp.unordered_map cimport unordered_map
 from libc.stdio cimport FILE
 
+
+DEF ADDR_ERROR  = 8192  # Value above the possible address of the codon: if k=5, max addr is 4**(5+1)
+DEF INFO        = 20
+DEF DEBUG       = 10
 
 logger = init_logger("cyt_ext")
 
@@ -43,19 +45,24 @@ logger = init_logger("cyt_ext")
 # ##########################    CONSTANTS AND VARIABLES FOR FUNCTIONS   ##########################
 # Related to DNA
 cdef:
-    unsigned int verbosity = 30
-    str nucleotides = "ACGT"
-    float [::1] template_kmer_counts
+    unsigned int verbosity   = 30
+    str          nucleotides = "ACGT"
+    float [::1]  template_kmer_counts
     # dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
-    unordered_map [char, unsigned int] nucl_val
-nucl_val[b"A"] = 0
-nucl_val[b"a"] = 0
-nucl_val[b"C"] = 1
-nucl_val[b"c"] = 1
-nucl_val[b"G"] = 2
-nucl_val[b"g"] = 2
-nucl_val[b"T"] = 3
-nucl_val[b"t"] = 3
+
+cdef unsigned int nucl_val(char c) nogil:
+    """ Map of letters TO value (for addressing the k-mer array """
+    if c == b"A" or c == b"a":
+        return 0
+    elif c == b"C" or c == b"c":
+        return 1
+    elif c == b"G" or c == b"g":
+        return 2
+    elif c == b"T" or c == b"t":
+        return 3
+    else:
+        return ADDR_ERROR
+
 
 # Related to combining k-mer counts.
 cdef:
@@ -95,7 +102,7 @@ cdef unsigned int codon_addr(str codon):
     cdef char codon_char
     for i in range(length):
         codon_char = <char>codon[i]  # todo: needed ?
-        total += nucl_val[codon_char] * 4 ** (length-1 - i)
+        total += nucl_val(codon_char) * 4 ** (length-1 - i)
     return total
 
 cdef combine_counts_with_reverse_complement(float[:] counts):
@@ -112,7 +119,7 @@ cdef combine_counts_with_reverse_complement(float[:] counts):
 cdef _init_variables(unsigned int k, unsigned int logging_level=30):
     """ Initialize k and indexes for fast processing """
     # Build the mapping to convert fast
-    if verbosity <= 20: logger.debug("Initializing Indexes for k-mer counting ")
+    if verbosity <= INFO: logger.debug("Initializing Indexes for k-mer counting ")
     global verbosity
     verbosity = logging_level
     logger.setLevel(logging_level)
@@ -167,56 +174,57 @@ cdef float [::1] kmer_counter(char *stream, unsigned int k_value=4):
     # stream = str(stream)
     # codons = codon_template.copy()
     # if debug >= 2: print(len(stream), flush=True)
-    if verbosity <= 10: logger.debug("comes to the kmer counter")
+    if verbosity <= DEBUG: logger.debug("comes to the kmer counter")
 
     cdef:
         float [::1] kmer_counts = template_kmer_counts.copy()
         unsigned int stream_len = len(stream)
         unsigned int last_failed = 0
         unsigned int addr = 0
+        unsigned int max_addr = 4**k_value - 1
+        unsigned int new_addr_mul = 4**(k_value - 1)
         unsigned int recover_addr = 0
         unsigned int fails = 0
-        unsigned long long counter = 4
+        unsigned long long counter = k_value
         char letter = b'N'  # initializing the while loop
 
-    if verbosity <= 10: logger.debug(f"empty codons counts[0]{kmer_counts[0]}, stream[:10]{stream[:10]}")
+    if verbosity <= DEBUG: logger.debug(f"empty codons counts[0]{kmer_counts[0]}, stream[:10]{stream[:10]}")
     if stream_len <= k_value:
         if verbosity <= 30: logger.warning("Sequence was shorter than the k used")
-        if verbosity <= 20: logger.warning(stream)
+        if verbosity <= INFO: logger.warning(stream)
         return kmer_counts
 
-    addr = nucl_val[stream[0]] + 4*nucl_val[stream[1]] + 16*nucl_val[stream[2]] + 64*nucl_val[stream[3]]
-    if verbosity <= 10: logger.debug(f"addr for the kmer counter: {addr}")
-    kmer_counts[addr] += 1
-    counter = k_value
-    if verbosity <= 10: logger.debug(f"Starting loop")
+    addr = nucl_val(stream[0]) + 4*nucl_val(stream[1]) + 16*nucl_val(stream[2]) + 64*nucl_val(stream[3])
+    if addr > max_addr:
+        addr = ADDR_ERROR       # force error for next step
+        recover_addr = 0  # prepare the next accurate address
+        last_failed += 1
+    else:
+        kmer_counts[addr] += 1
 
+    if verbosity <= DEBUG: logger.debug(f"Starting loop")
     for counter in range(4, stream_len):
-        # try:
         letter = stream[counter]
-        # except:
-        #     print(counter, stream, flush=True)
-        try:
-            addr = addr // 4 + nucl_val[letter] * 64
+        addr = addr // 4 + nucl_val(letter) * new_addr_mul
+        if addr < max_addr:
             kmer_counts[addr] += 1
-        except:
+        else:
             if last_failed == 0:
-                addr = 1024       # force error for next step
+                addr = ADDR_ERROR       # force error for next step
                 recover_addr = 0  # prepare the next accurate address
                 last_failed += 1
 
             elif last_failed <= 2:
-                addr = 1024
-                recover_addr = recover_addr // 4 + nucl_val[letter] * 64
+                addr = ADDR_ERROR
+                recover_addr = recover_addr // 4 + nucl_val(letter) * new_addr_mul
                 last_failed += 1
 
             else:  # last_failed reached 3
                 addr = recover_addr
                 last_failed = 0
                 fails += 1
-        # counter += 1
 
-    if verbosity <= 20: logger.info(f"stream length:{counter}, fails:{fails}")
+    if verbosity <= INFO: logger.info(f"stream length:{counter}, fails:{fails}")
     return kmer_counts  #, fails
 
 def py_kmer_counter(sequence, k=4):
@@ -257,7 +265,7 @@ def read_file(filename):
         if read == -1: break
         # length = seed - last_seed
         # last_seed = seed
-        if verbosity <= 15: logger.info(f"Line read: given length={length}, measured length:{len(line)}, {line[:10]}")
+        if verbosity <= DEBUG: logger.info(f"Line read: given length={length}, measured length:{len(line)}, {line[:10]}")
         # if length > 1:
         #     if line[length-1] == 10:
         #         print(f"(-1) length is {length} ")
@@ -307,6 +315,7 @@ cdef process_file3(str filename, str file_format="fastq"):
         size_t length = 0
         ssize_t read
         float [::1] counts
+        list list_counts = []
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
 
@@ -315,16 +324,17 @@ cdef process_file3(str filename, str file_format="fastq"):
         if read == -1: break
         if line_nb % modulo == 1:
             counts = kmer_counter(line)
+            list_counts.append(counts)
         line_nb += 1
 
     fclose(cfile)
-    return counts
+    return list_counts
 
 def py_process_file3(filename, file_format="fastq"):
     return process_file3(filename, file_format)
 
 
-from tqdm import tqdm
+
 def python_process(filename, file_format="fastq"):
 
     cdef long long modulo = 4 if file_format.lower() == "fastq" else 2
@@ -333,7 +343,7 @@ def python_process(filename, file_format="fastq"):
     cdef float [:] counts
     list_counts = []
     with open(filename, "rb") as f:
-        for line in tqdm(f):
+        for line in f:
             if line_nb % modulo == 1:
                 counts = kmer_counter(line)
                 list_counts.append(counts)
