@@ -1,9 +1,8 @@
 #! /usr/bin/env python3
 # coding: utf-8
 # cython: language_level=3, infer_types=True, boundscheck=True, profile=True, wraparound=False
-# distutils: language=c
+# distutils: language=c, define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 # unused args: wraparound=False, cdivision=True
-# defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 """
 python3 setup.py build_ext --inplace
@@ -157,7 +156,7 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
             codons_orig_indexes[counter] = rc_address
             counter += 1
 
-def init_variables(unsigned int k=4, unsigned int logging_level=30):
+def init_variables(unsigned int k=4, unsigned int logging_level=INFO):
     _init_variables(k, logging_level)
 
 init_variables()
@@ -168,7 +167,7 @@ init_variables()
 # @cython.boundscheck(False)  # Deactivate bounds checking
 # @cython.wraparound(False)   # Deactivate negative indexing.
 # Bytes Faster than const unsigned char [:]
-cdef float [::1] kmer_counter(char *stream, unsigned int k_value=4):
+cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     """
     Counting k-mers for one line/sequence/read. Return an array counts, alphabetically ordered
     :param stream: one line of a fastq/fast file
@@ -231,9 +230,9 @@ cdef float [::1] kmer_counter(char *stream, unsigned int k_value=4):
     if verbosity <= INFO: logger.info(f"stream length:{counter}, fails:{fails}")
     return kmer_counts  #, fails
 
-def py_kmer_counter(sequence, k=4):
+def kmer_counter(sequence, k=4):
     """ Python interface for the Cython k-mer counter """
-    return kmer_counter(sequence, k)
+    return _kmer_counter(sequence, k)
 
 
 # Related to the file reader. Can be replaced by from libc.stdio cimport fopen, fclose, getline ; +10% time
@@ -283,26 +282,26 @@ def read_file(filename):
     return (b"", 0)
 
 
-cdef process_file(str filename, str file_format="fastq"):
+cdef _process_file(str filename, str file_format="fastq"):
     """ Read a file and return the k-mer count """
     cdef:
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
         size_t length
-        line
+        char * line = NULL
         kmer_counts = []
 
     for line in read_file(filename):
         if line_nb % modulo == 1:
-            kmer_counts.append(kmer_counter(line))
+            kmer_counts.append(_kmer_counter(line))
         line_nb+= 1
     return kmer_counts
 
-def py_process_file(filename, file_format="fastq"):
-    return process_file(filename, file_format)
+def process_file(filename, file_format="fastq"):
+    return _process_file(filename, file_format)
 
 #
-cdef process_file3(str filename, str file_format="fastq"):
+cdef _classify_reads(str filename, unsigned int window, str file_format="fastq"):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
     """
@@ -322,24 +321,31 @@ cdef process_file3(str filename, str file_format="fastq"):
         list list_counts = []
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
+        # todo: add variables to hold the whole read (id, seq, +, quality)
 
     while True:
         read = getline(&line, &length, cfile)
         if read == -1: break
         if line_nb % modulo == 1:
-            counts = kmer_counter(line)
-            list_counts.append(counts)
+            # Count all kmers
+            counts = _kmer_counter(line)
+            # todo: fold forward and reverse strand
+
+            # todo: find cluster
+
+            # todo: copy read to bin
+
         line_nb += 1
 
     fclose(cfile)
     return list_counts
 
-def py_process_file3(filename, file_format="fastq"):
-    return process_file3(filename, file_format)
+def classify_reads(filename, file_format="fastq"):
+    return _classify_reads(filename, file_format)
 
 
 
-def python_process(filename, file_format="fastq"):
+def python_preprocess(filename, file_format="fastq"):
 
     cdef long long modulo = 4 if file_format.lower() == "fastq" else 2
     cdef long long line_nb = 0
@@ -349,7 +355,7 @@ def python_process(filename, file_format="fastq"):
     with open(filename, "rb") as f:
         for line in f:
             if line_nb % modulo == 1:
-                counts = kmer_counter(line)
+                counts = _kmer_counter(line)
                 list_counts.append(counts)
             line_nb += 1
     return list_counts
