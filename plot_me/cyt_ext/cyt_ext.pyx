@@ -29,10 +29,11 @@ def fib_pure_python(n):
 from plot_me.tools import init_logger
 
 # Lib for Cython
+cimport cython     # For @cython.boundscheck(False)
 import numpy as np
 cimport numpy as np
 from libc.stdio cimport FILE
-
+from cython.parallel import prange
 
 DEF ADDR_ERROR  = 8192  # Value above the possible address of the codon: if k=5, max addr is 4**(5+1)
 DEF INFO        = 20
@@ -95,20 +96,24 @@ cdef unsigned int n_dim_rc_combined(unsigned int k):
 
 cdef unsigned int codon_addr(str codon):
     """ Take a codon as char array / str and return the address, given its nucleotides """
-    cdef unsigned int length = len(codon)  # todo replace len() by class.k
-    cdef unsigned int i
-    cdef unsigned int total = 0
-    cdef char codon_char
+    cdef:
+        unsigned int length = len(codon)  # todo replace len() by class.k
+        unsigned int i
+        unsigned int total = 0
+        char codon_char
     for i in range(length):
         codon_char = <char>codon[i]  # todo: needed ?
         total += nucl_val(codon_char) * 4 ** (length-1 - i)
     return total
 
+#@cython.boundscheck(False)  # Deactivate bounds checking
+#@cython.wraparound(False)
 cdef combine_counts_with_reverse_complement(float[:] counts):
     """ Combine the forward and reverse complement in the k-mer profile  """
     cdef:
-         cdef float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
-         unsigned int i
+         float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
+         int i
+#    for i in prange(dim_combined_codons, nogil=True):
     for i in range(dim_combined_codons):
         res[i] = counts[codons_orig_indexes[i]] + counts[codons_kept_indexes[i]]
     return res
