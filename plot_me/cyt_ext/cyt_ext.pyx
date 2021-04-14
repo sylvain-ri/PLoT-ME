@@ -49,7 +49,7 @@ cdef:
     float [::1]  template_kmer_counts
     # dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
 
-cdef unsigned int nucl_val(char c) nogil:
+cdef inline unsigned int nucl_val(char c) nogil:
     """ Map of letters TO value (for addressing the k-mer array """
     if c == b"A" or c == b"a":
         return 0
@@ -284,6 +284,7 @@ def read_file(filename):
 
 cdef _process_file(str filename, str file_format="fastq"):
     """ Read a file and return the k-mer count """
+    # todo: buggy, doesn't return the whole list of arrays, some are empty after index ~10
     cdef:
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
