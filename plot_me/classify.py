@@ -47,6 +47,26 @@ from plot_me.bio import kmers_dic, seq_count_kmer
 
 logger = init_logger('classify')
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
+
+cython_is_there = False
+try:
+    try:
+        from plot_me.cython_module import cyt_ext
+    except:
+        from cython_module import cyt_ext
+    cyt_ext.init_variables()
+    cython_is_there = True
+    logger.info("Cython has been imported")
+except ModuleNotFoundError:
+    logger.warning("Module not found: 'from plot_me.cython_module import cython_module'")
+except ImportError:
+    logger.warning("Import error 'from plot_me.cython_module import cython_module'")
+except Exception as e:
+    logger.warning(e)
+    logger.warning("\n ************************************************************ \n"
+                   "Failed to import Cython extension, falling back to pure Python code. \n"
+                   "Please consider raising an issue on github.")
+
 THREADS            = 1
 CLASSIFIERS        = (('kraken2', 'k35_l31_s7'),
                       ("centrifuge", ''))
