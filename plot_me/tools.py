@@ -42,7 +42,7 @@ def init_logger(logger_name='reads_binning', verbose=False):
     ch.setFormatter(formatter)
     # create logger with parse_DB.py and add the handlers to the logger
     new_logger = logging.getLogger(logger_name)
-    new_logger.setLevel(logging.DEBUG if verbose else logging.INFO)
+    new_logger.setLevel(logging.DEBUG)
     new_logger.addHandler(fh)
     new_logger.addHandler(ch)
     return new_logger
