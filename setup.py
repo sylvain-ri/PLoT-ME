@@ -19,7 +19,7 @@ https://levelup.gitconnected.com/how-to-deploy-a-cython-package-to-pypi-8217a658
 """
 # Apparently setuptools is the news standard:
 # https://stackoverflow.com/questions/32528560/
-from setuptools import find_packages, setup, Extension
+from setuptools import find_namespace_packages, setup, Extension
 # setuptools MUST be imported first. https://stackoverflow.com/questions/21594925/
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
@@ -62,7 +62,7 @@ setup(
     long_description_content_type="text/markdown",
     include_package_data=True,
     url="https://github.com/sylvain-ri/PLoT-ME",
-    packages=find_packages(exclude=("tests", "work_in_progress", "plot_me/cyt_ext/work_in_progress")),
+    packages=find_namespace_packages(exclude=("tests", "work_in_progress", "plot_me/cyt_ext/work_in_progress")),
     include_dirs=np.get_include(),
     classifiers=[
         "Intended Audience :: Developers",
@@ -77,10 +77,7 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
-    python_requires=['>=3.7',
-                     'numpy>=1.12.2',
-                     'PyObjC;platform_system=="Darwin"',
-                     'PyGObject;platform_system=="Linux"', ],
+    python_requires='>=3.7',
     install_requires=parse_requirements(REQUIREMENTS),
     entry_points={
         'console_scripts': [
