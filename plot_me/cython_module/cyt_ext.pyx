@@ -35,8 +35,10 @@ from libc.stdio cimport FILE
 from cython.parallel import prange
 
 DEF ADDR_ERROR  = 8192  # Value above the possible address of the codon: if k=5, max addr is 4**(5+1)
+DEF WARNING     = 30
 DEF INFO        = 20
 DEF DEBUG       = 10
+DEF DEBUG_MORE  =  0
 
 logger = init_logger("cyt_ext")
 
@@ -122,7 +124,7 @@ cdef combine_counts_with_reverse_complement(float[:] counts):
 cdef _init_variables(unsigned int k, unsigned int logging_level=30):
     """ Initialize k and indexes for fast processing """
     # Build the mapping to convert fast
-    if verbosity <= INFO: logger.debug("Initializing Indexes for k-mer counting ")
+    if verbosity <= INFO: logger.info("Initializing Indexes for k-mer counting ")
     global verbosity
     verbosity = logging_level
     logger.setLevel(logging_level)
@@ -177,7 +179,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     # stream = str(stream)
     # codons = codon_template.copy()
     # if debug >= 2: print(len(stream), flush=True)
-    if verbosity <= DEBUG: logger.debug("comes to the kmer counter")
+    if verbosity <= DEBUG_MORE: logger.log(0, "comes to the kmer counter")
 
     cdef:
         float [::1] kmer_counts = template_kmer_counts.copy()
@@ -193,8 +195,8 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
 
     if verbosity <= DEBUG: logger.debug(f"empty codons counts[0]{kmer_counts[0]}, stream[:10]{stream[:10]}")
     if stream_len <= k_value:
-        if verbosity <= 30: logger.warning("Sequence was shorter than the k used")
-        if verbosity <= INFO: logger.warning(stream)
+        if verbosity <= WARNING: logger.warning("Sequence was shorter than the k used")
+        if verbosity <= WARNING: logger.warning(stream)
         return kmer_counts
 
     addr = nucl_val(stream[0]) + 4*nucl_val(stream[1]) + 16*nucl_val(stream[2]) + 64*nucl_val(stream[3])
@@ -205,8 +207,8 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     else:
         kmer_counts[addr] += 1
 
-    if verbosity <= DEBUG: logger.debug(f"Starting loop")
-    for counter in range(4, stream_len):
+    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"Starting loop")
+    for counter in range(k_value, stream_len):
         letter = stream[counter]
         addr = addr // 4 + nucl_val(letter) * new_addr_mul
         if addr < max_addr:
@@ -227,7 +229,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
                 last_failed = 0
                 fails += 1
 
-    if verbosity <= INFO: logger.info(f"stream length:{counter}, fails:{fails}")
+    if verbosity <= DEBUG: logger.debug(f"stream length:{counter}, fails:{fails}")
     return kmer_counts  #, fails
 
 def kmer_counter(sequence, k=4):
