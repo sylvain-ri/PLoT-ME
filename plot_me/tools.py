@@ -29,7 +29,7 @@ from plot_me import LOGS
 
 # #############################################################################
 # https://docs.python.org/3/howto/logging-cookbook.html
-def init_logger(logger_name='reads_binning', verbose=True):
+def init_logger(logger_name='reads_binning', verbose=False):
     # create formatter for the handlers
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # create file handler which logs even debug messages
@@ -38,11 +38,11 @@ def init_logger(logger_name='reads_binning', verbose=True):
     fh.setFormatter(formatter)
     # create console handler with a higher log level
     ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO if verbose else logging.DEBUG)
+    ch.setLevel(logging.DEBUG if verbose else logging.INFO)
     ch.setFormatter(formatter)
     # create logger with parse_DB.py and add the handlers to the logger
     new_logger = logging.getLogger(logger_name)
-    new_logger.setLevel(logging.DEBUG)
+    new_logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     new_logger.addHandler(fh)
     new_logger.addHandler(ch)
     return new_logger
