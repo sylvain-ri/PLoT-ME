@@ -14,6 +14,8 @@ For each new Cython file, with extension .pyx, add the header lines (see cyt_ext
 Cython FAQ : https://github.com/cython/cython/wiki/FAQ
 If Pure Python is needed, then create .pxd file for each.py file
 https://cython.readthedocs.io/en/latest/src/tutorial/pure.html
+Good tutorial for Cython package build:
+https://levelup.gitconnected.com/how-to-deploy-a-cython-package-to-pypi-8217a6581f09
 """
 # Apparently setuptools is the news standard:
 # https://stackoverflow.com/questions/32528560/
@@ -21,6 +23,7 @@ from setuptools import find_packages, setup, Extension
 # setuptools MUST be imported first. https://stackoverflow.com/questions/21594925/
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
+import numpy as np
 
 from plot_me import __version__
 
@@ -59,7 +62,8 @@ setup(
     long_description_content_type="text/markdown",
     include_package_data=True,
     url="https://github.com/sylvain-ri/PLoT-ME",
-    packages=find_packages(exclude=("tests", "work_in_progress")),
+    packages=find_packages(exclude=("tests", "work_in_progress", "plot_me/cyt_ext/work_in_progress")),
+    include_dirs=np.get_include(),
     classifiers=[
         "Intended Audience :: Developers",
         "Intended Audience :: Healthcare Industry",
@@ -73,7 +77,10 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
-    python_requires='>=3.7',
+    python_requires=['>=3.7',
+                     'numpy>=1.12.2',
+                     'PyObjC;platform_system=="Darwin"',
+                     'PyGObject;platform_system=="Linux"', ],
     install_requires=parse_requirements(REQUIREMENTS),
     entry_points={
         'console_scripts': [
