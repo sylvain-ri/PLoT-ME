@@ -75,12 +75,12 @@ CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
 cython_is_there = False
 try:
     try:
-        from plot_me.cython_module import cyt_ext
+        from .cython_module import cyt_ext
     except:
         try:
-            from cython_module import cyt_ext
+            from plot_me.cython_module import cyt_ext
         except:
-            from .cython_module import cyt_ext
+            from cython_module import cyt_ext
     cyt_ext.init_variables()
     cython_is_there = True
     logger.info("Cython has been imported")
@@ -92,7 +92,8 @@ except Exception as e:
     logger.warning(e)
     logger.warning("\n ************************************************************ \n"
                    "Failed to import Cython extension, falling back to pure Python code. \n"
-                   "Please consider raising an issue on github.")
+                   "Check the following: https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility \n"
+                   "If this didn't solve your issue, Please consider raising an issue on github.")
 
 
 class Genome:
