@@ -15,7 +15,6 @@ Reads Binning Project
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "0.9.0"
 PLOT_ME_ROOT = Path.home().joinpath("PLoT-ME")
 LOGS = PLOT_ME_ROOT.joinpath(f"logs/{datetime.now():%Y-%m-%d_%H-%M}.log")
 LOGS.parent.mkdir(parents=True, exist_ok=True)
@@ -24,6 +23,6 @@ RECORDS = PLOT_ME_ROOT.joinpath(f"logs/classify_timings.tsv")
 from plot_me import parse_DB, classify, tools, bio
 
 if __name__ == '__main__':
-    print(f"PLoT-ME version {__version__}. "
+    print(f"PLoT-ME : Pre-classification of Long-reads for Memory Efficient Taxonomic assignment "
           f"Information in the readme file and on https://github.com/sylvain-ri/PLoT-ME. ")
 
