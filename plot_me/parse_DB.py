@@ -77,7 +77,10 @@ try:
     try:
         from plot_me.cython_module import cyt_ext
     except:
-        from cython_module import cyt_ext
+        try:
+            from cython_module import cyt_ext
+        except:
+            from .cython_module import cyt_ext
     cyt_ext.init_variables()
     cython_is_there = True
     logger.info("Cython has been imported")
@@ -832,7 +835,7 @@ def arg_parser():
     main(folder_database=args.path_database, folder_output=args.path_plot_me, n_clusters=args.bins,
          k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
          early_stop=args.early, omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy,
-         full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean, verbosity=args.verbosity)
+         full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean, verbose_lvl=args.verbosity)
 
 
 # python ~/Scripts/Reads_Binning/plot_me/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
