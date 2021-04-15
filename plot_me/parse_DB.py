@@ -67,18 +67,28 @@ from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotid
 
 
 logger = init_logger('parse_DB')
+verbosity = 30
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
 
-
+# UGLY but necessary to allow import as raw python code as well as when compiled as a wheel/package
+cython_is_there = False
 try:
-    from plot_me.cyt_ext import cyt_ext
+    try:
+        from plot_me.cython_module import cyt_ext
+    except:
+        from cython_module import cyt_ext
     cyt_ext.init_variables()
     cython_is_there = True
-    logger.info(f"Cython has been imported")
-except:
-    cython_is_there = False
-    logger.warning("Failed to import Cython extension, falling back to pure Python code. "
+    logger.info("Cython has been imported")
+except ModuleNotFoundError:
+    logger.warning("Module not found: 'from plot_me.cython_module import cython_module'")
+except ImportError:
+    logger.warning("Import error 'from plot_me.cython_module import cython_module'")
+except Exception as e:
+    logger.warning(e)
+    logger.warning("\n ************************************************************ \n"
+                   "Failed to import Cython extension, falling back to pure Python code. \n"
                    "Please consider raising an issue on github.")
 
 
@@ -165,11 +175,6 @@ class Genome:
         cls.K = k
         cls.col_kmers = combinaisons(nucleotides, k)
         cls.kmer_count_zeros = kmers_dic(k)
-        if cython_is_there:
-            logger.info(f"Cython is available, initializing variables")
-            cyt_ext.init_variables(k, logger.INFO)
-        else:
-            logger.info(f"Falling back on pure python")
 
 
 def create_n_folders(path, n, delete_existing=False):
@@ -246,6 +251,8 @@ def parallel_kmer_counting(fastq, ):
     if osp.isfile(fastq.path_target):
         logger.debug(f"File already existing, skipping ({fastq.path_target})")
         return
+    else:
+        logger.debug(f"Processing: {fastq.path_abs}")
     with open(fastq.path_check) as f:
         taxon = int(f.read())
     genome = Genome(fastq.path_abs, taxon, window_size=main.w, k=main.k)
@@ -654,16 +661,22 @@ def kraken2_clean(path_bins_hash, n_clusters):
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", full_DB=False, k2_clean=False,
-         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0]):
+         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0], verbose_lvl=30):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
         folder_database : RefSeq root folder
         folder_output   : empty root folder to store kmer counts
     """
+    logger.setLevel(verbose_lvl)
     logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     try:
+        if cython_is_there:
+            logger.info(f"Cython is available, initializing variables")
+            cyt_ext.init_variables(k, verbosity)
+        else:
+            logger.info(f"Falling back on pure python")
         # Common folder name keeping parameters
         param_k_s = f"k{k}_s{window}"
         o_omitted = "" if len(omit_folders) == 0 else "o" + "-".join(omit_folders)
@@ -795,6 +808,8 @@ def arg_parser():
     parser.add_argument('--clean',          help='Make use of kraken2-build --clean to remove temporary files '
                                                  '(library/added/ and others)',
                                             action='store_true',)
+    parser.add_argument('--verbosity',      help='Set the verbosity level (default=%(default)d)',
+                                            default=30, type=int,  metavar='')
     parser.add_argument('-f', '--full_index', help='Build the index with the full RefSeq database for the chosen '
                                                    'classifier, without binning, omitting the directories set by '
                                                    '--omit. Skips all the other steps/processes '
@@ -811,11 +826,13 @@ def arg_parser():
     #                                         default=clustering_segments.models[0])
     args = parser.parse_args()
 
+    logger.setLevel(args.verbosity)
+
     logger.info(f"Script {__file__} called with {args}")
     main(folder_database=args.path_database, folder_output=args.path_plot_me, n_clusters=args.bins,
          k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
          early_stop=args.early, omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy,
-         full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean)
+         full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean, verbosity=args.verbosity)
 
 
 # python ~/Scripts/Reads_Binning/plot_me/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
