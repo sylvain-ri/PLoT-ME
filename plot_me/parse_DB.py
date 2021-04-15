@@ -35,7 +35,6 @@ https://github.com/sylvain-ri/PLoT-ME
 """
 
 import argparse
-from cython import compiled as cython_is_there
 from glob import glob
 import shutil
 from copy import deepcopy
@@ -65,12 +64,22 @@ from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
-from plot_me import cyt_ext
 
 
 logger = init_logger('parse_DB')
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
+
+
+try:
+    from plot_me.cyt_ext import cyt_ext
+    cyt_ext.init_variables()
+    cython_is_there = True
+    logger.info(f"Cython has been imported")
+except:
+    cython_is_there = False
+    logger.warning("Failed to import Cython extension, falling back to pure Python code. "
+                   "Please consider raising an issue on github.")
 
 
 class Genome:
@@ -159,6 +168,8 @@ class Genome:
         if cython_is_there:
             logger.info(f"Cython is available, initializing variables")
             cyt_ext.init_variables(k, logger.INFO)
+        else:
+            logger.info(f"Falling back on pure python")
 
 
 def create_n_folders(path, n, delete_existing=False):
