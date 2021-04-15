@@ -557,7 +557,7 @@ def arg_parser():
 
     args = parser.parse_args()
     logger.debug(f"Script {__file__} called with {args}")
-    if len(args.classifier) is 1:
+    if len(args.classifier) == 1:
         args.classifier.append('')
 
     bin_classify(args.input_fastq, args.path_reports, args.path_plot_me,
