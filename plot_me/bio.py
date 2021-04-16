@@ -46,6 +46,17 @@ def n_dim_rc_combined( k):
     return 2**k + (4**k - 2**k)//2
 
 
+def codons_without_rev_comp(k):
+    """ Forward codons only, without those which have been reverse complemented """
+    l_codons_all = combinaisons(k)
+    l_forward_only = []
+    for cod in l_codons_all:
+        rc = reverse_complement_string(cod)
+        if rc not in l_forward_only:
+            l_forward_only.append(cod)
+    return l_forward_only
+
+
 def table_rev_comp_to_forward_strand(k):
     """ Create a dict with the mapping of FORWARD strand to their REVERSE complements """
     l_codons_all = combinaisons(k)

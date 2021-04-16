@@ -64,7 +64,7 @@ from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_forward_rv, \
-    n_dim_rc_combined, table_rev_comp_to_forward_strand
+    n_dim_rc_combined, codons_without_rev_comp
 
 logger = init_logger('parse_DB')
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
@@ -172,8 +172,7 @@ class Genome:
     @classmethod
     def initialize_set_k_mers(cls, k, combine_rc=True):
         cls.K = k
-        codons = combinaisons(k)
-        cls.col_kmers = list(table_rev_comp_to_forward_strand(k)) if combine_rc else codons
+        cls.col_kmers = codons_without_rev_comp(k) if combine_rc else combinaisons(k)
         cls.kmer_count_zeros = kmers_dic(k)
 
 
@@ -694,7 +693,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             "start": int, "end": int,
             "name": 'category', "description": 'category', "fna_path": 'category',
         }
-        codons = table_rev_comp_to_forward_strand(main.k).keys() if combine_rc else kmers_dic(main.k).keys()
+        codons = codons_without_rev_comp(main.k) if combine_rc else combinaisons(main.k)
         for key in codons:
             cols_types[key] = float32
         main.cols_types = cols_types
