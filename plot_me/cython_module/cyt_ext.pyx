@@ -118,7 +118,10 @@ cdef float[:] combine_counts_with_reverse_complement(float[:] counts):
          int i
 #    for i in prange(dim_combined_codons, nogil=True):
     for i in range(dim_combined_codons):
-        res[i] = counts[ar_codons_rev_comp_addr[i]] + counts[ar_codons_forward_addr[i]]
+        if ar_codons_rev_comp_addr[i] == ar_codons_forward_addr[i]:
+            res[i] = counts[ar_codons_rev_comp_addr[i]]
+        else:
+            res[i] = counts[ar_codons_rev_comp_addr[i]] + counts[ar_codons_forward_addr[i]]
     return res
 
 
