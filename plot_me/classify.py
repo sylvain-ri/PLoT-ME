@@ -45,7 +45,7 @@ from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, i
 from plot_me.bio import kmers_dic, seq_count_kmer
 
 
-logger = init_logger(__name__)
+logger = logging.getLogger(__name__)
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
 
 cython_is_there = False
@@ -414,6 +414,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
                  f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD,
                  skip_clas=False, force_binning=False):
     """ Should load a file, do all the processing """
+    _ = init_logger(__package__)  # initialize the global logger
     logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     global THREADS

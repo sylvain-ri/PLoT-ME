@@ -35,6 +35,7 @@ https://github.com/sylvain-ri/PLoT-ME
 """
 
 import argparse
+import logging
 from glob import glob
 import shutil
 from copy import deepcopy
@@ -66,33 +67,40 @@ from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_pa
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_forward_rv, \
     n_dim_rc_combined, codons_without_rev_comp
 
-logger = init_logger(__package__)   # todo or __name__ ?
+
+logger = logging.getLogger(__name__)
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
 
 # UGLY but necessary to allow import as raw python code as well as when compiled as a wheel/package
 cython_is_there = False
-try:
-    try:
-        from .cython_module import cyt_ext
-    except:
-        try:
-            from plot_me.cython_module import cyt_ext
-        except:
-            from cython_module import cyt_ext
-    cython_is_there = True
-    logger.info("Cython has been imported")
-except ModuleNotFoundError:
-    logger.warning("Module not found: 'from plot_me.cython_module import cython_module'")
-except ImportError:
-    logger.warning("Import error 'from plot_me.cython_module import cython_module'")
-except Exception as e:
-    logger.warning(e)
-    logger.warning("\n ************************************************************ \n"
-                   "Failed to import Cython extension, falling back to pure Python code. \n"
-                   "Check the following: https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility \n"
-                   "If this didn't solve your issue, Please consider raising an issue on github.")
+cyt_ext = ImportError
 
+def import_cython_mod():
+    """ Dirty way of importing cyt_ext """
+    cyt_ext = ImportError
+    try:
+        try:
+            from .cython_module import cyt_ext
+        except:
+            try:
+                from plot_me.cython_module import cyt_ext
+            except:
+                from cython_module import cyt_ext
+        global cython_is_there
+        cython_is_there = True
+        logger.info("Cython has been imported")
+    except ModuleNotFoundError:
+        logger.warning("Module not found: 'from plot_me.cython_module import cython_module'")
+    except ImportError:
+        logger.warning("Import error 'from plot_me.cython_module import cython_module'")
+    except Exception as e:
+        logger.warning(e)
+        logger.warning("\n ************************************************************ \n"
+                       "Failed to import Cython extension, falling back to pure Python code. \n"
+                       "Check the following: https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility \n"
+                       "If this didn't solve your issue, Please consider raising an issue on github.")
+    return cyt_ext
 
 class Genome:
     """ Genome from RefSeq. Methods to split it into plasmid/genome and into segments
@@ -668,10 +676,12 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         folder_database : RefSeq root folder
         folder_output   : empty root folder to store kmer counts
     """
-    logger.setLevel(verbose_lvl)
+    _ = init_logger(__package__)  # initialize the global logger
     logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     try:
+        global cyt_ext
+        cyt_ext = import_cython_mod()
         if cython_is_there:
             logger.info(f"Cython is available, initializing variables")
             cyt_ext.init_variables(k, verbose_lvl)
@@ -826,8 +836,6 @@ def arg_parser():
     #                                         choices=clustering_segments.models, type=str, metavar='',
     #                                         default=clustering_segments.models[0])
     args = parser.parse_args()
-
-    logger.setLevel(args.verbosity)
 
     logger.info(f"Script {__file__} called with {args}")
     main(folder_database=args.path_database, folder_output=args.path_plot_me, n_clusters=args.bins,
