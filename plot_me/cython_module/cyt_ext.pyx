@@ -241,9 +241,12 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
 
 def kmer_counter(sequence, k=4, dictionary=True, combine=True):
     """ Python interface for the Cython k-mer counter """
+    cdef:
+        float [:] kmer_counts
+        dict dict_kmer_counts
+        unsigned int i
+        str key
     if dictionary:
-        cdef float [:] kmer_counts
-        cdef dict_kmer_counts
         if combine:
             kmer_counts = combine_counts_with_reverse_complement(_kmer_counter(sequence, k))
             dict_kmer_counts = d_template_counts_combined.copy()
