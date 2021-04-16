@@ -29,23 +29,28 @@ from plot_me import LOGS
 
 # #############################################################################
 # https://docs.python.org/3/howto/logging-cookbook.html
+loggers = {}
+
 def init_logger(logger_name='reads_binning', verbose=False):
-    # create formatter for the handlers
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # create file handler which logs even debug messages
-    fh = logging.FileHandler(LOGS)
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
-    # create console handler with a higher log level
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG if verbose else logging.INFO)
-    ch.setFormatter(formatter)
-    # create logger with parse_DB.py and add the handlers to the logger
-    new_logger = logging.getLogger(logger_name)
-    new_logger.setLevel(logging.DEBUG)
-    new_logger.addHandler(fh)
-    new_logger.addHandler(ch)
-    return new_logger
+    if loggers.get(logger_name):
+        return loggers.get(logger_name)
+    else:
+        # create formatter for the handlers
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(LOGS)
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        # create console handler with a higher log level
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO if verbose else logging.DEBUG)
+        ch.setFormatter(formatter)
+        # create logger with parse_DB.py and add the handlers to the logger
+        new_logger = logging.getLogger(logger_name)
+        new_logger.setLevel(logging.DEBUG)
+        new_logger.addHandler(fh)
+        new_logger.addHandler(ch)
+        return new_logger
 
 
 logger = init_logger('tools')
