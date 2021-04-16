@@ -63,7 +63,8 @@ from tqdm import tqdm
 from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
-from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides, combine_forward_rv
+from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides, combine_forward_rv, \
+    n_dim_rc_combined
 
 logger = init_logger('parse_DB')
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
@@ -173,9 +174,10 @@ class Genome:
         logger.debug(f"saved kmer count to {path_kmers}")
 
     @classmethod
-    def initialize_set_k_mers(cls, k):
+    def initialize_set_k_mers(cls, k, combine_rc=True):
         cls.K = k
-        cls.col_kmers = combinaisons(nucleotides, k)
+        codons = combinaisons(nucleotides, k)
+        cls.col_kmers = list(combine_forward_rv(codons, k)) if combine_rc else codons
         cls.kmer_count_zeros = kmers_dic(k)
 
 
@@ -327,7 +329,7 @@ def append_genome_kmer_counts(folder_kmers, path_df):
 
 
 @check_step
-def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm"):
+def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, model_name="minikm", combined_rc=True):
     """ Given a database of segments of genomes in fastq files, split it in n clusters/bins """
     assert model_name in clustering_segments.models, f"model {model_name} is not implemented"
     # Paths
@@ -335,6 +337,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     create_path(path_model)
     k = main.k
     w = main.w
+    nb_col = n_dim_rc_combined(k) if combined_rc else 4**k
 
     # https://www.codementor.io/@guidotournois/4-strategies-to-deal-with-large-datasets-using-pandas-qdw3an95k
     # filename = "data.csv"
@@ -361,8 +364,8 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
         df.description = df.description.astype('category')
         df.to_pickle(path_pkl_kmer_counts)
 
-    cols_kmers = df.columns[-4**k:]
-    cols_spe = df.columns[:-4**k]
+    cols_kmers = df.columns[-nb_col:]
+    cols_spe = df.columns[:-nb_col]
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
     # ## 1 ## Scaling by length and kmers
