@@ -111,7 +111,7 @@ cdef unsigned int codon_addr(str codon):
 
 #@cython.boundscheck(False)  # Deactivate bounds checking
 #@cython.wraparound(False)
-cdef float[:] combine_counts_with_reverse_complement(float[:] counts):
+cdef float[:] _combine_counts_with_reverse_complement(float[:] counts):
     """ Combine the forward and reverse complement in the k-mer profile  """
     cdef:
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
@@ -124,6 +124,11 @@ cdef float[:] combine_counts_with_reverse_complement(float[:] counts):
         else:
             res[i] = counts[ar_codons_rev_comp_addr[i]] + counts[ar_codons_forward_addr[i]]
     return res
+
+
+def combine_counts_with_reverse_complement(counts):
+    """ Python API for cython method. combine forward and reverse complement on an array"""
+    return _combine_counts_with_reverse_complement(counts)
 
 
  # ###################    INITIALIZATION OF VARIABLES    ########################
@@ -253,7 +258,7 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
         str key
     if dictionary:
         if combine:
-            kmer_counts = combine_counts_with_reverse_complement(_kmer_counter(sequence, k))
+            kmer_counts = _combine_counts_with_reverse_complement(_kmer_counter(sequence, k))
             dict_kmer_counts = d_template_counts_combined.copy()
         else:
             kmer_counts = _kmer_counter(sequence, k)
@@ -265,7 +270,7 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
 
     else:  # raw data, no dictionary
         if combine:
-            return combine_counts_with_reverse_complement(_kmer_counter(sequence, k))
+            return _combine_counts_with_reverse_complement(_kmer_counter(sequence, k))
         else:
             return _kmer_counter(sequence, k)
 
