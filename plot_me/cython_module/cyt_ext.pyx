@@ -67,12 +67,14 @@ cdef inline unsigned int nucl_val(char c) nogil:
 
 # Related to combining k-mer counts.
 cdef:
-    list codons_list_all = []
-    list codons_list_kept = []
+    dict d_template_counts_all      = {}
+    dict d_template_counts_combined = {}
+    list l_codons_all               = []
+    list l_codons_combined          = []
     unsigned int dim_combined_codons
-    unsigned int [:] codons_kept_indexes
-    unsigned int [:] codons_orig_indexes
-    dict codons_combined = {}
+    unsigned int [:] ar_codons_forward_addr
+    unsigned int [:] ar_codons_rev_comp_addr
+    dict d_codons_orig_target       = {}
 
 
 # ##########################             FUNCTIONS             ##########################
@@ -109,14 +111,14 @@ cdef unsigned int codon_addr(str codon):
 
 #@cython.boundscheck(False)  # Deactivate bounds checking
 #@cython.wraparound(False)
-cdef combine_counts_with_reverse_complement(float[:] counts):
+cdef float[:] combine_counts_with_reverse_complement(float[:] counts):
     """ Combine the forward and reverse complement in the k-mer profile  """
     cdef:
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
          int i
 #    for i in prange(dim_combined_codons, nogil=True):
     for i in range(dim_combined_codons):
-        res[i] = counts[codons_orig_indexes[i]] + counts[codons_kept_indexes[i]]
+        res[i] = counts[ar_codons_rev_comp_addr[i]] + counts[ar_codons_forward_addr[i]]
     return res
 
 
@@ -131,31 +133,36 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
 
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
-    global codons_list_all
-    codons_list_all = combinations(nucleotides, k)
+    global l_codons_all
+    l_codons_all = combinations(nucleotides, k)
     global dim_combined_codons
     dim_combined_codons = n_dim_rc_combined(k)
-    global codons_kept_indexes
-    codons_kept_indexes = np.zeros(dim_combined_codons, dtype=np.uint32)
-    global codons_orig_indexes
-    codons_orig_indexes = np.zeros(dim_combined_codons, dtype=np.uint32)
+    global ar_codons_forward_addr
+    ar_codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
+    global ar_codons_rev_comp_addr
+    ar_codons_rev_comp_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
 
     cdef unsigned int counter, index_codon, rc_address
     cdef str rc, cod
     counter = 0
-    for index_codon, cod in enumerate(codons_list_all):
+    for index_codon, cod in enumerate(l_codons_all):
+        global d_template_counts_all
+        d_template_counts_all[cod] = 0
         rc = reverse_complement_string(cod)
 
-        if index_codon not in codons_combined.keys():
-            global codons_list_kept
-            codons_list_kept.append(cod)
-            global codons_kept_indexes
-            codons_kept_indexes[counter] = index_codon
+        if index_codon not in d_codons_orig_target.keys():
             rc_address = codon_addr(rc)
-            global codons_combined
-            codons_combined[rc_address] = index_codon
-            global codons_orig_indexes
-            codons_orig_indexes[counter] = rc_address
+            global l_codons_combined
+            l_codons_combined.append(cod)
+            global d_codons_orig_target
+            d_codons_orig_target[rc_address] = index_codon
+            global d_template_counts_combined
+            d_template_counts_combined[cod] = 0
+
+            global ar_codons_forward_addr
+            ar_codons_forward_addr[counter] = index_codon
+            global ar_codons_rev_comp_addr
+            ar_codons_rev_comp_addr[counter] = rc_address
             counter += 1
 
 def init_variables(unsigned int k=4, unsigned int logging_level=INFO):
@@ -232,9 +239,28 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     if verbosity <= DEBUG: logger.debug(f"stream length:{counter}, fails:{fails}")
     return kmer_counts  #, fails
 
-def kmer_counter(sequence, k=4):
+def kmer_counter(sequence, k=4, dictionary=True, combine=True):
     """ Python interface for the Cython k-mer counter """
-    return _kmer_counter(sequence, k)
+    if dictionary:
+        cdef float [:] kmer_counts
+        cdef dict_kmer_counts
+        if combine:
+            kmer_counts = combine_counts_with_reverse_complement(_kmer_counter(sequence, k))
+            dict_kmer_counts = d_template_counts_combined.copy()
+        else:
+            kmer_counts = _kmer_counter(sequence, k)
+            dict_kmer_counts = d_template_counts_all.copy()
+
+        for i, key in enumerate(dict_kmer_counts.keys()):
+            dict_kmer_counts[key] = kmer_counts[i]
+        return dict_kmer_counts
+
+    else:  # raw data, no dictionary
+        if combine:
+            return combine_counts_with_reverse_complement(_kmer_counter(sequence, k))
+        else:
+            return _kmer_counter(sequence, k)
+
 
 
 # Related to the file reader. Can be replaced by from libc.stdio cimport fopen, fclose, getline ; +10% time
