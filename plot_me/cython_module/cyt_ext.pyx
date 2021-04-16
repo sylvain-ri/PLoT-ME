@@ -289,7 +289,7 @@ cdef extern from "stdio.h":
 def read_file(filename):
     """ Fast Cython file reader 
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
-        yields the line AND its length !
+        For even faster, could look at : https://github.com/EveryTimeIWill18/Cython_Repo/blob/master/FastFileProcessingWithCython.ipynb
     """
     filename_byte_string = filename.encode("UTF-8")
     cdef char* fname = filename_byte_string
