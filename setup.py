@@ -52,10 +52,11 @@ def parse_requirements(path):
     return list_pkg
 
 
-cython_module = [Extension("plot_me.cython_module.cyt_ext", ['plot_me/cython_module/cyt_ext.pyx'],
+cython_module = cythonize([Extension("plot_me.cython_module.cyt_ext", ['plot_me/cython_module/cyt_ext.pyx'],
                                     extra_compile_args=['-fopenmp'],
                                     extra_link_args=['-fopenmp'],
-                                    include_dirs=["."],), ]
+                                    include_dirs=["."],), ],
+                          language_level="3")
 # Can use Extension()
 
 setup(
