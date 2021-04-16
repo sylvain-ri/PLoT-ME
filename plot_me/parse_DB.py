@@ -63,8 +63,8 @@ from tqdm import tqdm
 from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
-from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides, combine_forward_rv, \
-    n_dim_rc_combined
+from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_forward_rv, \
+    n_dim_rc_combined, table_rev_comp_to_forward_strand
 
 logger = init_logger('parse_DB')
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
@@ -149,12 +149,8 @@ class Genome:
 
     def count_kmers_to_df(self, path_kmers):
         """ Take all splits, count the kmer distribution and save to the kmer folder as pandas DataFrame """
-        # todo: consider combining forward and backward kmers as well as complements.
-        #  Single counter for AAAT, TAAA, TTTA and ATTT
-
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
-            # TODO Cyt: use Cython kmer counter if possible, fallback on Python otherwise
             if cython_is_there:
                 kmer_count = cyt_ext.kmer_counter(str.encode(str(segment.seq)), k=self.k, dictionary=True, combine=True)
             else:
@@ -169,15 +165,15 @@ class Genome:
         df.name        = df.name.astype('category')
         df.fna_path    = df.fna_path.astype('category')
         for col in self.col_kmers:
-            df[col] = df[col].astype("uint16")
+            df[col] = df[col].astype("uint16")   # todo: not using float32 ??
         df.to_pickle(path_kmers)
         logger.debug(f"saved kmer count to {path_kmers}")
 
     @classmethod
     def initialize_set_k_mers(cls, k, combine_rc=True):
         cls.K = k
-        codons = combinaisons(nucleotides, k)
-        cls.col_kmers = list(combine_forward_rv(codons, k)) if combine_rc else codons
+        codons = combinaisons(k)
+        cls.col_kmers = list(table_rev_comp_to_forward_strand(k)) if combine_rc else codons
         cls.kmer_count_zeros = kmers_dic(k)
 
 
@@ -698,7 +694,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             "start": int, "end": int,
             "name": 'category', "description": 'category', "fna_path": 'category',
         }
-        codons = combine_forward_rv(kmers_dic(main.k), main.k).keys() if combine_rc else kmers_dic(main.k).keys()
+        codons = table_rev_comp_to_forward_strand(main.k).keys() if combine_rc else kmers_dic(main.k).keys()
         for key in codons:
             cols_types[key] = float32
         main.cols_types = cols_types
