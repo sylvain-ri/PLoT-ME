@@ -117,6 +117,7 @@ cdef float[:] combine_counts_with_reverse_complement(float[:] counts):
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
          int i
 #    for i in prange(dim_combined_codons, nogil=True):
+    # todo buggy somewhere, the palindrome have all the same value
     for i in range(dim_combined_codons):
         if ar_codons_rev_comp_addr[i] == ar_codons_forward_addr[i]:
             res[i] = counts[ar_codons_rev_comp_addr[i]]
@@ -162,6 +163,7 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
             global d_template_counts_combined
             d_template_counts_combined[cod] = 0
 
+            # todo check values, seems buggy
             global ar_codons_forward_addr
             ar_codons_forward_addr[counter] = index_codon
             global ar_codons_rev_comp_addr
