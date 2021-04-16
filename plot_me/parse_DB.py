@@ -63,11 +63,9 @@ from tqdm import tqdm
 from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size
-from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides
-
+from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, nucleotides, combine_forward_rv
 
 logger = init_logger('parse_DB')
-verbosity = 30
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
 
@@ -81,7 +79,6 @@ try:
             from plot_me.cython_module import cyt_ext
         except:
             from cython_module import cyt_ext
-    cyt_ext.init_variables()
     cython_is_there = True
     logger.info("Cython has been imported")
 except ModuleNotFoundError:
@@ -158,9 +155,10 @@ class Genome:
         for segment, taxon, cat, start, end in self.yield_genome_split():
             # TODO Cyt: use Cython kmer counter if possible, fallback on Python otherwise
             if cython_is_there:
-                kmer_count = cyt_ext.kmer_counter(str.encode(str(segment.seq)), k=self.k)
+                kmer_count = cyt_ext.kmer_counter(str.encode(str(segment.seq)), k=self.k, dictionary=True, combine=True)
             else:
-                kmer_count = seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k)
+                kmer_count = combine_forward_rv(seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k),
+                                                k=self.k)
             for_csv.append((taxon, cat, start, end, segment.name, segment.description, self.path_fna,
                             *kmer_count.values() ))
         # kmer_keys = list(self.kmer_count_zeros.keys())
@@ -665,7 +663,7 @@ def kraken2_clean(path_bins_hash, n_clusters):
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", full_DB=False, k2_clean=False,
-         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0], verbose_lvl=30):
+         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0], verbose_lvl=30, combine_rc=True):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -678,7 +676,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     try:
         if cython_is_there:
             logger.info(f"Cython is available, initializing variables")
-            cyt_ext.init_variables(k, verbosity)
+            cyt_ext.init_variables(k, verbose_lvl)
         else:
             logger.info(f"Falling back on pure python")
         # Common folder name keeping parameters
@@ -697,7 +695,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             "start": int, "end": int,
             "name": 'category', "description": 'category', "fna_path": 'category',
         }
-        for key in kmers_dic(main.k).keys():
+        codons = combine_forward_rv(kmers_dic(main.k), main.k).keys() if combine_rc else kmers_dic(main.k).keys()
+        for key in codons:
             cols_types[key] = float32
         main.cols_types = cols_types
 
