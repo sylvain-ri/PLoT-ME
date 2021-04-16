@@ -21,6 +21,51 @@ logger = init_logger("bio")
 # #############################################################################
 # Methods for nucleotides manipulations
 nucleotides = "ACGT"
+nucl_dico = {'A': 0, 'C': 1, 'G': 2, 'T': 3,
+             'a': 0, 'c': 1, 'g': 2, 't': 3, }
+conversion_table_rc = str.maketrans("ACTG", "TGAC")
+
+
+def reverse_complement_string(seq):
+    """ Return reverse complement string """
+    return seq.translate(conversion_table_rc)[::-1]
+
+
+def codon_addr(codon):
+    """ Take a codon as str and return the address, given its nucleotides """
+    length = len(codon)
+    total = 0
+    for i in range(length):
+        codon_char = codon[i]
+        total += nucl_dico[codon_char] * 4 ** (length-1 - i)
+    return total
+
+
+def n_dim_rc_combined( k):
+    """ Return the number of dimensions, for a given k, for the unique k-mer counts (forward - reverse complement) """
+    return 2**k + (4**k - 2**k)//2
+
+
+def table_rev_comp_to_forward_strand(k):
+    l_codons_all = combinaisons(nucleotides, k)
+    d_codons_orig_target = {}
+    for index_codon, cod in enumerate(l_codons_all):
+        rc = reverse_complement_string(cod)
+
+        if cod not in d_codons_orig_target.keys():
+            d_codons_orig_target[rc] = cod
+    return d_codons_orig_target
+
+
+def combine_forward_rv(d_data, k):
+    """ Combine forward and reverse codon into one. """
+    combined = {}
+    for rc, forward in table_rev_comp_to_forward_strand(k).items():
+        if forward == rc:
+            combined[forward] = d_data[forward]
+        else:
+            combined[forward] = d_data[forward] + d_data[rc]
+    return combined
 
 
 def kmers_dic(n, choice=nucleotides):
