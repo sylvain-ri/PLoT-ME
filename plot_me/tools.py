@@ -43,7 +43,7 @@ def init_logger(logger_name='reads_binning', verbose=False):
         fh.setFormatter(formatter)
         # create console handler with a higher log level
         ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO if verbose else logging.DEBUG)
+        ch.setLevel(logging.DEBUG if verbose else logging.INFO)
         ch.setFormatter(formatter)
         # create logger with parse_DB.py and add the handlers to the logger
         new_logger = logging.getLogger(logger_name)
