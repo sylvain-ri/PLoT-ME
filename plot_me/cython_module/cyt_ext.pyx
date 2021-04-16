@@ -81,12 +81,12 @@ cdef:
 
 # ##########################             UTILITIES             ##########################
 
-cdef combinations(str combi, unsigned int k):
+cdef combinations(k, combi=nucleotides):
     """ Return combinations from the char in instances. Using for finding possible k-mers, for a given n/k """
     if k == 1:
         return combi
     else:
-        return [f"{a}{b}" for a in combinations(combi, k - 1) for b in combi]
+        return [f"{a}{b}" for a in combinations(k - 1, combi) for b in combi]
 
 cdef conversion_table_rc = str.maketrans("ACTG", "TGAC")
 cdef reverse_complement_string(str seq):
@@ -138,7 +138,7 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
     global l_codons_all
-    l_codons_all = combinations(nucleotides, k)
+    l_codons_all = combinations(k)
     global dim_combined_codons
     dim_combined_codons = n_dim_rc_combined(k)
     global ar_codons_forward_addr
