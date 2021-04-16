@@ -13,9 +13,9 @@ import traceback
 # todo: check if this logger works
 import ete3.ncbi_taxonomy
 
-from plot_me.tools import init_logger
+import logging
 
-logger = init_logger("bio")
+logger = logging.getLogger(__name__)
 
 
 # #############################################################################

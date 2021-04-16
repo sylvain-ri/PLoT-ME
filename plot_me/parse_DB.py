@@ -66,7 +66,7 @@ from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_pa
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_forward_rv, \
     n_dim_rc_combined, codons_without_rev_comp
 
-logger = init_logger('parse_DB')
+logger = init_logger(__package__)   # todo or __name__ ?
 CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
                    ("centrifuge", ))
 

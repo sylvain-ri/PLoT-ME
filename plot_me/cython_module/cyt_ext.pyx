@@ -25,7 +25,7 @@ def fib_pure_python(n):
                    i=cython.int)
 """
 
-from plot_me.tools import init_logger
+import logging
 
 # Lib for Cython
 cimport cython     # For @cython.boundscheck(False)
@@ -40,7 +40,7 @@ DEF INFO        = 20
 DEF DEBUG       = 10
 DEF DEBUG_MORE  =  0
 
-logger = init_logger("cyt_ext")
+logger = logging.getLogger(__name__)
 
 
 # ##########################    CONSTANTS AND VARIABLES FOR FUNCTIONS   ##########################

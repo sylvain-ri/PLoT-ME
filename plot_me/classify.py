@@ -45,7 +45,7 @@ from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, i
 from plot_me.bio import kmers_dic, seq_count_kmer
 
 
-logger = init_logger('classify')
+logger = init_logger(__name__)
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
 
 cython_is_there = False
