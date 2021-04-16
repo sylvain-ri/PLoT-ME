@@ -63,7 +63,7 @@ from tqdm import tqdm
 # Import paths and constants for the whole project
 from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
-    time_to_hms, delete_folder_if_exists, bash_process, f_size
+    time_to_hms, delete_folder_if_exists, bash_process, f_size, import_cython_mod
 from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_forward_rv, \
     n_dim_rc_combined, codons_without_rev_comp
 
@@ -76,31 +76,6 @@ CLASSIFIERS     = (('kraken2', 'k', '35', 'l', '31', 's', '7'),
 cython_is_there = False
 cyt_ext = ImportError
 
-def import_cython_mod():
-    """ Dirty way of importing cyt_ext """
-    cyt_ext = ImportError
-    try:
-        try:
-            from .cython_module import cyt_ext
-        except:
-            try:
-                from plot_me.cython_module import cyt_ext
-            except:
-                from cython_module import cyt_ext
-        global cython_is_there
-        cython_is_there = True
-        logger.info("Cython has been imported")
-    except ModuleNotFoundError:
-        logger.warning("Module not found: 'from plot_me.cython_module import cython_module'")
-    except ImportError:
-        logger.warning("Import error 'from plot_me.cython_module import cython_module'")
-    except Exception as e:
-        logger.warning(e)
-        logger.warning("\n ************************************************************ \n"
-                       "Failed to import Cython extension, falling back to pure Python code. \n"
-                       "Check the following: https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility \n"
-                       "If this didn't solve your issue, Please consider raising an issue on github.")
-    return cyt_ext
 
 class Genome:
     """ Genome from RefSeq. Methods to split it into plasmid/genome and into segments

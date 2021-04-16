@@ -41,7 +41,7 @@ from tqdm import tqdm
 # Import paths and constants for the whole project
 from plot_me import RECORDS
 from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
-    time_to_hms, f_size, bash_process
+    time_to_hms, f_size, bash_process, import_cython_mod
 from plot_me.bio import kmers_dic, seq_count_kmer
 
 
@@ -49,27 +49,7 @@ logger = logging.getLogger(__name__)
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
 
 cython_is_there = False
-try:
-    try:
-        from .cython_module import cyt_ext
-    except:
-        try:
-            from plot_me.cython_module import cyt_ext
-        except:
-            from cython_module import cyt_ext
-    cyt_ext.init_variables()
-    cython_is_there = True
-    logger.info("Cython has been imported")
-except ModuleNotFoundError:
-    logger.warning("Module not found: 'from plot_me.cython_module import cython_module'")
-except ImportError:
-    logger.warning("Import error 'from plot_me.cython_module import cython_module'")
-except Exception as e:
-    logger.warning(e)
-    logger.warning("\n ************************************************************ \n"
-                   "Failed to import Cython extension, falling back to pure Python code. \n"
-                   "Check the following: https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility \n"
-                   "If this didn't solve your issue, Please consider raising an issue on github.")
+cyt_ext         = ImportError
 
 THREADS            = 1
 CLASSIFIERS        = (('kraken2', 'k35_l31_s7'),
@@ -419,6 +399,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     logger.info("**** Starting script **** \n ")
     global THREADS
     THREADS = threads
+    global cyt_ext
+    cyt_ext = import_cython_mod()
 
     # preparing csv record file
     if not osp.isfile(f_record):

@@ -26,6 +26,8 @@ from tqdm import tqdm
 
 from plot_me import LOGS
 
+logger = logging.getLogger(__name__)
+
 
 # #############################################################################
 # https://docs.python.org/3/howto/logging-cookbook.html
@@ -36,7 +38,7 @@ def init_logger(logger_name='reads_binning', verbose=False):
     #     return loggers.get(logger_name)
     # else:
     # create formatter for the handlers
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s --- %(message)s')
     # create file handler which logs even debug messages
     fh = logging.FileHandler(LOGS)
     fh.setLevel(logging.DEBUG)
@@ -51,9 +53,6 @@ def init_logger(logger_name='reads_binning', verbose=False):
     new_logger.addHandler(fh)
     new_logger.addHandler(ch)
     return new_logger
-
-
-logger = logging.getLogger(__name__)
 
 
 # #############################################################################
@@ -361,6 +360,32 @@ class ScanFolder:
     def __repr__(self):
         return self.path_abs
 
+
+def import_cython_mod():
+    """ Dirty way of importing cyt_ext """
+    cyt_ext = ImportError
+    try:
+        try:
+            from .cython_module import cyt_ext
+        except:
+            try:
+                from plot_me.cython_module import cyt_ext
+            except:
+                from cython_module import cyt_ext
+        global cython_is_there
+        cython_is_there = True
+        logger.info("Cython has been imported")
+    except ModuleNotFoundError:
+        logger.warning("Module not found: 'from plot_me.cython_module import cython_module'")
+    except ImportError:
+        logger.warning("Import error 'from plot_me.cython_module import cython_module'")
+    except Exception as e:
+        logger.warning(e)
+        logger.warning("\n ************************************************************ \n"
+                       "Failed to import Cython extension, falling back to pure Python code. \n"
+                       "Check the following: https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility \n"
+                       "If this didn't solve your issue, Please consider raising an issue on github.")
+    return cyt_ext
 
 # #############################################################################
 # Save for programming
