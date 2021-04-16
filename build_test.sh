@@ -15,8 +15,8 @@ wheel_name=$(ls -t wheelhouse/*.whl | head -1)
 echo "wheel_name $wheel_name"
 python3 -m pip install "$wheel_name"
 
-echo " -> DELETE OLD DB"
 path_DB="/mnt/data/PLoT-ME-DB"
+echo " -> DELETE OLD DB : $path_DB"
 rm -r "$path_DB/k4_s10000/"
 
 echo " -> COMMAND TO EXECUTE: "
