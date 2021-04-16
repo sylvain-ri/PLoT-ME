@@ -47,20 +47,21 @@ def n_dim_rc_combined( k):
 
 
 def table_rev_comp_to_forward_strand(k):
-    l_codons_all = combinaisons(nucleotides, k)
+    """ Create a dict with the mapping of FORWARD strand to their REVERSE complements """
+    l_codons_all = combinaisons(k)
     d_codons_orig_target = {}
     for index_codon, cod in enumerate(l_codons_all):
         rc = reverse_complement_string(cod)
 
         if cod not in d_codons_orig_target.keys():
-            d_codons_orig_target[rc] = cod
+            d_codons_orig_target[cod] = rc
     return d_codons_orig_target
 
 
 def combine_forward_rv(d_data, k):
     """ Combine forward and reverse codon into one. """
     combined = {}
-    for rc, forward in table_rev_comp_to_forward_strand(k).items():
+    for forward, rc in table_rev_comp_to_forward_strand(k).items():
         if forward == rc:
             combined[forward] = d_data[forward]
         else:
@@ -69,14 +70,16 @@ def combine_forward_rv(d_data, k):
 
 
 def kmers_dic(n, choice=nucleotides):
-    return {a: 0.0 for a in combinaisons(choice, n)}
+    """ From a list, create a dict with these keys and value 0.0 """
+    return {a: 0.0 for a in combinaisons(n, choice)}
 
 
-def combinaisons(combi, n, instances=nucleotides):
+def combinaisons(n=4, combi=nucleotides):
+    """ Give all combinations of length n for the items in combi (str of list) """
     if n == 1:
         return combi
     else:
-        return [f"{a}{n}" for a in combinaisons(combi, n-1) for n in instances]
+        return [f"{a}{b}" for a in combinaisons(n-1, combi) for b in combi]
 
 
 def seq_to_window(seq, window_size=4):
