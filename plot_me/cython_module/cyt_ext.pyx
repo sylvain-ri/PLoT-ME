@@ -193,16 +193,17 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
         d_template_counts_all[cod] = 0
         rc = _reverse_complement_string(cod)
 
-        if index_codon not in d_codons_orig_target.keys():
-            rc_address = _codon_addr(rc)
+        if rc not in d_codons_orig_target.keys():
+            global d_codons_orig_target
+            d_codons_orig_target[cod] = rc
+
             global l_codons_combined
             l_codons_combined.append(cod)
-            global d_codons_orig_target
-            d_codons_orig_target[rc_address] = index_codon
             global d_template_counts_combined
             d_template_counts_combined[cod] = 0
 
             # todo check values, seems buggy
+            rc_address = _codon_addr(rc)
             global ar_codons_forward_addr
             ar_codons_forward_addr[counter] = index_codon
             global ar_codons_rev_comp_addr
