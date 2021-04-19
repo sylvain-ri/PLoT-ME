@@ -109,9 +109,13 @@ cdef _reverse_complement_string(str seq):
 def reverse_complement_string(seq):
     return _reverse_complement_string(seq)
 
-cdef unsigned int n_dim_rc_combined(unsigned int k):
+cdef unsigned int _n_dim_rc_combined(unsigned int k):
     """ Return the number of dimensions, for a given k, for the unique k-mer counts (forward - reverse complement) """
-    return 2**k + (4**k - 2**k)//2
+    return 2**k + (4**k - 2**k)//2 if k % 2 == 0 else 4**k // 2
+
+def n_dim_rc_combined(k):
+    return _n_dim_rc_combined(k)
+
 
 cdef unsigned int _codon_addr(str codon):
     """ Take a codon as char array / str and return the address, given its nucleotides """
@@ -165,7 +169,7 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
     global l_codons_all
     l_codons_all = _combinations(k)
     global dim_combined_codons
-    dim_combined_codons = n_dim_rc_combined(k)
+    dim_combined_codons = _n_dim_rc_combined(k)
     global ar_codons_forward_addr
     ar_codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
     global ar_codons_rev_comp_addr
