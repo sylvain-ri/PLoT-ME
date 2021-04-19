@@ -76,28 +76,44 @@ cdef:
     unsigned int [:] ar_codons_rev_comp_addr
     dict d_codons_orig_target       = {}
 
+# ##########################              GETTERS              ##########################
+def get_dim_combined_codons():
+    return dim_combined_codons
+def get_d_template_counts_combined():
+    return d_template_counts_combined
+def get_ar_codons_forward_addr():
+    return ar_codons_forward_addr
+def get_ar_codons_rev_comp_addr():
+    return ar_codons_rev_comp_addr
+
 
 # ##########################             FUNCTIONS             ##########################
 
 # ##########################             UTILITIES             ##########################
 
-cdef combinations(k, combi=nucleotides):
+cdef _combinations(int k, str combi=nucleotides):
     """ Return combinations from the char in instances. Using for finding possible k-mers, for a given n/k """
     if k == 1:
         return combi
     else:
-        return [f"{a}{b}" for a in combinations(k - 1, combi) for b in combi]
+        return [f"{a}{b}" for a in _combinations(k - 1, combi) for b in combi]
+
+def combinations(k, combi=nucleotides):
+    return _combinations(k, combi)
 
 cdef conversion_table_rc = str.maketrans("ACTG", "TGAC")
-cdef reverse_complement_string(str seq):
+cdef _reverse_complement_string(str seq):
     """ Return reverse complement string """
     return seq.translate(conversion_table_rc)[::-1]
+
+def reverse_complement_string(seq):
+    return _reverse_complement_string(seq)
 
 cdef unsigned int n_dim_rc_combined(unsigned int k):
     """ Return the number of dimensions, for a given k, for the unique k-mer counts (forward - reverse complement) """
     return 2**k + (4**k - 2**k)//2
 
-cdef unsigned int codon_addr(str codon):
+cdef unsigned int _codon_addr(str codon):
     """ Take a codon as char array / str and return the address, given its nucleotides """
     cdef:
         unsigned int length = len(codon)  # todo replace len() by class.k
@@ -108,6 +124,10 @@ cdef unsigned int codon_addr(str codon):
         codon_char = <char>codon[i]  # todo: needed ?
         total += nucl_val(codon_char) * 4 ** (length-1 - i)
     return total
+
+def codon_addr(codon):
+    return _codon_addr(codon)
+
 
 #@cython.boundscheck(False)  # Deactivate bounds checking
 #@cython.wraparound(False)
@@ -143,7 +163,7 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
     global l_codons_all
-    l_codons_all = combinations(k)
+    l_codons_all = _combinations(k)
     global dim_combined_codons
     dim_combined_codons = n_dim_rc_combined(k)
     global ar_codons_forward_addr
@@ -157,10 +177,10 @@ cdef _init_variables(unsigned int k, unsigned int logging_level=30):
     for index_codon, cod in enumerate(l_codons_all):
         global d_template_counts_all
         d_template_counts_all[cod] = 0
-        rc = reverse_complement_string(cod)
+        rc = _reverse_complement_string(cod)
 
         if index_codon not in d_codons_orig_target.keys():
-            rc_address = codon_addr(rc)
+            rc_address = _codon_addr(rc)
             global l_codons_combined
             l_codons_combined.append(cod)
             global d_codons_orig_target
