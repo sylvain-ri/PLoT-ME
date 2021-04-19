@@ -5,6 +5,7 @@
 # unused args: wraparound=False, cdivision=True
 
 """
+!!!! MUST run this init before using any methods !!!!
 python3 setup.py build_ext --inplace
 
 TODO
@@ -14,7 +15,6 @@ TODO
  * make the binning
  * vectorize the distance calculation
  * save into fastq file
-
 
 ADD LATER, TO MAKE IT COMPATIBLE FOR PURE PYTHON
 import cython
@@ -38,7 +38,7 @@ DEF ADDR_ERROR  = 8192  # Value above the possible address of the codon: if k=5,
 DEF WARNING     = 30
 DEF INFO        = 20
 DEF DEBUG       = 10
-DEF DEBUG_MORE  =  0
+DEF DEBUG_MORE  =  5
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +68,9 @@ cdef inline unsigned int nucl_val(char c) nogil:
 # Related to combining k-mer counts.
 cdef:
     unsigned int dim_combined_codons
-    dict d_template_counts_all      = {}
-    dict d_template_counts_combined = {}
-    dict d_codons_orig_target       = {}
+    d_template_counts_all      = {}
+    d_template_counts_combined = {}
+    d_codons_orig_target       = {}
     list l_codons_all               = []
     list l_codons_combined          = []
     unsigned int [:] ar_codons_forward_addr
@@ -179,31 +179,45 @@ cdef _init_variables(unsigned int k):
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
     global l_codons_all
     l_codons_all = _combinations(k)
+    global l_codons_combined
+    l_codons_combined = []
     global dim_combined_codons
     dim_combined_codons = _n_dim_rc_combined(k)
     global ar_codons_forward_addr
     ar_codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
     global ar_codons_rev_comp_addr
     ar_codons_rev_comp_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
+    global d_template_counts_all
+    d_template_counts_all = {}
+    global d_template_counts_combined
+    d_template_counts_combined = {}
+    global d_codons_orig_target
+    d_codons_orig_target = {}
 
     cdef unsigned int counter, index_codon, rc_address
-    cdef str rc, cod
+    cdef str rc, forward
     counter = 0
 
-    if verbosity <= DEBUG: logger.debug(f"list of k-mers: {l_codons_all}")
-    for index_codon, cod in enumerate(l_codons_all):
+    if verbosity <= DEBUG: logger.debug(f"Initializing variables with this list of k-mers: {l_codons_all}")
+    for index_codon, forward in enumerate(l_codons_all):
+        rc = _reverse_complement_string(forward)
+        global d_codons_orig_target
+        d_codons_orig_target[forward] = rc
         global d_template_counts_all
-        d_template_counts_all[cod] = 0
-        rc = _reverse_complement_string(cod)
+        d_template_counts_all[forward] = 0
+
+        if verbosity <= DEBUG_MORE:
+            logger.log(DEBUG_MORE, f"values: counter={counter:3}, index_codon={index_codon:3}, "
+                                   f"rc_addr={_codon_addr(rc):3}, forward={forward:3}, rc={rc:3}, "
+                                   f"rc {'IN' if rc in d_codons_orig_target.keys() else 'NOT in':^6} origin_target")
+            if rc in d_codons_orig_target.keys():
+                logger.log(DEBUG_MORE, f"{rc} is in {list(d_codons_orig_target.keys())}")
 
         if rc not in d_codons_orig_target.keys():
-            global d_codons_orig_target
-            d_codons_orig_target[cod] = rc
-
             global l_codons_combined
-            l_codons_combined.append(cod)
+            l_codons_combined.append(forward)
             global d_template_counts_combined
-            d_template_counts_combined[cod] = 0
+            d_template_counts_combined[forward] = 0
 
             # todo check values, seems buggy
             rc_address = _codon_addr(rc)
@@ -212,11 +226,17 @@ cdef _init_variables(unsigned int k):
             global ar_codons_rev_comp_addr
             ar_codons_rev_comp_addr[counter] = rc_address
             counter += 1
+    if verbosity <= DEBUG: logger.debug(f"END of initialization. Final values:")
+    if verbosity <= DEBUG: logger.debug(f"d_codons_orig_target={d_codons_orig_target}")
+    if verbosity <= DEBUG: logger.debug(f"l_codons_combined={l_codons_combined[:20]}")
+    if verbosity <= DEBUG: logger.debug(f"d_template_counts_combined={d_template_counts_combined}")
+    if verbosity <= DEBUG: logger.debug(f"ar_codons_forward_addr={ar_codons_forward_addr[:20]}")
+    if verbosity <= DEBUG: logger.debug(f"ar_codons_rev_comp_addr={ar_codons_rev_comp_addr[:20]}")
 
-def init_variables(k=4):
+
+def init_variables(k):
+    """ MUST run this init before using any methods """
     _init_variables(k)
-
-init_variables()
 
 
 # ##########################           MAIN  FUNCTIONS         ##########################
@@ -234,7 +254,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     # stream = str(stream)
     # codons = codon_template.copy()
     # if debug >= 2: print(len(stream), flush=True)
-    if verbosity <= DEBUG_MORE: logger.log(0, "comes to the kmer counter")
+    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, "comes to the kmer counter")
 
     cdef:
         float [::1] kmer_counts = template_kmer_counts.copy()
@@ -248,7 +268,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
         unsigned long long counter = k_value
         char letter = b'N'  # initializing the while loop
 
-    if verbosity <= DEBUG: logger.debug(f"empty codons counts[0]{kmer_counts[0]}, stream[:10]{stream[:10]}")
+    if verbosity <= DEBUG: logger.debug(f"empty codons counts[0]={kmer_counts[0]}, stream[:10]={stream[:10]}")
     if stream_len <= k_value:
         if verbosity <= WARNING: logger.warning("Sequence was shorter than the k used")
         if verbosity <= WARNING: logger.warning(stream)
@@ -262,7 +282,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     else:
         kmer_counts[addr] += 1
 
-    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"Starting loop")
+    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"Starting loop with k={k_value} until={stream_len}")
     for counter in range(k_value, stream_len):
         letter = stream[counter]
         addr = addr // 4 + nucl_val(letter) * new_addr_mul
@@ -302,8 +322,10 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
             kmer_counts = _kmer_counter(sequence, k)
             dict_kmer_counts = d_template_counts_all.copy()
 
-        if verbosity <= DEBUG: logger.debug(f"MemoryView (len={kmer_counts.shape}) "
-                                            f"to Dict (template keys={dict_kmer_counts.keys()}")
+        if verbosity <= DEBUG:
+            dict_kmers_keys = list(dict_kmer_counts.keys())
+            logger.debug(f"MemoryView (len={kmer_counts.shape}, first 10={kmer_counts[0]}) "
+                         f"to Dict (template keys={dict_kmers_keys[:5]} - {dict_kmers_keys[-5:]}")
         for i, key in enumerate(dict_kmer_counts.keys()):
             dict_kmer_counts[key] = kmer_counts[i]
         return dict_kmer_counts
