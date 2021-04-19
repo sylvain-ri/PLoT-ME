@@ -93,7 +93,11 @@ def get_ar_codons_forward_addr():
     return ar_codons_forward_addr
 def get_ar_codons_rev_comp_addr():
     return ar_codons_rev_comp_addr
-
+def set_verbosity(v):
+    global verbosity
+    verbosity = v
+def get_verbosity():
+    return verbosity
 
 # ##########################             FUNCTIONS             ##########################
 
@@ -299,6 +303,8 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
             kmer_counts = _kmer_counter(sequence, k)
             dict_kmer_counts = d_template_counts_all.copy()
 
+        if verbosity <= DEBUG: logger.debug(f"MemoryView (len={kmer_counts.shape}) "
+                                            f"to Dict (template keys={dict_kmer_counts.keys()}")
         for i, key in enumerate(dict_kmer_counts.keys()):
             dict_kmer_counts[key] = kmer_counts[i]
         return dict_kmer_counts
