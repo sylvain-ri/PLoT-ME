@@ -170,13 +170,10 @@ def combine_counts_forward_w_rc(counts):
 
 
  # ###################    INITIALIZATION OF VARIABLES    ########################
-cdef _init_variables(unsigned int k, unsigned int logging_level=30):
+cdef _init_variables(unsigned int k):
     """ Initialize k and indexes for fast processing """
     # Build the mapping to convert fast
     if verbosity <= INFO: logger.info("Initializing Indexes for k-mer counting ")
-    global verbosity
-    verbosity = logging_level
-    logger.setLevel(logging_level)
 
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
