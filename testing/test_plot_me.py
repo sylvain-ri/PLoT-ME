@@ -5,13 +5,17 @@ python3 -m pytest -v
 
 Testing both plot_me.bio and plot_me.cython_module.cyt_ext
 """
-import logging
-
-import pytest
 from plot_me import bio
 from plot_me.cython_module import cyt_ext
-import numpy as np
+from plot_me.tools import init_logger
 
+import logging
+import numpy as np
+import pytest
+
+
+_ = init_logger(__package__)
+logger = logging.getLogger(__name__)
 cyt_ext.set_verbosity(logging.DEBUG)
 
 # ######################    TESTING COMBINATIONS    ######################
