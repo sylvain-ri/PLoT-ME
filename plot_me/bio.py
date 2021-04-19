@@ -57,22 +57,20 @@ def codons_without_rev_comp(k):
     return l_forward_only
 
 
-def table_rev_comp_to_forward_strand(k):
+def table_forward_strand_to_rev_comp(k):
     """ Create a dict with the mapping of FORWARD strand to their REVERSE complements """
     l_codons_all = combinations(k)
     d_codons_orig_target = {}
     for index_codon, cod in enumerate(l_codons_all):
         rc = reverse_complement_string(cod)
-
-        if cod not in d_codons_orig_target.keys():
-            d_codons_orig_target[cod] = rc
+        d_codons_orig_target[cod] = rc
     return d_codons_orig_target
 
 
 def combine_counts_forward_w_rc(d_data, k):
     """ Combine forward and reverse codon into one. """
     combined = {}
-    for forward, rc in table_rev_comp_to_forward_strand(k).items():
+    for forward, rc in table_forward_strand_to_rev_comp(k).items():
         if rc not in combined.keys():
             if forward == rc:
                 combined[forward] = d_data[forward]
