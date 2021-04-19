@@ -22,6 +22,7 @@ https://levelup.gitconnected.com/how-to-deploy-a-cython-package-to-pypi-8217a658
 add file ~/.pypirc : "[testpypi] \n username = __token__ \n password <token-value>"
 `python3 -m twine upload --repository testpypi wheelhouse/*.whl`
 
+For build and testing: python3 -m pip install -e .
 """
 # Apparently setuptools is the news standard:
 # https://stackoverflow.com/questions/32528560/
