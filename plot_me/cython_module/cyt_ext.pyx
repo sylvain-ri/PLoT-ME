@@ -213,7 +213,7 @@ cdef _init_variables(unsigned int k):
             if rc in d_codons_orig_target.keys():
                 logger.log(DEBUG_MORE, f"{rc} is in {list(d_codons_orig_target.keys())}")
 
-        if rc not in d_codons_orig_target.keys():
+        if rc not in d_template_counts_combined.keys():
             global l_codons_combined
             l_codons_combined.append(forward)
             global d_template_counts_combined
@@ -228,10 +228,10 @@ cdef _init_variables(unsigned int k):
             counter += 1
     if verbosity <= DEBUG: logger.debug(f"END of initialization. Final values:")
     if verbosity <= DEBUG: logger.debug(f"d_codons_orig_target={d_codons_orig_target}")
-    if verbosity <= DEBUG: logger.debug(f"l_codons_combined={l_codons_combined[:20]}")
+    if verbosity <= DEBUG: logger.debug(f"l_codons_combined={l_codons_combined[:10]} - {l_codons_combined[-10:]}")
     if verbosity <= DEBUG: logger.debug(f"d_template_counts_combined={d_template_counts_combined}")
-    if verbosity <= DEBUG: logger.debug(f"ar_codons_forward_addr={ar_codons_forward_addr[:20]}")
-    if verbosity <= DEBUG: logger.debug(f"ar_codons_rev_comp_addr={ar_codons_rev_comp_addr[:20]}")
+    if verbosity <= DEBUG: logger.debug(f"ar_codons_forward_addr={ar_codons_forward_addr.base[:10]} - {ar_codons_forward_addr.base[-10:]}")
+    if verbosity <= DEBUG: logger.debug(f"ar_codons_rev_comp_addr={ar_codons_rev_comp_addr.base[:10]} - {ar_codons_rev_comp_addr.base[-10:]}")
 
 
 def init_variables(k):
