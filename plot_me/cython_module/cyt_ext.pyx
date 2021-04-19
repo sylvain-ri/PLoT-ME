@@ -189,6 +189,8 @@ cdef _init_variables(unsigned int k):
     cdef unsigned int counter, index_codon, rc_address
     cdef str rc, cod
     counter = 0
+
+    if verbosity <= DEBUG: logger.debug(f"list of k-mers: {l_codons_all}")
     for index_codon, cod in enumerate(l_codons_all):
         global d_template_counts_all
         d_template_counts_all[cod] = 0
