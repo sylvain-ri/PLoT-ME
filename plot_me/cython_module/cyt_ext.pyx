@@ -211,8 +211,8 @@ cdef _init_variables(unsigned int k):
             ar_codons_rev_comp_addr[counter] = rc_address
             counter += 1
 
-def init_variables(unsigned int k=4, unsigned int logging_level=INFO):
-    _init_variables(k, logging_level)
+def init_variables(k=4):
+    _init_variables(k)
 
 init_variables()
 
