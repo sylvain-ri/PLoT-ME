@@ -77,25 +77,34 @@ for item in counts_all_to_combined:
 
 @pytest.mark.parametrize("dict_counts, dict_combined, k", counts_all_to_combined)
 def test_bio_combine_forward_rv(dict_counts, dict_combined, k):
-    assert bio.combine_forward_rv(dict_counts, k) == dict_combined
+    assert bio.combine_counts_forward_w_rc(dict_counts, k) == dict_combined
 
 @pytest.mark.parametrize("dict_counts, dict_combined, k", np_counts_all_to_combined)
 def test_cyt_combine_counts_with_reverse_complement(dict_counts, dict_combined, k):
     cyt_ext.init_variables(k)
-    res = [np.float32(i) for i in cyt_ext.combine_counts_with_reverse_complement(dict_counts)]
+    res = [np.float32(i) for i in cyt_ext.combine_counts_forward_w_rc(dict_counts)]
     print(res)
-    np.testing.assert_array_equal(cyt_ext.combine_counts_with_reverse_complement(dict_counts), dict_combined)
+    np.testing.assert_array_equal(cyt_ext.combine_counts_forward_w_rc(dict_counts), dict_combined)
 
 
 # Testing if the initialization of values work in cyt_ext
 # The arrays are initialized to speed up methods
 initialized_arrays = [
+    # k, dict mapping of k-mers to their reverse complement if they Should be combined
     (2,  {"AA": "AA", "AC": "AC", "AG": "AG", "AT": "AT", "CA": "CA", "CC": "CC", "CG": "CG", "CT": "AG",
           "GA": "GA", "GC": "GC", "GG": "CC", "GT": "AC", "TA": "TA", "TC": "GA", "TG": "CA", "TT": "AA", },
-         {},
-         [],
+         # dic with only the kept k-mers
+         {"AA": 0, "AC": 0, "AG": 0, "AT": 0, "CA": 0, "CC": 0, "CG": 0,
+          "GA": 0, "GC": 0, "TA": 0, },
+         # mapping of array indexes, for the forward strand, to where it should be added
+         [0, 1, 2, 3, 4, 5, 6,  ],
+         # mapping of array indexes, for the reverse complement, to where it should be added
          [], ),
 ]
+
+@pytest.mark.parametrize("k, d_codons_orig_target, d_template_counts_combined, ar_codons_forward_addr, ar_codons_rev_comp_addr", initialized_arrays)
+def test_table_rev_comp_to_forward_strand(k, d_codons_orig_target, *_):
+    assert bio.table_rev_comp_to_forward_strand(k) == d_codons_orig_target
 
 @pytest.mark.parametrize("k, d_codons_orig_target, d_template_counts_combined, ar_codons_forward_addr, ar_codons_rev_comp_addr", initialized_arrays)
 def test_init_variables(k, d_codons_orig_target, d_template_counts_combined, ar_codons_forward_addr, ar_codons_rev_comp_addr):

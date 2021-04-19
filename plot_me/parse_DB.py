@@ -64,7 +64,7 @@ from tqdm import tqdm
 from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size, import_cython_mod
-from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_forward_rv, \
+from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_counts_forward_w_rc, \
     n_dim_rc_combined, codons_without_rev_comp
 
 
@@ -137,8 +137,8 @@ class Genome:
             if cython_is_there:
                 kmer_count = cyt_ext.kmer_counter(str.encode(str(segment.seq)), k=self.k, dictionary=True, combine=True)
             else:
-                kmer_count = combine_forward_rv(seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k),
-                                                k=self.k)
+                kmer_count = combine_counts_forward_w_rc(seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k),
+                                                         k=self.k)
             for_csv.append((taxon, cat, start, end, segment.name, segment.description, self.path_fna,
                             *kmer_count.values() ))
         # kmer_keys = list(self.kmer_count_zeros.keys())

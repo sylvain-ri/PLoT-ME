@@ -69,7 +69,7 @@ def table_rev_comp_to_forward_strand(k):
     return d_codons_orig_target
 
 
-def combine_forward_rv(d_data, k):
+def combine_counts_forward_w_rc(d_data, k):
     """ Combine forward and reverse codon into one. """
     combined = {}
     for forward, rc in table_rev_comp_to_forward_strand(k).items():
