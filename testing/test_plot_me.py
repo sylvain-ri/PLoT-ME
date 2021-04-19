@@ -2,6 +2,7 @@
 """
 First attempt to add test to project, using pytest
 python3 -m pytest -v
+python3 -m pytest -v --color=yes --log-level=0 | less -r
 
 Testing both plot_me.bio and plot_me.cython_module.cyt_ext
 """
@@ -16,7 +17,7 @@ import pytest
 
 _ = init_logger(__package__)
 logger = logging.getLogger(__name__)
-cyt_ext.set_verbosity(logging.DEBUG)
+cyt_ext.set_verbosity(5)
 
 # ######################    TESTING COMBINATIONS    ######################
 combinations = [
@@ -105,7 +106,7 @@ initialized_data = [
 
 @pytest.mark.parametrize("k, origin_target, template_combined, map_forward_adr, map_rc_adr", initialized_data)
 def test_bio_table_rev_comp_to_forward_strand(k, origin_target, template_combined, map_forward_adr, map_rc_adr):
-    assert bio.table_rev_comp_to_forward_strand(k) == origin_target
+    assert bio.table_forward_strand_to_rev_comp(k) == origin_target
 
 @pytest.mark.parametrize("k, origin_target, template_combined, map_forward_adr, map_rc_adr", initialized_data)
 def test_cyt_init_variables(k, origin_target, template_combined, map_forward_adr, map_rc_adr):
@@ -117,6 +118,9 @@ def test_cyt_init_variables(k, origin_target, template_combined, map_forward_adr
     np.testing.assert_array_equal(cyt_ext.get_ar_codons_rev_comp_addr(),
                                          np.array(map_rc_adr, dtype=np.float32))
 
+
+def test_codons_without_rev_comp(k):
+    assert bio.codons_without_rev_comp(k) == 56
 
 # #############   KMER COUNTER   #######################
 seq_w_expected_counts = [
@@ -144,7 +148,7 @@ def test_cyt_seq_count_kmer_return_array(k, seq, counts, np_counts):
     cyt_ext.init_variables(k)
     with pytest.raises(TypeError):
         assert cyt_ext.kmer_counter(seq, k, dictionary=True)  == counts
-    cyt_counts = cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=False)
+    cyt_counts = cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=False, combine=False)
     np.testing.assert_array_equal(cyt_counts, np_counts)
 
 @pytest.mark.parametrize("k, seq, counts, np_counts", seq_w_expected_counts_tuples)
@@ -152,7 +156,7 @@ def test_cyt_seq_count_kmer_return_dict(k, seq, counts, np_counts):
     cyt_ext.init_variables(k)
     with pytest.raises(TypeError):
         assert cyt_ext.kmer_counter(seq, k, dictionary=True)  == counts
-    assert cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=True)  == counts
+    assert cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=True, combine=False)  == counts
 
 
 # ######################    TESTING COMBINATION FOR FORWARD AND REVERSE COMPLEMENT    ######################
