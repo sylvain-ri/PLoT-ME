@@ -48,7 +48,7 @@ def n_dim_rc_combined( k):
 
 def codons_without_rev_comp(k):
     """ Forward codons only, without those which have been reverse complemented """
-    l_codons_all = combinaisons(k)
+    l_codons_all = combinations(k)
     l_forward_only = []
     for cod in l_codons_all:
         rc = reverse_complement_string(cod)
@@ -59,7 +59,7 @@ def codons_without_rev_comp(k):
 
 def table_rev_comp_to_forward_strand(k):
     """ Create a dict with the mapping of FORWARD strand to their REVERSE complements """
-    l_codons_all = combinaisons(k)
+    l_codons_all = combinations(k)
     d_codons_orig_target = {}
     for index_codon, cod in enumerate(l_codons_all):
         rc = reverse_complement_string(cod)
@@ -83,15 +83,15 @@ def combine_counts_forward_w_rc(d_data, k):
 
 def kmers_dic(n, choice=nucleotides):
     """ From a list, create a dict with these keys and value 0.0 """
-    return {a: 0.0 for a in combinaisons(n, choice)}
+    return {a: 0.0 for a in combinations(n, choice)}
 
 
-def combinaisons(n=4, combi=nucleotides):
+def combinations(n=4, combi=nucleotides):
     """ Give all combinations of length n for the items in combi (str of list) """
     if n == 1:
         return combi
     else:
-        return [f"{a}{b}" for a in combinaisons(n-1, combi) for b in combi]
+        return [f"{a}{b}" for a in combinations(n - 1, combi) for b in combi]
 
 
 def seq_to_window(seq, window_size=4):

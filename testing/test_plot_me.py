@@ -21,7 +21,7 @@ combinations = [
 ]
 @pytest.mark.parametrize("k, list_combinations", combinations)
 def test_bio_combinations(k, list_combinations):
-    assert bio.combinaisons(k) == list_combinations
+    assert bio.combinations(k) == list_combinations
 
 @pytest.mark.parametrize("k, list_combinations", combinations)
 def test_cyt_combinations(k, list_combinations):

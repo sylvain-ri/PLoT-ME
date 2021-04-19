@@ -64,7 +64,7 @@ from tqdm import tqdm
 from plot_me import LOGS
 from plot_me.tools import ScanFolder, is_valid_directory, init_logger, create_path, scale_df_by_length, \
     time_to_hms, delete_folder_if_exists, bash_process, f_size, import_cython_mod
-from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinaisons, combine_counts_forward_w_rc, \
+from plot_me.bio import kmers_dic, ncbi, seq_count_kmer, combinations, combine_counts_forward_w_rc, \
     n_dim_rc_combined, codons_without_rev_comp
 
 
@@ -155,7 +155,7 @@ class Genome:
     @classmethod
     def initialize_set_k_mers(cls, k, combine_rc=True):
         cls.K = k
-        cls.col_kmers = codons_without_rev_comp(k) if combine_rc else combinaisons(k)
+        cls.col_kmers = codons_without_rev_comp(k) if combine_rc else combinations(k)
         cls.kmer_count_zeros = kmers_dic(k)
 
 
@@ -678,7 +678,7 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
             "start": int, "end": int,
             "name": 'category', "description": 'category', "fna_path": 'category',
         }
-        codons = codons_without_rev_comp(main.k) if combine_rc else combinaisons(main.k)
+        codons = codons_without_rev_comp(main.k) if combine_rc else combinations(main.k)
         for key in codons:
             cols_types[key] = float32
         main.cols_types = cols_types
