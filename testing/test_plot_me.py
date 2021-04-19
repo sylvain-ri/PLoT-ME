@@ -103,11 +103,11 @@ def test_bio_table_rev_comp_to_forward_strand(k, origin_target, template_combine
 @pytest.mark.parametrize("k, origin_target, template_combined, map_forward_adr, map_rc_adr", initialized_data)
 def test_cyt_init_variables(k, origin_target, template_combined, map_forward_adr, map_rc_adr):
     cyt_ext.init_variables(k)
-    assert cyt_ext.d_codons_orig_target()       == origin_target
+    assert cyt_ext.get_d_codons_orig_target()       == origin_target
     assert cyt_ext.get_d_template_counts_combined() == template_combined
-    assert np.testing.assert_array_equal(cyt_ext.get_ar_codons_forward_addr(),
+    np.testing.assert_array_equal(cyt_ext.get_ar_codons_forward_addr(),
                                          np.array(map_forward_adr, dtype=np.float32))
-    assert np.testing.assert_array_equal(cyt_ext.get_ar_codons_rev_comp_addr(),
+    np.testing.assert_array_equal(cyt_ext.get_ar_codons_rev_comp_addr(),
                                          np.array(map_rc_adr, dtype=np.float32))
 
 
@@ -137,7 +137,8 @@ def test_cyt_seq_count_kmer_return_array(k, seq, counts, np_counts):
     cyt_ext.init_variables(k)
     with pytest.raises(TypeError):
         assert cyt_ext.kmer_counter(seq, k, dictionary=True)  == counts
-    assert cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=False) == np_counts
+    cyt_counts = cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=False)
+    np.testing.assert_array_equal(cyt_counts, np_counts)
 
 @pytest.mark.parametrize("k, seq, counts, np_counts", seq_w_expected_counts_tuples)
 def test_cyt_seq_count_kmer_return_dict(k, seq, counts, np_counts):
