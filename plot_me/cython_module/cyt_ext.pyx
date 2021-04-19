@@ -162,7 +162,7 @@ cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
 
 def combine_counts_forward_w_rc(counts):
     """ Python API for cython method. combine forward and reverse complement on an array"""
-    return _combine_counts_forward_w_rc(counts)
+    return _combine_counts_forward_w_rc(counts).base
 
 
  # ###################    INITIALIZATION OF VARIABLES    ########################
@@ -305,9 +305,9 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
 
     else:  # raw data, no dictionary
         if combine:
-            return _combine_counts_forward_w_rc(_kmer_counter(sequence, k))
+            return _combine_counts_forward_w_rc(_kmer_counter(sequence, k)).base
         else:
-            return _kmer_counter(sequence, k)
+            return _kmer_counter(sequence, k).base
 
 
 
