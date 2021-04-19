@@ -73,10 +73,11 @@ def combine_forward_rv(d_data, k):
     """ Combine forward and reverse codon into one. """
     combined = {}
     for forward, rc in table_rev_comp_to_forward_strand(k).items():
-        if forward == rc:
-            combined[forward] = d_data[forward]
-        else:
-            combined[forward] = d_data[forward] + d_data[rc]
+        if rc not in combined.keys():
+            if forward == rc:
+                combined[forward] = d_data[forward]
+            else:
+                combined[forward] = d_data[forward] + d_data[rc]
     return combined
 
 
