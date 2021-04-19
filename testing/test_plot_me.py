@@ -82,7 +82,7 @@ def test_cyt_dim_combined_codons(k, combined_dim):
 # ######################    TESTING INITIALIZATION OF CYTHON'S VARIABLES    ######################
 # Testing if the initialization of values work in cyt_ext
 # The arrays are initialized to speed up methods
-initialized_arrays = [
+initialized_data = [
     # k, dict mapping of k-mers to their reverse complement if they Should be combined
     (2,  {"AA": "TT", "AC": "GT", "AG": "CT", "AT": "AT", "CA": "TG", "CC": "GG", "CG": "CG", "CT": "AG",
           "GA": "TC", "GC": "GC", "GG": "CC", "GT": "AC", "TA": "TA", "TC": "GA", "TG": "CA", "TT": "AA", },
@@ -96,19 +96,19 @@ initialized_arrays = [
          [ 15, 11,  7,  3, 14, 10,  6,  13,  9,  12], ),
 ]
 
-@pytest.mark.parametrize("k, d_codons_orig_target, d_template_counts_combined, ar_codons_forward_addr, ar_codons_rev_comp_addr", initialized_arrays)
-def test_bio_table_rev_comp_to_forward_strand(k, d_codons_orig_target, d_template_counts_combined, ar_codons_forward_addr, ar_codons_rev_comp_addr):
-    assert bio.table_rev_comp_to_forward_strand(k) == d_codons_orig_target
+@pytest.mark.parametrize("k, origin_target, template_combined, map_forward_adr, map_rc_adr", initialized_data)
+def test_bio_table_rev_comp_to_forward_strand(k, origin_target, template_combined, map_forward_adr, map_rc_adr):
+    assert bio.table_rev_comp_to_forward_strand(k) == origin_target
 
-@pytest.mark.parametrize("k, d_codons_orig_target, d_template_counts_combined, ar_codons_forward_addr, ar_codons_rev_comp_addr", initialized_arrays)
-def test_cyt_init_variables(k, d_codons_orig_target, d_template_counts_combined, ar_codons_forward_addr, ar_codons_rev_comp_addr):
+@pytest.mark.parametrize("k, origin_target, template_combined, map_forward_adr, map_rc_adr", initialized_data)
+def test_cyt_init_variables(k, origin_target, template_combined, map_forward_adr, map_rc_adr):
     cyt_ext.init_variables(k)
-    assert cyt_ext.get_d_codons_orig_target()       == d_codons_orig_target
-    assert cyt_ext.get_d_template_counts_combined() == d_template_counts_combined
+    assert cyt_ext.d_codons_orig_target()       == origin_target
+    assert cyt_ext.get_d_template_counts_combined() == template_combined
     assert np.testing.assert_array_equal(cyt_ext.get_ar_codons_forward_addr(),
-                                         np.array(ar_codons_forward_addr, dtype=np.float32))
+                                         np.array(map_forward_adr, dtype=np.float32))
     assert np.testing.assert_array_equal(cyt_ext.get_ar_codons_rev_comp_addr(),
-                                         np.array(ar_codons_rev_comp_addr, dtype=np.float32))
+                                         np.array(map_rc_adr, dtype=np.float32))
 
 
 # #############   KMER COUNTER   #######################
