@@ -67,20 +67,28 @@ cdef inline unsigned int nucl_val(char c) nogil:
 
 # Related to combining k-mer counts.
 cdef:
+    unsigned int dim_combined_codons
     dict d_template_counts_all      = {}
     dict d_template_counts_combined = {}
+    dict d_codons_orig_target       = {}
     list l_codons_all               = []
     list l_codons_combined          = []
-    unsigned int dim_combined_codons
     unsigned int [:] ar_codons_forward_addr
     unsigned int [:] ar_codons_rev_comp_addr
-    dict d_codons_orig_target       = {}
 
 # ##########################              GETTERS              ##########################
 def get_dim_combined_codons():
     return dim_combined_codons
+def get_d_template_counts_all():
+    return d_template_counts_all
 def get_d_template_counts_combined():
     return d_template_counts_combined
+def get_d_codons_orig_target():
+    return d_codons_orig_target
+def get_l_codons_all():
+    return l_codons_all
+def get_l_codons_combined():
+    return l_codons_combined
 def get_ar_codons_forward_addr():
     return ar_codons_forward_addr
 def get_ar_codons_rev_comp_addr():
@@ -110,7 +118,9 @@ def reverse_complement_string(seq):
     return _reverse_complement_string(seq)
 
 cdef unsigned int _n_dim_rc_combined(unsigned int k):
-    """ Return the number of dimensions, for a given k, for the unique k-mer counts (forward - reverse complement) """
+    """ Return the number of dimensions, for a given k, for the unique k-mer counts (forward - reverse complement) 
+        https://stackoverflow.com/questions/40952719/algorithm-to-collapse-forward-and-reverse-complement-of-a-dna-sequence-in-python
+    """
     return 2**k + (4**k - 2**k)//2 if k % 2 == 0 else 4**k // 2
 
 def n_dim_rc_combined(k):
