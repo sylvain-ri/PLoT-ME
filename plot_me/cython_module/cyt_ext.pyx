@@ -61,14 +61,90 @@ logger = logging.getLogger(__name__)
 # ##########################    CONSTANTS AND VARIABLES FOR FUNCTIONS   ##########################
 # Related to DNA
 cdef:
-    unsigned int verbosity   = 30
-    unsigned int     k_val   = 0
-    str          nucleotides = "ACGT"
-    float [::1]  template_kmer_counts
-    # dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
+    unsigned int verbosity          = 30
+    unsigned int     k_val          = 0
+    unsigned int dim_combined_codons
+    str          nucleotides        = "ACGT"
+
+    # Related to combining k-mer counts.
+    d_template_counts_all           = {}
+    d_template_counts_combined      = {}
+    d_codons_orig_target            = {}
+    list         l_codons_all       = []
+    list         l_codons_combined  = []
+    unsigned int [:] ar_codons_forward_addr
+    unsigned int [:] ar_codons_rev_comp_addr
+    float [::1]      template_kmer_counts
+
+# ##########################              GETTERS / SETTERS              ##########################
+# Getters in Python only. Setters in Cython as well, to set global variables
+def get_verbosity():
+    return verbosity
+def get_k_val():
+    return k_val
+def get_dim_combined_codons():
+    return dim_combined_codons
+cpdef set_verbosity(value):
+    global verbosity
+    verbosity = value
+cpdef set_k_val(value):
+    global k_val
+    k_val = value
+cpdef set_dim_combined_codons(value):
+    global dim_combined_codons
+    dim_combined_codons = value
+
+def get_d_template_counts_all():
+    return d_template_counts_all
+def get_d_template_counts_combined():
+    return d_template_counts_combined
+def get_d_codons_orig_target():
+    return d_codons_orig_target
+cpdef set_d_template_counts_all(value):
+    global d_template_counts_all
+    d_template_counts_all = value
+cpdef set_d_template_counts_combined(value):
+    global d_template_counts_combined
+    d_template_counts_combined = value
+cpdef set_d_codons_orig_target(value):
+    global d_codons_orig_target
+    d_codons_orig_target = value
+
+def get_l_codons_all():
+    return l_codons_all
+def get_l_codons_combined():
+    return l_codons_combined
+cpdef set_l_codons_all(value):
+    global l_codons_all
+    l_codons_all = value
+cpdef set_l_codons_combined(value):
+    global l_codons_combined
+    l_codons_combined = value
+
+def get_ar_codons_forward_addr():
+    return ar_codons_forward_addr
+def get_ar_codons_rev_comp_addr():
+    return ar_codons_rev_comp_addr
+cpdef set_ar_codons_forward_addr(value):
+    global ar_codons_forward_addr
+    ar_codons_forward_addr = value
+cpdef set_ar_codons_rev_comp_addr(value):
+    global ar_codons_rev_comp_addr
+    ar_codons_rev_comp_addr = value
+
+def get_template_kmer_counts():
+    return template_kmer_counts
+cpdef set_template_kmer_counts(value):
+    global template_kmer_counts
+    template_kmer_counts = value
+
+
+# ##########################             FUNCTIONS             ##########################
+
+# ##########################             UTILITIES             ##########################
 
 cdef inline unsigned int nucl_val(char c) nogil:
-    """ Map of letters TO value (for addressing the k-mer array """
+    """ Map of letters To Value (for addressing the k-mer array """
     if c == b"A" or c == b"a":
         return 0
     elif c == b"C" or c == b"c":
@@ -79,45 +155,6 @@ cdef inline unsigned int nucl_val(char c) nogil:
         return 3
     else:
         return ADDR_ERROR
-
-
-# Related to combining k-mer counts.
-cdef:
-    unsigned int dim_combined_codons
-    d_template_counts_all      = {}
-    d_template_counts_combined = {}
-    d_codons_orig_target       = {}
-    list l_codons_all               = []
-    list l_codons_combined          = []
-    unsigned int [:] ar_codons_forward_addr
-    unsigned int [:] ar_codons_rev_comp_addr
-
-# ##########################              GETTERS              ##########################
-def get_dim_combined_codons():
-    return dim_combined_codons
-def get_d_template_counts_all():
-    return d_template_counts_all
-def get_d_template_counts_combined():
-    return d_template_counts_combined
-def get_d_codons_orig_target():
-    return d_codons_orig_target
-def get_l_codons_all():
-    return l_codons_all
-def get_l_codons_combined():
-    return l_codons_combined
-def get_ar_codons_forward_addr():
-    return ar_codons_forward_addr
-def get_ar_codons_rev_comp_addr():
-    return ar_codons_rev_comp_addr
-def set_verbosity(v):
-    global verbosity
-    verbosity = v
-def get_verbosity():
-    return verbosity
-
-# ##########################             FUNCTIONS             ##########################
-
-# ##########################             UTILITIES             ##########################
 
 cdef _combinations(int k, str combi=nucleotides):
     """ Return combinations from the char in instances. Using for finding possible k-mers, for a given n/k """
@@ -197,64 +234,61 @@ cdef _init_variables(unsigned int k):
     # Build the mapping to convert fast
     if verbosity <= INFO: logger.info("Initializing Indexes for k-mer counting ")
 
-    global k_val
-    k_val = k
-    global template_kmer_counts
-    template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
-    global l_codons_all
-    l_codons_all = _combinations(k)
-    global l_codons_combined
-    l_codons_combined = []
-    global dim_combined_codons
-    dim_combined_codons = _n_dim_rc_combined(k)
-    global ar_codons_forward_addr
-    ar_codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
-    global ar_codons_rev_comp_addr
-    ar_codons_rev_comp_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
-    global d_template_counts_all
-    d_template_counts_all = {}
-    global d_template_counts_combined
-    d_template_counts_combined = {}
-    global d_codons_orig_target
-    d_codons_orig_target = {}
+    cdef:
+        template_counts_all           = {}
+        template_counts_combined      = {}
+        codons_orig_target            = {}
+        list         codons_all       = []
+        list         codons_combined  = []
+        unsigned int [:] codons_forward_addr
+        unsigned int [:] codons_rev_comp_addr
+        codons_all = _combinations(k)
+        codons_combined = []
+        codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
+        codons_rev_comp_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
 
     cdef unsigned int counter, index_codon, rc_address
     cdef str rc, forward
     counter = 0
 
-    if verbosity <= DEBUG: logger.debug(f"Initializing variables with this list of k-mers: {l_codons_all}")
-    for forward in l_codons_all:
+    if verbosity <= DEBUG: logger.debug(f"Initializing variables with this list of k-mers: {codons_all}")
+    for forward in codons_all:
         rc = _reverse_complement_string(forward)
         rc_address = _codon_addr(rc)
         fw_address = _codon_addr(forward)
-        global d_codons_orig_target
-        d_codons_orig_target[forward] = rc
-        global d_template_counts_all
-        d_template_counts_all[forward] = 0
+        codons_orig_target[forward] = rc
+        template_counts_all[forward] = 0
 
         if verbosity <= DEBUG_MORE:
             logger.log(DEBUG_MORE, f"values: counter={counter:3}, fw_address={fw_address:3}, "
                                    f"rc_addr={_codon_addr(rc):3}, forward={forward:3}, rc={rc:3}, "
-                                   f"rc {'IN' if rc in d_codons_orig_target.keys() else 'NOT in':^6} origin_target")
+                                   f"rc {'IN' if rc in codons_orig_target.keys() else 'NOT in':^6} origin_target")
 
-        if rc not in d_template_counts_combined.keys():
-            global l_codons_combined
-            l_codons_combined.append(forward)
-            global d_template_counts_combined
-            d_template_counts_combined[forward] = 0
+        if rc not in template_counts_combined.keys():
+            codons_combined.append(forward)
+            template_counts_combined[forward] = 0
 
-            global ar_codons_forward_addr
-            ar_codons_forward_addr[counter] = fw_address
-            global ar_codons_rev_comp_addr
-            ar_codons_rev_comp_addr[counter] = rc_address
+            codons_forward_addr[counter] = fw_address
+            codons_rev_comp_addr[counter] = rc_address
             counter += 1
     if verbosity <= DEBUG: logger.debug(f"END of initialization. Final values:")
-    if verbosity <= DEBUG: logger.debug(f"d_codons_orig_target={d_codons_orig_target}")
-    if verbosity <= DEBUG: logger.debug(f"l_codons_combined={l_codons_combined[:10]} - {l_codons_combined[-10:]}")
-    if verbosity <= DEBUG: logger.debug(f"d_template_counts_combined={d_template_counts_combined}")
-    if verbosity <= DEBUG: logger.debug(f"ar_codons_forward_addr={ar_codons_forward_addr.base[:10]} - {ar_codons_forward_addr.base[-10:]}")
-    if verbosity <= DEBUG: logger.debug(f"ar_codons_rev_comp_addr={ar_codons_rev_comp_addr.base[:10]} - {ar_codons_rev_comp_addr.base[-10:]}")
+    if verbosity <= DEBUG: logger.debug(f"d_codons_orig_target={codons_orig_target}")
+    if verbosity <= DEBUG: logger.debug(f"l_codons_combined={codons_combined[:10]} - {codons_combined[-10:]}")
+    if verbosity <= DEBUG: logger.debug(f"d_template_counts_combined={template_counts_combined}")
+    if verbosity <= DEBUG: logger.debug(f"codons_forward_addr={codons_forward_addr.base[:10]} - {codons_forward_addr.base[-10:]}")
+    if verbosity <= DEBUG: logger.debug(f"codons_rev_comp_addr={codons_rev_comp_addr.base[:10]} - {codons_rev_comp_addr.base[-10:]}")
 
+    # Setting the values
+    set_k_val(k)
+    set_dim_combined_codons(_n_dim_rc_combined(k))
+    set_template_kmer_counts(np.zeros(4**k, dtype=np.float32))
+    set_l_codons_all(codons_all)
+    set_l_codons_combined(codons_combined)
+    set_d_template_counts_all(template_counts_all)
+    set_d_template_counts_combined(template_counts_combined)
+    set_d_codons_orig_target(codons_orig_target)
+    set_ar_codons_forward_addr(codons_forward_addr)
+    set_ar_codons_rev_comp_addr(codons_rev_comp_addr)
 
 def init_variables(k):
     """ MUST run this init before using any methods """
@@ -307,7 +341,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
 
             # before we have a full length k-mer, we just add the address, but skip counting the still forming k-mer
             if counter >= k_minus_1:
-                kmer_counts[addr] += 1
+                kmer_counts[addr] += 1.
             else:
                 continue
         else:
@@ -319,7 +353,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
                 last_failed  = 1        # We just failed, let's count until we can start again
 
             # wait until the wrong letter goes away
-            elif last_failed < k_value-1:
+            elif last_failed < k_minus_1:
                 addr = ADDR_ERROR
                 recover_addr = (recover_addr % modulo_addr) * 4 + next_nucleotide_addr
                 last_failed += 1
