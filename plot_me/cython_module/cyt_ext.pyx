@@ -175,7 +175,8 @@ def codon_addr(codon):
 #@cython.wraparound(False)
 cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
     """ Combine the forward and reverse complement in the k-mer profile  """
-    assert counts.shape[0] == 4 ** k_val, LookupError(f"k (={k_val}) hasn't been initialized properly, combining forward and RC can't be made ")
+    if counts.shape[0] != 4 ** k_val:
+        LookupError(f"k (={k_val}) hasn't been initialized properly, combining forward and RC can't be made ")
     cdef:
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
          int i
@@ -283,18 +284,17 @@ def init_variables(k):
 # @cython.profile(True)       # Allows profiling the function
 # @cython.cdivision(False)    # No check for div by zero
 # Bytes Faster than const unsigned char [:]
-cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
+cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4, ssize_t length=-1):
     """
     Counting k-mers for one line/sequence/read. Return an array counts, alphabetically ordered
+    :param length: 
     :param stream: one line of a fastq/fast file
     :param k_value: value of k (k-mer)
     :return: array of length n_dim_rc_combined(k)
     """
-    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, "comes to the kmer counter")
-
     cdef:
         float [::1] kmer_counts = template_kmer_counts.copy()
-        unsigned int stream_len = len(stream)
+        unsigned int stream_len
         unsigned int addr = 0
         unsigned int next_nucleotide_addr = 0
         unsigned int recover_addr = 0
@@ -303,6 +303,11 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
         unsigned int last_failed = 0
         unsigned int fails = 0
         unsigned long long counter = 0
+
+    if length >= 0:
+        stream_len = length
+    else:
+        stream_len = len(stream)
 
     if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"codons template.shape={kmer_counts.shape}, for k={k_value}, "
                                                        f"stream length={stream_len} and stream[:20]={stream[:min(20, stream_len)]}")
@@ -313,8 +318,9 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     for counter in range(0, stream_len):
         # Value of the nucleotide
         next_nucleotide_addr = nucl_val(stream[counter])
-        if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"counter={counter}, letter={stream[counter]}, "
-           f"nucl_val={next_nucleotide_addr}, last_addr_mod={addr % modulo_addr}, next_addr={(addr % modulo_addr) * 4 + next_nucleotide_addr}")
+        # todo: might get the linefeed character
+        # if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"counter={counter}, letter={stream[counter]}, "
+        #    f"nucl_val={next_nucleotide_addr}, last_addr_mod={addr % modulo_addr}, next_addr={(addr % modulo_addr) * 4 + next_nucleotide_addr}")
 
         if next_nucleotide_addr != ADDR_ERROR:     # If the character was recognized
             addr = (addr % modulo_addr) * 4 + next_nucleotide_addr
@@ -343,15 +349,16 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
                 addr = recover_addr
                 last_failed = 0
 
-    if verbosity <= DEBUG: logger.debug(f"stream length:{counter}, fails:{fails}")
+    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"stream length:{counter}, fails:{fails}")
     return kmer_counts  #, fails
 
-def kmer_counter(sequence, k=4, dictionary=True, combine=True):
+def kmer_counter(sequence, k=4, dictionary=True, combine=True, ssize_t length=-1):
     """ Python interface for the Cython k-mer counter
         sequence   : bytes (str.encode(dna_sequence)
         k          : int, k-mer value
         dictionary : flag for the return format (else array)
         combine    : flag for the return format (else all k-mers)
+        length     : length of the sequence. If provided, assumes that the sequence is a binary sequence (bytes)
     """
     cdef:
         float [:] kmer_counts
@@ -360,28 +367,33 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
         str key
         char* seq
 
+    if length == -1:
+        length = len(sequence)
+    if isinstance(sequence, str):
+        sequence = str.encode(sequence)
     seq = <char*>sequence
+
     if dictionary:
         if combine:
-            kmer_counts = _combine_counts_forward_w_rc(_kmer_counter(seq, k))
+            kmer_counts = _combine_counts_forward_w_rc(_kmer_counter(seq, k_value=k, length=length))
             dict_kmer_counts = d_template_counts_combined.copy()
         else:
-            kmer_counts = _kmer_counter(seq, k)
+            kmer_counts = _kmer_counter(seq, k_value=k, length=length)
             dict_kmer_counts = d_template_counts_all.copy()
 
         if verbosity <= DEBUG:
             dict_kmers_keys = list(dict_kmer_counts.keys())
             logger.debug(f"MemoryView (len={kmer_counts.shape}, first 10={kmer_counts[0]}) "
-                         f"to Dict (template keys={dict_kmers_keys[:5]} - {dict_kmers_keys[-5:]}")
+                         f"to Dict (template keys={dict_kmers_keys[:5]}")
         for i, key in enumerate(dict_kmer_counts.keys()):
             dict_kmer_counts[key] = kmer_counts[i]
         return dict_kmer_counts
 
     else:  # raw data, no dictionary, but as numpy arrays
         if combine:
-            return _combine_counts_forward_w_rc(_kmer_counter(seq, k)).base
+            return _combine_counts_forward_w_rc(_kmer_counter(seq, k_value=k, length=length)).base
         else:
-            return np.asarray(_kmer_counter(seq, k))
+            return np.asarray(_kmer_counter(seq, k_value=k, length=length))
 
 
 # ######################################      FILE PROCESSING      ########################################
@@ -396,7 +408,8 @@ cdef extern from "stdio.h":
     ssize_t getline(char **, size_t *, FILE *)
 
 def read_file(filename):
-    """ Fast Cython file reader 
+    """ Fast Cython file reader
+        return each line as char array and its length
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
         For even faster, could look at : https://github.com/EveryTimeIWill18/Cython_Repo/blob/master/FastFileProcessingWithCython.ipynb
     """
@@ -410,19 +423,18 @@ def read_file(filename):
 
     cdef char * line = NULL
     cdef size_t seed = 0
-    cdef size_t last_seed = 0
-    cdef ssize_t read
+    cdef ssize_t length
     while True:
-        read = getline(&line, &seed, cfile)
-        if read == -1: break
-        if verbosity <= DEBUG: logger.info(f"Line read: measured length:{len(line)}, {line[:10]}")
-        yield line
+        length = getline(&line, &seed, cfile)
+        if length <= -1: break
+        if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"Line read: measured length:{len(line)}, returned length={length}, {line[:10]}")
+        yield line, length
 
     fclose(cfile)
     return (b"", 0)
 
 #
-cdef _classify_reads(str filename, unsigned int k, str file_format="fastq"):
+cdef _classify_reads(str filename, unsigned int k, file_format="fastq"):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
     """
@@ -436,8 +448,8 @@ cdef _classify_reads(str filename, unsigned int k, str file_format="fastq"):
 
     cdef:
         char * line = NULL
-        size_t length = 0
-        ssize_t read
+        size_t seed = 0
+        ssize_t length
         float [::1] counts
         list list_counts = []
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
@@ -445,12 +457,12 @@ cdef _classify_reads(str filename, unsigned int k, str file_format="fastq"):
         # todo: add variables to hold the whole read (id, seq, +, quality)
 
     while True:
-        read = getline(&line, &length, cfile)
-        if read == -1: break
+        length = getline(&line, &seed, cfile)
+        if length == -1: break
         if line_nb % modulo == 1:
             # Count all kmers
-            # counts = _kmer_counter(line, k)
-            counts = kmer_counter(line, k, dictionary=False, combine=True)
+            counts = _kmer_counter(line, k_value=k, length=length)
+            # counts = kmer_counter(line, k, dictionary=False, combine=True, length=length)
             list_counts.append(counts)
             # todo: scale / normalize
 
@@ -463,15 +475,16 @@ cdef _classify_reads(str filename, unsigned int k, str file_format="fastq"):
     fclose(cfile)
     return list_counts
 
-def classify_reads(filename, file_format="fastq"):
-    return _classify_reads(filename, file_format)
+def classify_reads(filename, k, file_format="fastq"):
+    # todo: use ramfs to preload the file ()
+    return _classify_reads(filename, k=k, file_format=file_format)
 
 
 
 
 
 # ###################################         UNUSED and DISCONTINUED METHODS        ##################################
-cdef _process_file(str filename, str file_format="fastq"):
+cdef _process_file(str filename, unsigned int k=4, file_format="fastq"):
     """ Read a file and return the k-mer count """
     # todo: buggy, doesn't return the whole list of arrays, some are empty after index ~10
     cdef:
@@ -481,14 +494,14 @@ cdef _process_file(str filename, str file_format="fastq"):
         char * line = NULL
         kmer_counts = []
 
-    for line in read_file(filename):
+    for line, length in read_file(filename):
         if line_nb % modulo == 1:
-            kmer_counts.append(_kmer_counter(line))
+            kmer_counts.append(_kmer_counter(line, k_value=k, length=length))
         line_nb+= 1
     return kmer_counts
 
-def process_file(filename, file_format="fastq"):
-    return _process_file(filename, file_format)
+def process_file(filename, k, file_format="fastq"):
+    return _process_file(filename, k=k, file_format=file_format)
 
 
 def python_preprocess(filename, k, file_format="fastq"):
@@ -505,7 +518,7 @@ def python_preprocess(filename, k, file_format="fastq"):
         for line in f:
             if verbosity <= DEBUG: logger.info(f"Line length={len(line)}, seq={line[:20]}")
             if line_nb % modulo == 1:
-                counts = _kmer_counter(line)
+                counts = _kmer_counter(line, k_value=k, length=len(line))
                 if verbosity <= DEBUG: logger.info(f"counts length={len(line)}, counts={counts}")
                 list_counts.append(counts)
             line_nb += 1
