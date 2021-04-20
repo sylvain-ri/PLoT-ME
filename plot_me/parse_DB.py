@@ -660,10 +660,10 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
         if not no_cython:
             global cyt_ext, cython_is_there
             cyt_ext, cython_is_there = import_cython_mod()
-        if cython_is_there:
-            logger.info(f"Cython is available, initializing variables")
-            cyt_ext.set_verbosity(verbose_lvl)
-            cyt_ext.init_variables(k)
+            if cython_is_there:
+                logger.info(f"Cython is available, initializing variables")
+                cyt_ext.set_verbosity(verbose_lvl)
+                cyt_ext.init_variables(k)
         else:
             logger.info(f"Falling back on pure python")
         # Common folder name keeping parameters
