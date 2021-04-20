@@ -17,7 +17,7 @@ python3 -m pip install "$wheel_name"
 
 path_DB="/mnt/data/PLoT-ME-DB"
 echo " -> DELETE OLD DB : $path_DB"
-rm -r "$path_DB/k4_s10000/"
+echo "rm -r $path_DB/k4_s10000/"
 
 echo " -> COMMAND TO EXECUTE: "
 echo "plot-me.preprocess /mnt/data/NCBI/20190704/refseq /mnt/data/taxonomy $path_DB"
