@@ -392,15 +392,16 @@ class MockCommunity:
 
 def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=False, threads=cpu_count(),
                  f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD,
-                 skip_clas=False, force_binning=False):
+                 skip_clas=False, force_binning=False, no_cython=False):
     """ Should load a file, do all the processing """
     _ = init_logger(__package__)  # initialize the global logger
     logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     global THREADS
     THREADS = threads
-    global cyt_ext, cython_is_there
-    cyt_ext, cython_is_there = import_cython_mod()
+    if not no_cython:
+        global cyt_ext, cython_is_there
+        cyt_ext, cython_is_there = import_cython_mod()
 
     # preparing csv record file
     if not osp.isfile(f_record):
@@ -561,6 +562,7 @@ def arg_parser():
     parser.add_argument('--force_binning',      help='If reads have already been binned, binning is skipped, unless '
                                                      'this flag is activated',
                                                 action='store_true')
+    parser.add_argument('--no_cython',          help='Disable Cython', action='store_true')
 
     args = parser.parse_args()
     logger.debug(f"Script {__file__} called with {args}")
@@ -570,7 +572,7 @@ def arg_parser():
     bin_classify(args.input_fastq, args.path_reports, args.path_plot_me,
                  classifier=args.classifier[0], full_DB=args.full_index, threads=args.threads, f_record=args.record,
                  drop_bin_threshold=args.drop_bin_threshold, skip_clas=args.skip_classification,
-                 clf_settings=args.classifier[1], force_binning=args.force_binning)
+                 clf_settings=args.classifier[1], force_binning=args.force_binning, no_cython=args.no_cython)
 
 
 if __name__ == '__main__':

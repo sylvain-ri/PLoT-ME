@@ -645,7 +645,8 @@ def kraken2_clean(path_bins_hash, n_clusters):
 def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(), skip_existing="111110",
          early_stop=len(check_step.can_skip)-1, omit_folders=("plant", "vertebrate"),
          path_taxonomy="", full_DB=False, k2_clean=False,
-         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0], verbose_lvl=30, combine_rc=True):
+         ml_model=clustering_segments.models[0], classifier_param=CLASSIFIERS[0], verbose_lvl=30, no_cython=False,
+         combine_rc=True):
     """ Pre-processing of RefSeq database to split genomes into windows, then count their k-mers
         Second part, load all the k-mer counts into one single Pandas dataframe
         Third train a clustering algorithm on the k-mer frequencies of these genomes' windows
@@ -656,8 +657,9 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     try:
-        global cyt_ext, cython_is_there
-        cyt_ext, cython_is_there = import_cython_mod()
+        if not no_cython:
+            global cyt_ext, cython_is_there
+            cyt_ext, cython_is_there = import_cython_mod()
         if cython_is_there:
             logger.info(f"Cython is available, initializing variables")
             cyt_ext.set_verbosity(verbose_lvl)
@@ -798,6 +800,7 @@ def arg_parser():
                                             action='store_true',)
     parser.add_argument('--verbosity',      help='Set the verbosity level (default=%(default)d)',
                                             default=30, type=int,  metavar='')
+    parser.add_argument('--no_cython',      help='Disable Cython', action='store_true')
     parser.add_argument('-f', '--full_index', help='Build the index with the full RefSeq database for the chosen '
                                                    'classifier, without binning, omitting the directories set by '
                                                    '--omit. Skips all the other steps/processes '
@@ -818,7 +821,8 @@ def arg_parser():
     main(folder_database=args.path_database, folder_output=args.path_plot_me, n_clusters=args.bins,
          k=args.kmer, window=args.window, cores=args.threads, skip_existing=args.skip_existing,
          early_stop=args.early, omit_folders=tuple(args.omit), path_taxonomy=args.taxonomy,
-         full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean, verbose_lvl=args.verbosity)
+         full_DB=args.full_index, classifier_param=args.classifier, k2_clean=args.clean, verbose_lvl=args.verbosity,
+         no_cython=args.no_cython)
 
 
 # python ~/Scripts/Reads_Binning/plot_me/classify.py -t 4 -d bins /hdd1000/Reports/ /ssd1500/Segmentation/3mer_s5000/clustered_by_minikm_3mer_s5000_omitted_plant_vertebrate/ -i /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-12-05_100000-WindowReads_20-BacGut/2019-12-05_100000-WindowReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/Synthetic_from_Genomes/2019-11-26_100000-SyntReads_20-BacGut/2019-11-26_100000-SyntReads_20-BacGut.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_10000-uniform-bacteria-l1000-q8.fastq /ssd1500/Segmentation/Test-Data/ONT_Silico_Communities/Mock_100000-bacteria-l1000-q10.fastq
