@@ -414,14 +414,14 @@ def pll_copy_segments_to_bin(df):
 
         path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id), f"{taxon}.fna")
 
-        descr = description.replace(" ", "_").replace(" ", "_")  # To avoid issues with bash. Space and non-breaking space
-        descr_splits = descr.split("|")
-        description_new = "|".join(descr_splits[:3] + [f"s:{start}-e:{end-1}"] + descr_splits[4:])
+        descr = description.replace(" ", "_")  # To avoid issues with bash. Space and non-breaking space
+        descr_splits = descr.split("|", maxsplit=3)
+        description_new = "|".join(descr_splits[:3]) + f"s:{start}-e:{end-1}" + descr_splits[4]
 
         # Need to find the genome/plasmid/ and the right chromosome
         seq = genome.records[category][name]
-        logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
-                      f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
+        # logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
+        #               f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
 
         segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
                             seq.features, seq.annotations, seq.letter_annotations)
