@@ -98,11 +98,12 @@ initialized_data = [
          {"AA": 0., "AC": 0., "AG": 0., "AT": 0., "CA": 0., "CC": 0., "CG": 0.,
           "GA": 0., "GC": 0., "TA": 0., },
          # mapping of array indexes, for the forward strand, FROM where it should be added
-         # AA, CA, GA, TA, AC, CC, GC, AG, CG, AT
-         [  0,  4,  8, 12,  1,  5,  9,  2,  6,  3, ],
-         # mapping of array indexes, for the reverse complement, FROM where it should be added
-         # TT, TG, TC, TA, GT, GG, GC, CT, CG, AT
-         [ 15, 14, 13, 12, 11, 10,  9,  7,  6,  3], ),
+         # mapping of array indexes, for the forward strand, to where it should be added
+         # AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
+         [  0,  1,  2,  3,  4,  5,  6,  8,  9, 12, ],
+         # mapping of array indexes, for the reverse complement, to where it should be added
+         # TT, GT, CT, AT, TG, GG, CG, TC, GC, TA
+         [ 15, 11,  7,  3, 14, 10,  6, 13,  9, 12], ),
 ]
 
 @pytest.mark.parametrize("k, origin_target, template_combined, map_forward_adr, map_rc_adr", initialized_data)
@@ -121,7 +122,7 @@ def test_cyt_init_variables(k, origin_target, template_combined, map_forward_adr
 
 
 def test_codons_without_rev_comp():
-    assert bio.codons_without_rev_comp(2) == ["AA", "CA", "GA", "TA", "AC", "CC", "GC", "AG", "CG", "AT"]
+    assert bio.codons_without_rev_comp(2) == ["AA", "AC", "AG", "AT", "CA", "CC", "CG", "GA", "GC", "TA", ]
 
 
 # #############   KMER COUNTER   #######################
@@ -194,11 +195,14 @@ seq_combined_k_mers = [
     (2, "TTTTTTTTTTTGGGGCCC",
      {"AA":10., "AC": 0., "AG": 0., "AT": 0., "CA": 1., "CC": 5., "CG": 0.,
       "GA": 0., "GC": 1., "TA": 0., }),
+    (3, "AAAAAAACCCCCCAAAGGGGGTTTTTT",
+     {"AAA":10., "AAC": 2., "AAG": 1., "AAT": 0., "ACA": 0., "ACC": 2., "ACG": 0., "ACT": 0., "AGA": 0., "AGC": 0., "AGG": 1., "ATA": 0., "ATC": 0., "ATG": 0.,
+      "CAA": 1., "CAC": 0., "CAG": 0., "CCA": 1., "CCC": 7., "CCG": 0., "CGA": 0., "CGC": 0., "CTA": 0., "CTC": 0.,
+      "GAA": 0., "GAC": 0., "GCA": 0., "GCC": 0., "GGA": 0., "GTA": 0., "TAA": 0., "TCA": 0., }),
     (3, "TTTTTTTTTTTGGGGCCCGAAT",
-    {"AAA": 9., "AAC": 0., "AAG": 0., "AAT": 1., "ACA": 0., "ACC": 0., "ACG": 0., "ACT": 0., "AGA": 0., "AGC": 0., "AGG": 0., "AGT": 0., "ATA": 0., "ATC": 0., "ATG": 0., "ATT": 0.,
-     "CAA": 1., "CAC": 0., "CAG": 0., "CAT": 0., "CCA": 1., "CCC": 3., "CCG": 1., "CCT": 0., "CGA": 1., "CGC": 0., "CGG": 0., "CGT": 0., "CTA": 0., "CTC": 0., "CTG": 0., "CTT": 0.,
-     "GAA": 1., "GAC": 0., "GAG": 0., "GAT": 0., "GCA": 0., "GCC": 2., "GCG": 0., "GCT": 0., "GGA": 0., "GGC": 0., "GGG": 0., "GGT": 0., "GTA": 0., "GTC": 0., "GTG": 0., "GTT": 0.,
-     "TAA": 0., "TAC": 0., "TAG": 0., "TAT": 0., "TCA": 0., "TCC": 0., "TCG": 0., "TCT": 0., "TGA": 0., "TGC": 0., "TGG": 0., "TGT": 0., "TTA": 0., "TTC": 0., "TTG": 0., "TTT": 0., })
+     {"AAA": 9., "AAC": 0., "AAG": 0., "AAT": 1., "ACA": 0., "ACC": 0., "ACG": 0., "ACT": 0., "AGA": 0., "AGC": 0., "AGG": 0., "ATA": 0., "ATC": 0., "ATG": 0.,
+      "CAA": 1., "CAC": 0., "CAG": 0., "CCA": 1., "CCC": 3., "CCG": 1., "CGA": 1., "CGC": 0., "CTA": 0., "CTC": 0.,
+      "GAA": 1., "GAC": 0., "GCA": 0., "GCC": 2., "GGA": 0., "GTA": 0., "TAA": 0., "TCA": 0., })
 ]
 seq_combined_k_mers_array = []
 for item in seq_combined_k_mers:
@@ -211,10 +215,12 @@ def test_bio_count_and_combine_seq(k, seq, counts):
 
 @pytest.mark.parametrize("k, seq, counts", seq_combined_k_mers)
 def test_cyt_count_and_combine_seq_dicts(k, seq, counts):
+    cyt_ext.init_variables(k)
     np.testing.assert_array_equal(counts, cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=True, combine=True))
 
 @pytest.mark.parametrize("k, seq, counts", seq_combined_k_mers_array)
 def test_cyt_count_and_combine_seq_arrays(k, seq, counts):
+    cyt_ext.init_variables(k)
     np.testing.assert_array_equal(counts, cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=False, combine=True))
 
 
