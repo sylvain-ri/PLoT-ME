@@ -350,8 +350,8 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
             dict_kmers_keys = list(dict_kmer_counts.keys())
             logger.debug(f"MemoryView (len={kmer_counts.shape}, first 10={kmer_counts[0]}) "
                          f"to Dict (template keys={dict_kmers_keys[:5]} - {dict_kmers_keys[-5:]}")
-        for key in dict_kmer_counts.keys():
-            dict_kmer_counts[key] = kmer_counts[codon_addr(key)]
+        for i, key in enumerate(dict_kmer_counts.keys()):
+            dict_kmer_counts[key] = kmer_counts[i]
         return dict_kmer_counts
 
     else:  # raw data, no dictionary
