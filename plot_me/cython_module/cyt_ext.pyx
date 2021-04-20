@@ -204,12 +204,15 @@ cdef _init_variables(unsigned int k):
     # Build the mapping to convert fast
     if verbosity <= INFO: logger.info("Initializing Indexes for k-mer counting ")
 
+    global dim_combined_codons
+    dim_combined_codons = _n_dim_rc_combined(k)
+
     cdef:
-        template_counts_all           = {}
-        template_counts_combined      = {}
-        codons_orig_target            = {}
-        list         codons_all       = _combinations(k)
-        list         codons_combined  = []
+        template_counts_all       = {}
+        template_counts_combined  = {}
+        codons_orig_target        = {}
+        codons_all                = _combinations(k)
+        codons_combined           = []
         unsigned int [:] codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
         unsigned int [:] codons_rev_comp_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
 
@@ -247,8 +250,6 @@ cdef _init_variables(unsigned int k):
     # Setting the values
     global k_val
     k_val = k
-    global dim_combined_codons
-    dim_combined_codons = _n_dim_rc_combined(k)
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)
     global l_codons_all
