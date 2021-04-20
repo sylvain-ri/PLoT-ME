@@ -778,7 +778,7 @@ def arg_parser():
     parser.add_argument('-b', '--bins',     help='Number of bins/clusters to split the DB into (default=%(default)d)',
                                             default=10,         type=int, metavar='')
 
-    parser.add_argument('-t', '--threads',  help='Number of threads (default=%(default)d)',
+    parser.add_argument('-t', '--threads',  help='Number of threads (default=%(default)d). Use One (1) if your disk is slow',
                                             default=cpu_count(), type=int,  metavar='')
     parser.add_argument('-e', '--early',    help="Early stop. Index of last step to run. "
                                                  "Use -1 to display all steps and paths (DRY RUN)",
