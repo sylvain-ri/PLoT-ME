@@ -25,8 +25,6 @@ AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
 
 TODO
  * count k-mers in fastq
- * count k-mers in genomes
- * make the reverse complement
  * make the binning
  * vectorize the distance calculation
  * save into fastq file
@@ -157,12 +155,12 @@ def n_dim_rc_combined(k):
 cdef unsigned int _codon_addr(str codon):
     """ Take a codon as char array / str and return the address, given its nucleotides """
     cdef:
-        unsigned int length = len(codon)  # todo replace len() by class.k
+        unsigned int length = len(codon)
         unsigned int i
         unsigned int total = 0
         char codon_char
     for i in range(length):
-        codon_char = <char>codon[i]  # todo: needed ?
+        codon_char = codon[i]
         total += nucl_val(codon_char) * 4 ** (length-1 - i)
     return total
 
@@ -182,8 +180,8 @@ cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
     if verbosity <= DEBUG_MORE:
         logger.log(DEBUG_MORE, f"ar_codons_forward_addr={ar_codons_forward_addr.base}, ar_codons_rev_comp_addr={ar_codons_rev_comp_addr.base}")
 
+    # todo: use prange ?
 #    for i in prange(dim_combined_codons, nogil=True):
-    # todo buggy somewhere, the palindrome have all the same value
     for i in range(dim_combined_codons):
         if ar_codons_forward_addr[i] == ar_codons_rev_comp_addr[i]:
             res[i] = counts[ar_codons_forward_addr[i]]
