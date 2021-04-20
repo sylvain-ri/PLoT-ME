@@ -205,14 +205,10 @@ cdef _init_variables(unsigned int k):
         template_counts_all           = {}
         template_counts_combined      = {}
         codons_orig_target            = {}
-        list         codons_all       = []
+        list         codons_all       = _combinations(k)
         list         codons_combined  = []
-        unsigned int [:] codons_forward_addr
-        unsigned int [:] codons_rev_comp_addr
-        codons_all = _combinations(k)
-        codons_combined = []
-        codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
-        codons_rev_comp_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
+        unsigned int [:] codons_forward_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
+        unsigned int [:] codons_rev_comp_addr = np.zeros(dim_combined_codons, dtype=np.uint32)
 
     cdef unsigned int counter, index_codon, rc_address
     cdef str rc, forward
