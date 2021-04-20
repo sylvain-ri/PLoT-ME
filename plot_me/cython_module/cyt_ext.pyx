@@ -336,6 +336,9 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
         dict dict_kmer_counts
         unsigned int i
         str key
+
+    if isinstance(sequence, str):
+        sequence = str.encode(sequence)
     if dictionary:
         if combine:
             kmer_counts = _combine_counts_forward_w_rc(_kmer_counter(sequence, k))
