@@ -285,14 +285,13 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
         unsigned int next_nucleotide_addr = 0
         unsigned int recover_addr = 0
         unsigned int k_minus_1 = k_value - 1
-        unsigned int max_addr = 4**k_value - 1
         unsigned int modulo_addr = 4 ** (k_value - 1)
         unsigned int last_failed = 0
         unsigned int fails = 0
         unsigned long long counter = 0
 
-    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"codons template[0]={kmer_counts[0]}, of length={stream_len}, "
-                                                       f"for k={k_value} and stream[:20]={stream[:min(20, stream_len)]}")
+    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"codons template.shape={kmer_counts.shape}, for k={k_value}, "
+                                                       f"stream length={stream_len} and stream[:20]={stream[:min(20, stream_len)]}")
     if stream_len <= k_value:
         if verbosity <= WARNING: logger.warning(f"Sequence was shorter than the k used {stream}")
         return kmer_counts
@@ -300,10 +299,11 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     for counter in range(0, stream_len):
         # Value of the nucleotide
         next_nucleotide_addr = nucl_val(stream[counter])
+        if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"counter={counter}, letter={stream[counter]}, "
+           f"nucl_val={next_nucleotide_addr}, last_addr_mod={addr % modulo_addr}, next_addr={(addr % modulo_addr) * 4 + next_nucleotide_addr}")
 
         if next_nucleotide_addr != ADDR_ERROR:     # If the character was recognized
             addr = (addr % modulo_addr) * 4 + next_nucleotide_addr
-            logger.debug(f"counter={counter}, letter={stream[counter]}, nucl_val={next_nucleotide_addr}, addr={addr}, addr_mod={addr % modulo_addr}")
 
             # before we have a full length k-mer, we just add the address, but skip counting the still forming k-mer
             if counter >= k_minus_1:
