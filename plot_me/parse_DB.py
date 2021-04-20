@@ -26,6 +26,7 @@ Using large k (5+) and small s (10000-) yield very large kmer counts, costing
  high amounts of RAM (esp. when combining all kmer counts together,
  RAM needs to reach ~30GB or more). Currently working on this (July 2020)
 
+
 #############################################################################
 Sylvain @ GIS / Biopolis / Singapore
 Sylvain RIONDET <sylvainriondet@gmail.com>
@@ -95,7 +96,7 @@ class Genome:
         self.window_size = window_size
         self.k           = Genome.K if k < 0 else k
         # records is a dict of SeqRecord
-        self.records = {cat: [] for cat in self.categories}
+        self.records = {cat: {} for cat in self.categories}
         # self.splits  = {cat: [] for cat in self.categories}
 
     def __repr__(self):
@@ -109,7 +110,7 @@ class Genome:
         for record in SeqIO.parse(self.path_fna, "fasta"):
             for cat in self.categories:
                 if cat in record.description:
-                    self.records[cat].append(record)
+                    self.records[cat][record.name] = record
                     break
 
     def yield_genome_split(self):
@@ -117,7 +118,7 @@ class Genome:
             or to create the .fna files for kraken2-build
         """
         for cat in self.categories:
-            for record in self.records[cat]:
+            for record in self.records[cat].values():
 
                 full_seq = record.seq
                 len_genome = len(full_seq)
@@ -135,7 +136,7 @@ class Genome:
         for_csv = []
         for segment, taxon, cat, start, end in self.yield_genome_split():
             if cython_is_there:
-                kmer_count = cyt_ext.kmer_counter(str.encode(str(segment.seq)), k=self.k, dictionary=True, combine=True)
+                kmer_count = cyt_ext.kmer_counter(str(segment.seq), k=self.k, dictionary=True, combine=True)
             else:
                 kmer_count = combine_counts_forward_w_rc(seq_count_kmer(str(segment.seq), deepcopy(self.kmer_count_zeros), k=self.k),
                                                          k=self.k)
@@ -418,18 +419,16 @@ def pll_copy_segments_to_bin(df):
         description_new = "|".join(descr_splits[:3] + [f"s:{start}-e:{end-1}"] + descr_splits[4:])
 
         # Need to find the genome/plasmid/ and the right chromosome
-        for seq in genome.records[category]:
-            if seq.name == name:
-                logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
-                              f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
+        seq = genome.records[category][name]
+        logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
+                      f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
 
-                segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
-                                    seq.features, seq.annotations, seq.letter_annotations)
-                # Append the combined segment to avoid multiple files for the same taxon
-                with open(path_bin_segment, "a") as f:
-                    SeqIO.write(segment, f, "fasta")
-                count += 1
-                break
+        segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
+                            seq.features, seq.annotations, seq.letter_annotations)
+        # Append the combined segment to avoid multiple files for the same taxon
+        with open(path_bin_segment, "a") as f:
+            SeqIO.write(segment, f, "fasta")
+        count += 1
     return
 
 
@@ -460,6 +459,8 @@ def split_genomes_to_bins(path_bins_assignments, path_db_bins, clusters):
     try:
         with Pool(main.cores) as pool:  # file copy don't need many cores (main.cores)
             results = list(tqdm(pool.imap(pll_copy_segments_to_bin, df_per_fna), total=len(df_per_fna), dynamic_ncols=True))
+    except KeyboardInterrupt:
+        logger.warning(f"Stopped by user")
     except:
         logger.warning(f"Multiprocessing failed, launching single core version")
         results = []
