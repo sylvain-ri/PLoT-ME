@@ -77,9 +77,12 @@ cdef:
     float [::1]      template_kmer_counts
 
 # ##########################              GETTERS / SETTERS              ##########################
-# Getters in Python only. Setters in Cython as well, to set global variables
+# Getters in Python only. Setter for Verbosity
 def get_verbosity():
     return verbosity
+def set_verbosity(v):
+    global verbosity
+    verbosity = v
 def get_k_val():
     return k_val
 def get_dim_combined_codons():
