@@ -165,10 +165,9 @@ def codon_addr(codon):
 
 #@cython.boundscheck(False)  # Deactivate bounds checking
 #@cython.wraparound(False)
-cdef float[:] _combine_counts_forward_w_rc(float[:] counts, unsigned int k=None):
+cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
     """ Combine the forward and reverse complement in the k-mer profile  """
-    if k is not None and k != k_val:
-        raise LookupError(f"k (={k_val}) hasn't been initialized properly, combining forward and RC can't be made ")
+    assert counts.shape[0] == 4 ** k_val, LookupError(f"k (={k_val}) hasn't been initialized properly, combining forward and RC can't be made ")
     cdef:
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
          int i
