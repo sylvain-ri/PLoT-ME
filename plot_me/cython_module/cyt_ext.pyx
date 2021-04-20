@@ -4,6 +4,9 @@
 # distutils: language=c, define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 # unused args: cdivision=True
 # todo: set to False the cython flags, one by one
+# todo: use a class
+#       https://cython.readthedocs.io/en/latest/src/userguide/extension_types.html
+#       https://cython.readthedocs.io/en/latest/src/tutorial/cdef_classes.html
 """
 !!!! MUST run this init before using any methods !!!!
 python3 setup.py build_ext --inplace
