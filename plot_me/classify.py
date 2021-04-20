@@ -48,8 +48,8 @@ from plot_me.bio import kmers_dic, seq_count_kmer
 logger = logging.getLogger(__name__)
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
 
-cython_is_there = False
-cyt_ext         = ImportError
+cython_is_there    = False
+cyt_ext            = ImportError
 
 THREADS            = 1
 CLASSIFIERS        = (('kraken2', 'k35_l31_s7'),
@@ -399,8 +399,8 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     logger.info("**** Starting script **** \n ")
     global THREADS
     THREADS = threads
-    global cyt_ext
-    cyt_ext = import_cython_mod()
+    global cyt_ext, cython_is_there
+    cyt_ext, cython_is_there = import_cython_mod()
 
     # preparing csv record file
     if not osp.isfile(f_record):

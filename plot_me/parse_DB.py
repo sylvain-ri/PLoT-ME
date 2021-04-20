@@ -655,8 +655,8 @@ def main(folder_database, folder_output, n_clusters, k, window, cores=cpu_count(
     logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     try:
-        global cyt_ext
-        cyt_ext = import_cython_mod()
+        global cyt_ext, cython_is_there
+        cyt_ext, cython_is_there = import_cython_mod()
         if cython_is_there:
             logger.info(f"Cython is available, initializing variables")
             cyt_ext.set_verbosity(verbose_lvl)

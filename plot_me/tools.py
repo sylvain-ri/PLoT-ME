@@ -364,6 +364,7 @@ class ScanFolder:
 def import_cython_mod():
     """ Dirty way of importing cyt_ext """
     cyt_ext = ImportError
+    cython_is_there = False
     try:
         try:
             from .cython_module import cyt_ext
@@ -372,7 +373,6 @@ def import_cython_mod():
                 from plot_me.cython_module import cyt_ext
             except:
                 from cython_module import cyt_ext
-        global cython_is_there
         cython_is_there = True
         logger.info("Cython has been imported")
     except ModuleNotFoundError:
@@ -385,7 +385,7 @@ def import_cython_mod():
                        "Failed to import Cython extension, falling back to pure Python code. \n"
                        "Check the following: https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility \n"
                        "If this didn't solve your issue, Please consider raising an issue on github.")
-    return cyt_ext
+    return cyt_ext, cython_is_there
 
 # #############################################################################
 # Save for programming
