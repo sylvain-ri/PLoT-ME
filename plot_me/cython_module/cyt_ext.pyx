@@ -335,30 +335,30 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True):
         dict dict_kmer_counts
         unsigned int i
         str key
+        char* seq
 
-    if isinstance(sequence, str):
-        sequence = str.encode(sequence)
+    seq = <char*>sequence
     if dictionary:
         if combine:
-            kmer_counts = _combine_counts_forward_w_rc(_kmer_counter(sequence, k))
+            kmer_counts = _combine_counts_forward_w_rc(_kmer_counter(seq, k))
             dict_kmer_counts = d_template_counts_combined.copy()
         else:
-            kmer_counts = _kmer_counter(sequence, k)
+            kmer_counts = _kmer_counter(seq, k)
             dict_kmer_counts = d_template_counts_all.copy()
 
         if verbosity <= DEBUG:
             dict_kmers_keys = list(dict_kmer_counts.keys())
             logger.debug(f"MemoryView (len={kmer_counts.shape}, first 10={kmer_counts[0]}) "
                          f"to Dict (template keys={dict_kmers_keys[:5]} - {dict_kmers_keys[-5:]}")
-        for i, key in enumerate(dict_kmer_counts.keys()):
-            dict_kmer_counts[key] = kmer_counts[i]
+        for key in dict_kmer_counts.keys():
+            dict_kmer_counts[key] = kmer_counts[codon_addr(i)]
         return dict_kmer_counts
 
     else:  # raw data, no dictionary
         if combine:
-            return _combine_counts_forward_w_rc(_kmer_counter(sequence, k)).base
+            return _combine_counts_forward_w_rc(_kmer_counter(seq, k)).base
         else:
-            return _kmer_counter(sequence, k).base
+            return _kmer_counter(seq, k).base
 
 
 
