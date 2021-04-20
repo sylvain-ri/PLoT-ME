@@ -203,43 +203,22 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
         super().add_argument(*args, **kwargs)
 
 
-def pll_scaling(serie):
-    serie = pd.to_numeric(serie, downcast='float')
-    serie *= pll_scaling.ratio
-    return serie
-
-
-pll_scaling.ratio = 0
-
-
-def scale_df_by_length(data, kmer_cols, k, w, single_row=False, cores=cpu_count()):
+def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
+    # todo: should scale by the actual number of columns (palindromes and reverse complemented k-mers)
     divider = w - k + 1
     ratio = 4**k / divider if divider > 1 else 4**k  # avoid divide by 0
     ratio = np.float32(ratio)
     if single_row:
         return data * ratio
     else:
-        logger.info(f"Scaling the dataframe {data.shape}, converting to float32")
-        logger.debug(f"{data}")
+        logger.info(f"Scaling the dataframe {data.shape}")
+        logger.debug(f"{data.iloc[:5,:20]}")
 
-        pll_scaling.ratio = ratio
-
-        # Mono thread version (extremely slow for some reasons)
         for col in tqdm(kmer_cols):
             data[col] *= ratio
 
-        # with Pool(cores) as pool:
-        #     results = list(tqdm(pool.imap(pll_scaling, (data.loc[:, col] for col in kmer_cols)),
-        #                         total=len(kmer_cols), desc="scaling each Series"))
-        # # much faster, but let's see if there an even faster assignment
-        # # todo: build a new DataFrame from scratch ?
-        # for i, col in tqdm(enumerate(kmer_cols), total=len(kmer_cols), desc="Assigning results back to DataFrame"):
-        #     data.assign[col] = results[i]
-        #     data[col] = results[i]
-
-        logger.debug(f"{data}")
-        # data.loc[:, col] = pd.to_numeric(data.loc[:, col], downcast='float')
+        logger.debug(f"{data.iloc[:5,:20]}")
 
 
 class ScanFolder:
