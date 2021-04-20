@@ -124,12 +124,12 @@ cdef _combinations(int k, str combi=nucleotides):
     if k == 1:
         return combi
     else:
-        return [f"{b}{a}" for a in _combinations(k - 1, combi) for b in combi]
+        return [f"{a}{b}" for a in _combinations(k - 1, combi) for b in combi]
 
 def combinations(k, combi=nucleotides):
     return _combinations(k, combi)
 
-cdef conversion_table_rc = str.maketrans("ACTG", "TGAC")
+cdef conversion_table_rc = str.maketrans("ACGT", "TGCA")
 cdef _reverse_complement_string(str seq):
     """ Return reverse complement string """
     return seq.translate(conversion_table_rc)[::-1]
@@ -265,6 +265,9 @@ def init_variables(k):
 
 # @cython.boundscheck(False)  # Deactivate bounds checking
 # @cython.wraparound(False)   # Deactivate negative indexing.
+# @cython.nonecheck(False)    # Check if receives None value
+# @cython.profile(True)       # Allows profiling the function
+# @cython.cdivision(False)    # No check for div by zero
 # Bytes Faster than const unsigned char [:]
 cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     """
@@ -279,14 +282,14 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
         float [::1] kmer_counts = template_kmer_counts.copy()
         unsigned int stream_len = len(stream)
         unsigned int addr = 0
+        unsigned int next_nucleotide_addr = 0
         unsigned int recover_addr = 0
         unsigned int k_minus_1 = k_value - 1
         unsigned int max_addr = 4**k_value - 1
-        unsigned int new_addr_mul = 4**k_minus_1
+        unsigned int modulo_addr = 4 ** (k_value - 1)
         unsigned int last_failed = 0
         unsigned int fails = 0
-        unsigned long long counter = k_value
-        char letter = b'N'  # initializing the while loop
+        unsigned long long counter = 0
 
     if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"codons template[0]={kmer_counts[0]}, of length={stream_len}, "
                                                        f"for k={k_value} and stream[:20]={stream[:min(20, stream_len)]}")
@@ -295,17 +298,18 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
         return kmer_counts
 
     for counter in range(0, stream_len):
-        letter = stream[counter]
-        addr = addr // 4 + nucl_val(letter) * new_addr_mul
-        logger.debug(f"counter={counter}, letter={letter}, nucl_val={nucl_val(letter)}, addr={addr}")
+        # Value of the nucleotide
+        next_nucleotide_addr = nucl_val(stream[counter])
 
-        # before we have a full k-mer, we just add the address, but skip counting the still forming k-mer
-        if counter < k_minus_1:
-            continue
+        if next_nucleotide_addr != ADDR_ERROR:     # If the character was recognized
+            addr = (addr % modulo_addr) * 4 + next_nucleotide_addr
+            logger.debug(f"counter={counter}, letter={stream[counter]}, nucl_val={next_nucleotide_addr}, addr={addr}, addr_mod={addr % modulo_addr}")
 
-        # If the address is valid, we count it
-        if addr <= max_addr:
-            kmer_counts[addr] += 1
+            # before we have a full length k-mer, we just add the address, but skip counting the still forming k-mer
+            if counter >= k_minus_1:
+                kmer_counts[addr] += 1
+            else:
+                continue
         else:
             # Failed this time (an unknown character threw an address too big)
             if last_failed == 0:
@@ -317,7 +321,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
             # wait until the wrong letter goes away
             elif last_failed < k_value-1:
                 addr = ADDR_ERROR
-                recover_addr = recover_addr // 4 + nucl_val(letter) * new_addr_mul
+                recover_addr = (recover_addr % modulo_addr) * 4 + next_nucleotide_addr
                 last_failed += 1
 
             # last iteration, resetting the error variables

@@ -89,7 +89,7 @@ def combinations(n=4, combi=nucleotides):
     if n == 1:
         return combi
     else:
-        return [f"{b}{a}" for a in combinations(n - 1, combi) for b in combi]
+        return [f"{a}{b}" for a in combinations(n - 1, combi) for b in combi]
 
 
 def seq_to_window(seq, window_size=4):

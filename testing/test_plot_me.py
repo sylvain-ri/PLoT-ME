@@ -21,12 +21,11 @@ cyt_ext.set_verbosity(5)
 
 # ######################    TESTING COMBINATIONS    ######################
 combinations = [
-    (2, ["AA", "CA", "GA", "TA", "AC", "CC", "GC", "TC",
-         "AG", "CG", "GG", "TG", "AT", "CT", "GT", "TT", ]),
-    (3, ["AAA", "CAA", "GAA", "TAA", "ACA", "CCA", "GCA", "TCA", "AGA", "CGA", "GGA", "TGA", "ATA", "CTA", "GTA", "TTA",
-         "AAC", "CAC", "GAC", "TAC", "ACC", "CCC", "GCC", "TCC", "AGC", "CGC", "GGC", "TGC", "ATC", "CTC", "GTC", "TTC",
-         "AAG", "CAG", "GAG", "TAG", "ACG", "CCG", "GCG", "TCG", "AGG", "CGG", "GGG", "TGG", "ATG", "CTG", "GTG", "TTG",
-         "AAT", "CAT", "GAT", "TAT", "ACT", "CCT", "GCT", "TCT", "AGT", "CGT", "GGT", "TGT", "ATT", "CTT", "GTT", "TTT", ]),
+    (2, [ "AA",  "AC",  "AG",  "AT",  "CA",  "CC",  "CG",  "CT",  "GA",  "GC",  "GG",  "GT",  "TA",  "TC",  "TG",  "TT", ]),
+    (3, ["AAA", "AAC", "AAG", "AAT", "ACA", "ACC", "ACG", "ACT", "AGA", "AGC", "AGG", "AGT", "ATA", "ATC", "ATG", "ATT",
+         "CAA", "CAC", "CAG", "CAT", "CCA", "CCC", "CCG", "CCT", "CGA", "CGC", "CGG", "CGT", "CTA", "CTC", "CTG", "CTT",
+         "GAA", "GAC", "GAG", "GAT", "GCA", "GCC", "GCG", "GCT", "GGA", "GGC", "GGG", "GGT", "GTA", "GTC", "GTG", "GTT",
+         "TAA", "TAC", "TAG", "TAT", "TCA", "TCC", "TCG", "TCT", "TGA", "TGC", "TGG", "TGT", "TTA", "TTC", "TTG", "TTT"]),
 ]
 @pytest.mark.parametrize("k, list_combinations", combinations)
 def test_bio_combinations(k, list_combinations):
@@ -93,11 +92,11 @@ def test_cyt_dim_combined_codons(k, combined_dim):
 # The arrays are initialized to speed up methods
 initialized_data = [
     # k, dict mapping of k-mers to their reverse complement if they Should be combined
-    (2,  {"AA": "TT", "CA": "TG", "GA": "TC", "TA": "TA", "AC": "GT", "CC": "GG", "GC": "GC", "TC": "GA",
-          "AG": "CT", "CG": "CG", "GG": "CC", "TG": "CA", "AT": "AT", "CT": "AG", "GT": "AC", "TT": "AA", },
+    (2,  {"AA": "TT", "AC": "GT", "AG": "CT", "AT": "AT", "CA": "TG", "CC": "GG", "CG": "CG", "CT": "AG",
+          "GA": "TC", "GC": "GC", "GG": "CC", "GT": "AC", "TA": "TA", "TC": "GA", "TG": "CA", "TT": "AA", },
          # dic with only the kept k-mers
-         {"AA": 0., "CA": 0., "GA": 0., "TA": 0., "AC": 0., "CC": 0., "GC": 0.,
-          "AG": 0., "CG": 0., "AT": 0., },
+         {"AA": 0., "AC": 0., "AG": 0., "AT": 0., "CA": 0., "CC": 0., "CG": 0.,
+          "GA": 0., "GC": 0., "TA": 0., },
          # mapping of array indexes, for the forward strand, FROM where it should be added
          # AA, CA, GA, TA, AC, CC, GC, AG, CG, AT
          [  0,  4,  8, 12,  1,  5,  9,  2,  6,  3, ],
@@ -128,13 +127,13 @@ def test_codons_without_rev_comp():
 # #############   KMER COUNTER   #######################
 seq_w_expected_counts = [
     {'k':2, 'seq': "AAAACCCCGGGGTTTT",
-     'counts': {"AA": 3., "CA": 0., "GA": 0., "TA": 0., "AC": 1., "CC": 3., "GC": 0., "TC": 0.,
-                "AG": 0., "CG": 1., "GG": 3., "TG": 0., "AT": 0., "CT": 0., "GT": 1., "TT": 3., }, },
+     'counts': {"AA": 3., "AC": 1., "AG": 0., "AT": 0., "CA": 0., "CC": 3., "CG": 1., "CT": 0.,
+                "GA": 0., "GC": 0., "GG": 3., "GT": 1., "TA": 0., "TC": 0., "TG": 0., "TT": 3., }, },
     {'k':3, 'seq': "AAAACCCCGGGGTTTT",
-     'counts': {"AAA":2., "CAA":0., "GAA":0., "TAA":0., "ACA":0., "CCA":0., "GCA":0., "TCA":0., "AGA":0., "CGA":0., "GGA":0., "TGA":0., "ATA":0., "CTA":0., "GTA":0., "TTA":0.,
-                "AAC":1., "CAC":0., "GAC":0., "TAC":0., "ACC":1., "CCC":2., "GCC":0., "TCC":0., "AGC":0., "CGC":0., "GGC":0., "TGC":0., "ATC":0., "CTC":0., "GTC":0., "TTC":0.,
-                "AAG":0., "CAG":0., "GAG":0., "TAG":0., "ACG":0., "CCG":1., "GCG":0., "TCG":0., "AGG":0., "CGG":1., "GGG":2., "TGG":0., "ATG":0., "CTG":0., "GTG":0., "TTG":0.,
-                "AAT":0., "CAT":0., "GAT":0., "TAT":0., "ACT":0., "CCT":0., "GCT":0., "TCT":0., "AGT":0., "CGT":0., "GGT":1., "TGT":0., "ATT":0., "CTT":0., "GTT":1., "TTT":2.,
+     'counts': {"AAA":2., "AAC":1., "AAG":0., "AAT":0., "ACA":0., "ACC":1., "ACG":0., "ACT":0., "AGA":0., "AGC":0., "AGG":0., "AGT":0., "ATA":0., "ATC":0., "ATG":0., "ATT":0.,
+                "CAA":0., "CAC":0., "CAG":0., "CAT":0., "CCA":0., "CCC":2., "CCG":1., "CCT":0., "CGA":0., "CGC":0., "CGG":1., "CGT":0., "CTA":0., "CTC":0., "CTG":0., "CTT":0.,
+                "GAA":0., "GAC":0., "GAG":0., "GAT":0., "GCA":0., "GCC":0., "GCG":0., "GCT":0., "GGA":0., "GGC":0., "GGG":2., "GGT":1., "GTA":0., "GTC":0., "GTG":0., "GTT":1.,
+                "TAA":0., "TAC":0., "TAG":0., "TAT":0., "TCA":0., "TCC":0., "TCG":0., "TCT":0., "TGA":0., "TGC":0., "TGG":0., "TGT":0., "TTA":0., "TTC":0., "TTG":0., "TTT":2.,
                 }, },
 ]
 seq_w_expected_counts_tuples = []
@@ -163,10 +162,10 @@ def test_cyt_seq_count_kmer_return_dict(k, seq, counts, np_counts):
 # ######################    TESTING COMBINATION FOR FORWARD AND REVERSE COMPLEMENT    ######################
 # Combining forward and reverse into one array / list
 counts_all_to_combined = [
-    ({"AA": 2., "CA": 2., "GA": 5., "TA": 9., "AC": 4., "CC": 3., "GC": 6., "TC": 1.,
-      "AG": 6., "CG": 4., "GG": 7., "TG": 2., "AT": 1., "CT": 5., "GT": 8., "TT": 3., },
-     {"AA": 5., "AC":12., "AG":11., "AT": 1., "CA": 4., "CC":10., "CG": 4.,
-      "GA": 6., "GC": 6., "TA": 9., },
+    ({"AA":2., "AC": 4., "AG": 6., "AT":1., "CA":2., "CC": 3., "CG":4., "CT":5.,
+      "GA":5., "GC": 6., "GG": 7., "GT":8., "TA":9., "TC": 1., "TG":2., "TT":3., },
+     {"AA":5., "AC":12., "AG":11., "AT":1., "CA":4., "CC":10., "CG":4.,
+      "GA":6., "GC": 6., "TA": 9., },
      2),
 ]
 np_counts_all_to_combined = []
