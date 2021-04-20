@@ -9,4 +9,5 @@ echo " -> build -e"
 python3 -m pip install -e .
 
 echo " -> PYTEST"
-python3 -m pytest -v --color=yes --log-level=5
+python3 -m pytest --color=yes --log-level=10
+echo "python3 -m pytest -v --color=yes --log-level=5"
