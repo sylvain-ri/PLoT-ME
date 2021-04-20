@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 # coding: utf-8
-# cython: language_level=3, infer_types=True, boundscheck=True, profile=True, wraparound=True, cdivision=True
+# cython: language_level=3, infer_types=True, boundscheck=True, profile=False, wraparound=False, cdivision=True
 # distutils: language=c, define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
-# unused args: cdivision=True
+# unused args: DISABLED_cdivision=True, DISABLED_define_macros=CYTHON_TRACE_NOGIL=1,
 # todo: set to False the cython flags, one by one
 # todo: use a class
 #       https://cython.readthedocs.io/en/latest/src/userguide/extension_types.html
@@ -75,7 +75,7 @@ cdef:
     list         l_codons_combined  = []
     unsigned int [:] ar_codons_forward_addr
     unsigned int [:] ar_codons_rev_comp_addr
-    float [::1]      template_kmer_counts
+    float [:]      template_kmer_counts
 
 # ##########################              GETTERS / SETTERS              ##########################
 # Getters in Python only. Setter for Verbosity
@@ -114,6 +114,7 @@ def get_template_kmer_counts():
 
 # ##########################             UTILITIES             ##########################
 
+@cython.profile(False)       # Allows profiling the function
 cdef inline unsigned int nucl_val(char c) nogil:
     """ Map of letters To Value (for addressing the k-mer array """
     if c == b"A" or c == b"a":
@@ -200,6 +201,31 @@ def combine_counts_forward_w_rc(counts):
     return _combine_counts_forward_w_rc(counts).base
 
 
+cdef _scale_counts(float[:] counts, unsigned int k, ssize_t length):
+    """ Scale the counts by their length, in place """
+    # todo: should scale by the actual number of columns (palindromes and reverse complemented k-mers)
+    #       then do it in parse_DB tools.scale_df_by_length() as well
+    cdef:
+        unsigned int i
+        float divisor, factor
+
+    divisor = (<unsigned int>length) - k + 1
+    factor  = 4**k / divisor
+
+    for i in range(0, counts.shape[0]):
+        counts[i] = counts[i] * factor
+
+def scale_counts(counts, k, length):
+    return _scale_counts(counts, k, length)
+
+
+cdef unsigned int _find_bin(float[:] counts):
+    return NotImplemented
+
+def find_bin(float[:] counts):
+    return _find_bin(counts)
+
+
  # ###################    INITIALIZATION OF VARIABLES    ########################
 cdef _init_variables(unsigned int k):
     """ Initialize k and indexes for fast processing """
@@ -276,15 +302,19 @@ def init_variables(k):
     _init_variables(k)
 
 
+def init_binner():
+    # todo: load the model
+    # todo: save weights in an array
+    raise NotImplemented
+
 # ##########################           MAIN  FUNCTIONS         ##########################
 
 # @cython.boundscheck(False)  # Deactivate bounds checking
 # @cython.wraparound(False)   # Deactivate negative indexing.
 # @cython.nonecheck(False)    # Check if receives None value
-# @cython.profile(True)       # Allows profiling the function
-# @cython.cdivision(False)    # No check for div by zero
-# Bytes Faster than const unsigned char [:]
-cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4, ssize_t length=-1):
+# @cython.cdivision(True)    # No check for div by zero
+@cython.profile(False)       # Allows profiling the function
+cdef float [:] _kmer_counter(const char *stream, unsigned int k_value=4, ssize_t length=-1):
     """
     Counting k-mers for one line/sequence/read. Return an array counts, alphabetically ordered
     :param length: 
@@ -293,7 +323,7 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4, ssize_t len
     :return: array of length n_dim_rc_combined(k)
     """
     cdef:
-        float [::1] kmer_counts = template_kmer_counts.copy()
+        float [:] kmer_counts = template_kmer_counts.copy()
         unsigned int stream_len
         unsigned int addr = 0
         unsigned int next_nucleotide_addr = 0
@@ -450,7 +480,7 @@ cdef _classify_reads(str filename, unsigned int k, file_format="fastq"):
         char * line = NULL
         size_t seed = 0
         ssize_t length
-        float [::1] counts
+        float [:] counts
         list list_counts = []
         unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
         unsigned long long line_nb = 0
