@@ -84,15 +84,6 @@ def get_k_val():
     return k_val
 def get_dim_combined_codons():
     return dim_combined_codons
-cpdef set_verbosity(value):
-    global verbosity
-    verbosity = value
-cpdef set_k_val(value):
-    global k_val
-    k_val = value
-cpdef set_dim_combined_codons(value):
-    global dim_combined_codons
-    dim_combined_codons = value
 
 def get_d_template_counts_all():
     return d_template_counts_all
@@ -100,43 +91,19 @@ def get_d_template_counts_combined():
     return d_template_counts_combined
 def get_d_codons_orig_target():
     return d_codons_orig_target
-cpdef set_d_template_counts_all(value):
-    global d_template_counts_all
-    d_template_counts_all = value
-cpdef set_d_template_counts_combined(value):
-    global d_template_counts_combined
-    d_template_counts_combined = value
-cpdef set_d_codons_orig_target(value):
-    global d_codons_orig_target
-    d_codons_orig_target = value
 
 def get_l_codons_all():
     return l_codons_all
 def get_l_codons_combined():
     return l_codons_combined
-cpdef set_l_codons_all(value):
-    global l_codons_all
-    l_codons_all = value
-cpdef set_l_codons_combined(value):
-    global l_codons_combined
-    l_codons_combined = value
 
 def get_ar_codons_forward_addr():
     return ar_codons_forward_addr
 def get_ar_codons_rev_comp_addr():
     return ar_codons_rev_comp_addr
-cpdef set_ar_codons_forward_addr(value):
-    global ar_codons_forward_addr
-    ar_codons_forward_addr = value
-cpdef set_ar_codons_rev_comp_addr(value):
-    global ar_codons_rev_comp_addr
-    ar_codons_rev_comp_addr = value
 
 def get_template_kmer_counts():
     return template_kmer_counts
-cpdef set_template_kmer_counts(value):
-    global template_kmer_counts
-    template_kmer_counts = value
 
 
 # ##########################             FUNCTIONS             ##########################
@@ -279,16 +246,27 @@ cdef _init_variables(unsigned int k):
     if verbosity <= DEBUG: logger.debug(f"codons_rev_comp_addr={codons_rev_comp_addr.base[:10]} - {codons_rev_comp_addr.base[-10:]}")
 
     # Setting the values
-    set_k_val(k)
-    set_dim_combined_codons(_n_dim_rc_combined(k))
-    set_template_kmer_counts(np.zeros(4**k, dtype=np.float32))
-    set_l_codons_all(codons_all)
-    set_l_codons_combined(codons_combined)
-    set_d_template_counts_all(template_counts_all)
-    set_d_template_counts_combined(template_counts_combined)
-    set_d_codons_orig_target(codons_orig_target)
-    set_ar_codons_forward_addr(codons_forward_addr)
-    set_ar_codons_rev_comp_addr(codons_rev_comp_addr)
+    global k_val
+    k_val = k
+    global dim_combined_codons
+    dim_combined_codons = _n_dim_rc_combined(k)
+    global template_kmer_counts
+    template_kmer_counts = np.zeros(4**k, dtype=np.float32)
+    global l_codons_all
+    l_codons_all = codons_all
+    global l_codons_combined
+    l_codons_combined = codons_combined
+    global d_template_counts_all
+    d_template_counts_all = template_counts_all
+    global d_template_counts_combined
+    d_template_counts_combined = template_counts_combined
+    global d_codons_orig_target
+    d_codons_orig_target = codons_orig_target
+    global ar_codons_forward_addr
+    ar_codons_forward_addr = codons_forward_addr
+    global ar_codons_rev_comp_addr
+    ar_codons_rev_comp_addr = codons_rev_comp_addr
+
 
 def init_variables(k):
     """ MUST run this init before using any methods """
