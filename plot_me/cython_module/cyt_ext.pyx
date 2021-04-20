@@ -7,6 +7,21 @@
 """
 !!!! MUST run this init before using any methods !!!!
 python3 setup.py build_ext --inplace
+python3 -m pip install -e .
+
+!!!!   CAREFUL   !!!!
+While the _kmer_counter counts k-mer reverse way, the combined counts are alphabetically ordered
+for _kmer_counter("AACCGGT", k=2)
+ return is : 1,  0,  0,  0,  1,  1,  0,  0,  0,  1,  1,  0,  0,  0,  1,  0
+ (equiv for AA, CA, GA, TA, AC, CC, GC, TC, AG, CG, GG, TG, AT, CT, GT, TT
+ instead of : 1,  1,  0,  0,  0,  1,  1,  0,  0,  0,  1,  1,  0,  0,  0,  0
+(for k-mers  AA, AC, AG, AT, CA, CC, CG, CT, GA, GC, GG, GT, TA, TC, TG, TT
+
+combine_counts_forward_w_rc(counts) will produce
+ 1,  2,  0,  0,  0,  2,  1,  0,  0,  0
+AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
+
+
 
 TODO
  * count k-mers in fastq
@@ -47,6 +62,7 @@ logger = logging.getLogger(__name__)
 # Related to DNA
 cdef:
     unsigned int verbosity   = 30
+    unsigned int     k_val   = 0
     str          nucleotides = "ACGT"
     float [::1]  template_kmer_counts
     # dict nucl_dico = {'A':0,'C':1,'G':2,'T':3,  'a':0,'c':1,'g':2,'t':3, }
@@ -108,7 +124,7 @@ cdef _combinations(int k, str combi=nucleotides):
     if k == 1:
         return combi
     else:
-        return [f"{a}{b}" for a in _combinations(k - 1, combi) for b in combi]
+        return [f"{b}{a}" for a in _combinations(k - 1, combi) for b in combi]
 
 def combinations(k, combi=nucleotides):
     return _combinations(k, combi)
@@ -149,18 +165,25 @@ def codon_addr(codon):
 
 #@cython.boundscheck(False)  # Deactivate bounds checking
 #@cython.wraparound(False)
-cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
+cdef float[:] _combine_counts_forward_w_rc(float[:] counts, unsigned int k=None):
     """ Combine the forward and reverse complement in the k-mer profile  """
+    if k is not None and k != k_val:
+        raise LookupError(f"k (={k_val}) hasn't been initialized properly, combining forward and RC can't be made ")
     cdef:
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
          int i
+    if verbosity <= DEBUG: logger.debug(f"Combining forward and reverse complement: {counts.base}")
+    if verbosity <= DEBUG_MORE:
+        logger.log(DEBUG_MORE, f"ar_codons_forward_addr={ar_codons_forward_addr.base}, ar_codons_rev_comp_addr={ar_codons_rev_comp_addr.base}")
+
 #    for i in prange(dim_combined_codons, nogil=True):
     # todo buggy somewhere, the palindrome have all the same value
     for i in range(dim_combined_codons):
-        if ar_codons_rev_comp_addr[i] == ar_codons_forward_addr[i]:
-            res[i] = counts[ar_codons_rev_comp_addr[i]]
+        if ar_codons_forward_addr[i] == ar_codons_rev_comp_addr[i]:
+            res[i] = counts[ar_codons_forward_addr[i]]
         else:
-            res[i] = counts[ar_codons_rev_comp_addr[i]] + counts[ar_codons_forward_addr[i]]
+            res[i] = counts[ar_codons_forward_addr[i]] + counts[ar_codons_rev_comp_addr[i]]
+    if verbosity <= DEBUG: logger.debug(f"Combining forward and reverse complement: {res.base}")
     return res
 
 
@@ -175,6 +198,8 @@ cdef _init_variables(unsigned int k):
     # Build the mapping to convert fast
     if verbosity <= INFO: logger.info("Initializing Indexes for k-mer counting ")
 
+    global k_val
+    k_val = k
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)  # [float 0. for _ in range(256)]
     global l_codons_all
@@ -199,19 +224,19 @@ cdef _init_variables(unsigned int k):
     counter = 0
 
     if verbosity <= DEBUG: logger.debug(f"Initializing variables with this list of k-mers: {l_codons_all}")
-    for index_codon, forward in enumerate(l_codons_all):
+    for forward in l_codons_all:
         rc = _reverse_complement_string(forward)
+        rc_address = _codon_addr(rc)
+        fw_address = _codon_addr(forward)
         global d_codons_orig_target
         d_codons_orig_target[forward] = rc
         global d_template_counts_all
         d_template_counts_all[forward] = 0
 
         if verbosity <= DEBUG_MORE:
-            logger.log(DEBUG_MORE, f"values: counter={counter:3}, index_codon={index_codon:3}, "
+            logger.log(DEBUG_MORE, f"values: counter={counter:3}, fw_address={fw_address:3}, "
                                    f"rc_addr={_codon_addr(rc):3}, forward={forward:3}, rc={rc:3}, "
                                    f"rc {'IN' if rc in d_codons_orig_target.keys() else 'NOT in':^6} origin_target")
-            if rc in d_codons_orig_target.keys():
-                logger.log(DEBUG_MORE, f"{rc} is in {list(d_codons_orig_target.keys())}")
 
         if rc not in d_template_counts_combined.keys():
             global l_codons_combined
@@ -219,10 +244,8 @@ cdef _init_variables(unsigned int k):
             global d_template_counts_combined
             d_template_counts_combined[forward] = 0
 
-            # todo check values, seems buggy
-            rc_address = _codon_addr(rc)
             global ar_codons_forward_addr
-            ar_codons_forward_addr[counter] = index_codon
+            ar_codons_forward_addr[counter] = fw_address
             global ar_codons_rev_comp_addr
             ar_codons_rev_comp_addr[counter] = rc_address
             counter += 1
@@ -251,58 +274,57 @@ cdef float [::1] _kmer_counter(char *stream, unsigned int k_value=4):
     :param k_value: value of k (k-mer)
     :return: array of length n_dim_rc_combined(k)
     """
-    # stream = str(stream)
-    # codons = codon_template.copy()
-    # if debug >= 2: print(len(stream), flush=True)
     if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, "comes to the kmer counter")
 
     cdef:
         float [::1] kmer_counts = template_kmer_counts.copy()
         unsigned int stream_len = len(stream)
-        unsigned int last_failed = 0
         unsigned int addr = 0
-        unsigned int max_addr = 4**k_value - 1
-        unsigned int new_addr_mul = 4**(k_value - 1)
         unsigned int recover_addr = 0
+        unsigned int k_minus_1 = k_value - 1
+        unsigned int max_addr = 4**k_value - 1
+        unsigned int new_addr_mul = 4**k_minus_1
+        unsigned int last_failed = 0
         unsigned int fails = 0
         unsigned long long counter = k_value
         char letter = b'N'  # initializing the while loop
 
-    if verbosity <= DEBUG: logger.debug(f"empty codons counts[0]={kmer_counts[0]}, stream[:10]={stream[:10]}")
+    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"codons template[0]={kmer_counts[0]}, of length={stream_len}, "
+                                                       f"for k={k_value} and stream[:20]={stream[:min(20, stream_len)]}")
     if stream_len <= k_value:
-        if verbosity <= WARNING: logger.warning("Sequence was shorter than the k used")
-        if verbosity <= WARNING: logger.warning(stream)
+        if verbosity <= WARNING: logger.warning(f"Sequence was shorter than the k used {stream}")
         return kmer_counts
 
-    addr = nucl_val(stream[0]) + 4*nucl_val(stream[1]) + 16*nucl_val(stream[2]) + 64*nucl_val(stream[3])
-    if addr > max_addr:
-        addr = ADDR_ERROR       # force error for next step
-        recover_addr = 0  # prepare the next accurate address
-        last_failed += 1
-    else:
-        kmer_counts[addr] += 1
-
-    if verbosity <= DEBUG_MORE: logger.log(DEBUG_MORE, f"Starting loop with k={k_value} until={stream_len}")
-    for counter in range(k_value, stream_len):
+    for counter in range(0, stream_len):
         letter = stream[counter]
         addr = addr // 4 + nucl_val(letter) * new_addr_mul
-        if addr < max_addr:
+        logger.debug(f"counter={counter}, letter={letter}, nucl_val={nucl_val(letter)}, addr={addr}")
+
+        # before we have a full k-mer, we just add the address, but skip counting the still forming k-mer
+        if counter < k_minus_1:
+            continue
+
+        # If the address is valid, we count it
+        if addr <= max_addr:
             kmer_counts[addr] += 1
         else:
+            # Failed this time (an unknown character threw an address too big)
             if last_failed == 0:
+                fails += 1
                 addr = ADDR_ERROR       # force error for next step
-                recover_addr = 0  # prepare the next accurate address
-                last_failed += 1
+                recover_addr = 0        # prepare the next accurate address
+                last_failed  = 1        # We just failed, let's count until we can start again
 
-            elif last_failed <= 2:
+            # wait until the wrong letter goes away
+            elif last_failed < k_value-1:
                 addr = ADDR_ERROR
                 recover_addr = recover_addr // 4 + nucl_val(letter) * new_addr_mul
                 last_failed += 1
 
+            # last iteration, resetting the error variables
             else:  # last_failed reached 3
                 addr = recover_addr
                 last_failed = 0
-                fails += 1
 
     if verbosity <= DEBUG: logger.debug(f"stream length:{counter}, fails:{fails}")
     return kmer_counts  #, fails
