@@ -42,8 +42,7 @@ from tqdm import tqdm
 from plot_me import RECORDS
 from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
     time_to_hms, f_size, bash_process, import_cython_mod
-from plot_me.bio import kmers_dic, seq_count_kmer
-
+from plot_me.bio import kmers_dic, seq_count_kmer, combine_counts_forward_w_rc
 
 logger = logging.getLogger(__name__)
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
@@ -129,7 +128,10 @@ class ReadToBin(SeqRecord.SeqRecord):
     def kmer_count(self, ignore_N=True):
         """ common method """
         if self._kmer_count is None:
-            self._kmer_count = seq_count_kmer(self.seq, self.KMER.copy(), K, ignore_N=ignore_N)
+            if cython_is_there:
+                self._kmer_count = cyt_ext.kmer_counter(self.seq, k=K, dictionary=True, combine=True, length=len(self.seq))
+            else:
+                self._kmer_count = combine_counts_forward_w_rc(seq_count_kmer(self.seq, self.KMER.copy(), K, ignore_N=ignore_N), k=K)
         return self._kmer_count
 
     @property
