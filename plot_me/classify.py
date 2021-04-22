@@ -42,7 +42,7 @@ from tqdm import tqdm
 from plot_me import RECORDS
 from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
     time_to_hms, f_size, bash_process, import_cython_mod
-from plot_me.bio import kmers_dic, seq_count_kmer, combine_counts_forward_w_rc
+from plot_me.bio import kmers_dic, seq_count_kmer, combine_counts_forward_w_rc, n_dim_rc_combined
 
 logger = logging.getLogger(__name__)
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
@@ -99,7 +99,7 @@ class Binner:
 # #############################################################################
 class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
-    logger = logging.getLogger('classify.ReadToBin')
+    logger = logging.getLogger(__name__)
     KMER = {}  # kmers_dic(K)
     FASTQ_PATH = None
     FASTQ_BIN_FOLDER = None
@@ -110,6 +110,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     total_reads = 0
     file_has_been_binned = False
     NUMBER_BINNED = 0
+    DIM_COMBINED = None
 
     def __init__(self, obj):
         # wrap the object
@@ -129,7 +130,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         """ common method """
         if self._kmer_count is None:
             if cython_is_there:
-                self._kmer_count = cyt_ext.kmer_counter(self.seq, k=K, dictionary=True, combine=True, length=len(self.seq))
+                self._kmer_count = cyt_ext.kmer_counter(str(self.seq), k=K, dictionary=True, combine=True, length=len(self.seq))
             else:
                 self._kmer_count = combine_counts_forward_w_rc(seq_count_kmer(self.seq, self.KMER.copy(), K, ignore_N=ignore_N), k=K)
         return self._kmer_count
@@ -140,8 +141,15 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def scale(self):
         self.logger.log(5, "scaling the read by it's length and k-mer")
-        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=int).reshape(-1, 4**K),
-                                         None, k=K, w=len(self.seq), single_row=True)  # Put into 2D one row
+        if cython_is_there:
+            counts = cyt_ext.kmer_counter(str(self.seq), k=K, dictionary=False, combine=True, length=len(self.seq))
+            cyt_ext.scale_counts(counts, K, len(self.seq))
+            self.scaled = scale_df_by_length(counts.reshape(-1, self.DIM_COMBINED),
+                                             None, k=K, w=len(self.seq), single_row=True)
+        else:
+            self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=np.float32)\
+                                             .reshape(-1, self.DIM_COMBINED),
+                                             None, k=K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
@@ -167,6 +175,9 @@ class ReadToBin(SeqRecord.SeqRecord):
         folder, file_base = osp.split(osp.splitext(path_fastq)[0])
         # output folder, will host one file for each bin
         cls.FASTQ_BIN_FOLDER = osp.join(folder, param)
+
+        # Compute expected length
+        cls.DIM_COMBINED = n_dim_rc_combined(K)
 
         cls.total_reads = reads_in_file(cls.FASTQ_PATH)
 
@@ -407,6 +418,7 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
 
     # preparing csv record file
     if not osp.isfile(f_record):
+        os.makedirs(osp.dirname(f_record), exist_ok=True)
         with open(f_record, 'w', newline='') as csv_file:
             csv_writer = csv.writer(csv_file, delimiter='\t', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             headers = ("FILE", "BINS_vs_FULL", "BINNING", "CLASSIFY", "TOTAL", "HASHES_SIZE", "NB_BINS", "HASH_PATH", "HASH_NAME")
@@ -443,6 +455,9 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
         path_to_hash = osp.join(path_database, classifier, clf_settings)
         logger.debug(f"path_to_hash: {path_to_hash}")
         logger.debug(f"Found parameters: clusterer={clusterer}, bin number={BIN_NB}, k={K}, w={w}, omitted={omitted}")
+        if cython_is_there:
+            cyt_ext.set_verbosity(logging.INFO)
+            cyt_ext.init_variables(K)
 
     # Set the folder with hash tables
     param = osp.basename(path_database)
