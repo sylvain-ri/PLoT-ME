@@ -386,21 +386,20 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
 clustering_segments.models = ("minikm", "kmeans")
 
 
-def pll_copy_segments_to_bin(df):
+def pll_copy_segments_to_bin(args):
     """ Function for parallel copying of segments of genomes to a bin, file path and bin number in a dataframe
         Input is only ONE .fna file, which has to be split into segments, but these might be recombined
         if their bin association are consecutive.
     """
-    df = df[1]
+    genome_path, df = args
     taxon = df.taxon.iloc[0]
-    genome_path = df.fna_path.iloc[0]
     logger.debug(f"Got the segments clustering: {df.shape} (nb of segments, nb of bins) "
                  f"for the genome {osp.split(genome_path)[1]}")
 
     # Load the entire genome
     genome = Genome(genome_path, taxon, window_size=main.w, k=main.k)
     genome.load_genome()
-    # todo: probably memory or integer size issue somewhere here
+    # todo: optimize these dataframes. Looks veeery slow.
     # First get the real segmentation depending on cluster continuity of the segments
     # Aggregate segments with same cluster (consecutive values of cluster), get start, end and description updated
     count = 0
@@ -415,13 +414,13 @@ def pll_copy_segments_to_bin(df):
         path_bin_segment = osp.join(pll_copy_segments_to_bin.path_db_bins, str(cluster_id), f"{taxon}.fna")
 
         descr = description.replace(" ", "_")  # To avoid issues with bash. Space and non-breaking space
-        descr_splits = descr.split("|", maxsplit=3)
-        description_new = "|".join(descr_splits[:3]) + f"s:{start}-e:{end-1}" + descr_splits[4]
+        descr_splits = descr.split("|", maxsplit=4)
+        description_new = "|".join(descr_splits[:3]) + f"s:{start}-e:{end-1}|{descr_splits[4]}|"
 
         # Need to find the genome/plasmid/ and the right chromosome
         seq = genome.records[category][name]
-        # logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
-        #               f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
+        logger.log(5, f"Adding combined segment {i}, start={start}, end={end-1}, id={seq.id}, "
+                      f"from {(end-start)/main.w} seqs, to bin {cluster_id}, file: {path_bin_segment}")
 
         segment = SeqRecord(seq.seq[start:end], seq.id, seq.name, description_new, seq.dbxrefs,
                             seq.features, seq.annotations, seq.letter_annotations)
