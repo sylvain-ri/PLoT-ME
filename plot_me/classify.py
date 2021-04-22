@@ -42,7 +42,8 @@ from tqdm import tqdm
 from plot_me import RECORDS
 from plot_me.tools import init_logger, scale_df_by_length, is_valid_directory, is_valid_file, create_path, \
     time_to_hms, f_size, bash_process, import_cython_mod
-from plot_me.bio import kmers_dic, seq_count_kmer, combine_counts_forward_w_rc, n_dim_rc_combined
+from plot_me.bio import kmers_dic, seq_count_kmer, combine_counts_forward_w_rc, n_dim_rc_combined, \
+    codons_without_rev_comp
 
 logger = logging.getLogger(__name__)
 # If the total size of the reads, assigned to one bin, is below this percentage of the total fastq file, those reads are dropped
@@ -84,7 +85,7 @@ class Binner:
             self.model = pickle.load(f)
 
     def _set_cols(self):
-        self.kmer_cols = list(kmers_dic(self.k).keys())
+        self.kmer_cols = codons_without_rev_comp(self.k)
 
     def scale(self, df):
         divider = df[self.kmer_cols].sum(1) - self.k + 1
@@ -144,8 +145,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         if cython_is_there:
             counts = cyt_ext.kmer_counter(str(self.seq), k=K, dictionary=False, combine=True, length=len(self.seq))
             cyt_ext.scale_counts(counts, K, len(self.seq))
-            self.scaled = scale_df_by_length(counts.reshape(-1, self.DIM_COMBINED),
-                                             None, k=K, w=len(self.seq), single_row=True)
+            self.scaled = counts.reshape(-1, self.DIM_COMBINED)
         else:
             self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=np.float32)\
                                              .reshape(-1, self.DIM_COMBINED),
