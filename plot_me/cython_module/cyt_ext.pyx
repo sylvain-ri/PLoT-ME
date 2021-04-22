@@ -9,36 +9,15 @@
 #       https://cython.readthedocs.io/en/latest/src/tutorial/cdef_classes.html
 """
 !!!! MUST run this init before using any methods !!!!
+python3 -m build
 python3 setup.py build_ext --inplace
 python3 -m pip install -e .
-
-!!!!   CAREFUL   !!!!
-While the _kmer_counter counts k-mer reverse way, the combined counts are alphabetically ordered
-for _kmer_counter("AACCGGT", k=2)
- return is : 1,  0,  0,  0,  1,  1,  0,  0,  0,  1,  1,  0,  0,  0,  1,  0
- (equiv for AA, CA, GA, TA, AC, CC, GC, TC, AG, CG, GG, TG, AT, CT, GT, TT
- instead of : 1,  1,  0,  0,  0,  1,  1,  0,  0,  0,  1,  1,  0,  0,  0,  0
-(for k-mers  AA, AC, AG, AT, CA, CC, CG, CT, GA, GC, GG, GT, TA, TC, TG, TT
-
-combine_counts_forward_w_rc(counts) will produce
- 1,  2,  0,  0,  0,  2,  1,  0,  0,  0
-AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
-
-
 
 TODO
  * count k-mers in fastq
  * make the binning
  * vectorize the distance calculation
  * save into fastq file
-
-ADD LATER, TO MAKE IT COMPATIBLE FOR PURE PYTHON
-import cython
-@cython.locals(n=cython.int)
-def fib_pure_python(n):
-    cython.declare(a=cython.int,
-                   b=cython.int,
-                   i=cython.int)
 """
 
 import logging
