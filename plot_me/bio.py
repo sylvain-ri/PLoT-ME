@@ -41,7 +41,7 @@ def codon_addr(codon):
     return total
 
 
-def n_dim_rc_combined( k):
+def n_dim_rc_combined(k):
     """ Return the number of dimensions, for a given k, for the unique k-mer counts (forward - reverse complement) """
     return 2**k + (4**k - 2**k)//2 if k % 2 == 0 else 4**k // 2
 
