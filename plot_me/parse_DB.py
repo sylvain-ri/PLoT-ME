@@ -362,7 +362,8 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     if model_name == "kmeans":
         ml_model = KMeans(n_clusters=n_clusters, n_jobs=main.cores, random_state=3)
     elif model_name == "minikm":
-        ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_iter=100)
+        ml_model = MiniBatchKMeans(n_clusters=n_clusters, random_state=3, batch_size=1000, max_no_improvement=100,
+                                   max_iter=1000, reassignment_ratio=0.05)
     else:
         logger.error(f"No model defined for {model_name}.")
         raise NotImplementedError
@@ -380,6 +381,11 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
 
     df[list(cols_spe) + ["cluster"]].to_pickle(output_pred)
     logger.info(f"Defined {n_clusters} clusters, assignments here: {output_pred} with ML model {model_name}.")
+
+    # print the % of segments in each bin
+    repartition = " - ".join([f"[{cluster}]={value*100:.1f}%" for cluster, value
+                              in df["cluster"].value_counts(sort=False, normalize=True).items()])
+    logger.info(f"Relative number of segments per cluster: {repartition}")
     return
 
 
