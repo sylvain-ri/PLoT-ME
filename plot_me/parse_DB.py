@@ -45,6 +45,7 @@ from multiprocessing import cpu_count, Pool
 from pathlib import Path
 
 from numpy import float32
+import numpy as np
 import os
 import os.path as osp
 import pandas as pd
@@ -373,7 +374,12 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     # Model saving
     with open(path_model, 'wb') as f:
         pickle.dump(ml_model, f)
-    logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}, now predicting bins for each segment...")
+    logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}")
+    p_weights = path_model.replace("model", "weights").replace(".pkl", ".npy")
+    np.save(p_weights, ml_model.cluster_centers_)
+    np.savetxt(p_weights.replace(".npy", ".tsv"), ml_model.cluster_centers_, delimiter="\t", newline="\n",
+               header="Weights for PLoT-ME model. Load with numpy.loadtxt(). Full precision in the .npy file with numpy.load()", )
+    logger.info(f"Also saved in numpy and .tsv format ({p_weights}), now predicting bins for each segment...")
 
     # ## 3 ##
     predicted = ml_model.predict(df[cols_kmers])
