@@ -26,7 +26,10 @@ import logging
 cimport cython     # For @cython.boundscheck(False)
 import numpy as np
 cimport numpy as np
-from libc.stdio cimport FILE
+
+# todo: try with cpython.array : https://cython.readthedocs.io/en/latest/src/tutorial/array.html#array-array
+# from cpython cimport array
+# import array
 from cython.parallel import prange
 
 DEF ADDR_ERROR  = 8192  # Value above the possible address of the codon: if k=5, max addr is 4**(5+1)
@@ -54,7 +57,8 @@ cdef:
     list         l_codons_combined  = []
     unsigned int [:] ar_codons_forward_addr
     unsigned int [:] ar_codons_rev_comp_addr
-    float [:]      template_kmer_counts
+    float [:]        template_kmer_counts
+    float [:]        template_distances
 
 # ##########################              GETTERS / SETTERS              ##########################
 # Getters in Python only. Setter for Verbosity
@@ -180,7 +184,7 @@ def combine_counts_forward_w_rc(counts):
     return _combine_counts_forward_w_rc(counts).base
 
 
-cdef _scale_counts(float[:] counts, unsigned int k, ssize_t length):
+cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length):
     """ Scale the counts by their length, in place """
     # todo: should scale by the actual number of columns (palindromes and reverse complemented k-mers)
     #       then do it in parse_DB tools.scale_df_by_length() as well
@@ -197,12 +201,26 @@ cdef _scale_counts(float[:] counts, unsigned int k, ssize_t length):
 def scale_counts(counts, k, length):
     return _scale_counts(counts, k, length)
 
+cdef unsigned int _find_cluster(float[:] counts, float[:,::1] weights):
+    """ Compute the distance to each centroid, given the weights for each centroid, for all dimensions """
+    cdef unsigned int cluster_nb = weights.shape[0]
+    cdef float [:] distances = template_distances    # copy template with zeros, faster than initializing each time
+    cdef float shortest_distance
+    cdef unsigned int cluster_choice
+    cdef unsigned int i, j
 
-cdef unsigned int _find_bin(float[:] counts):
-    return NotImplemented
+    # Compute the distance to each centroid
+    for i in range(cluster_nb):
+        for j in range(weights[0].shape[0]):
+            distances[i] += counts[j] * weights[i][j]
 
-def find_bin(float[:] counts):
-    return _find_bin(counts)
+    # Find the cluster with the minimum distance
+    shortest_distance = distances[0]
+    cluster_choice = 0
+    for i in range(1, cluster_nb):
+        if shortest_distance > distances[i]:
+            cluster_choice = i
+    return cluster_choice
 
 
  # ###################    INITIALIZATION OF VARIABLES    ########################
@@ -260,6 +278,8 @@ cdef _init_variables(unsigned int k):
     k_val = k
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)
+    global template_distances
+    template_distances = np.zeros(dim_combined_codons, dtype=np.float32)
     global l_codons_all
     l_codons_all = codons_all
     global l_codons_combined
@@ -408,13 +428,19 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True, ssize_t length=-1
 # ######################################      FILE PROCESSING      ########################################
 # Related to the file reader. Can be replaced by from libc.stdio cimport fopen, fclose, getline ; +10% time
 # from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
-cdef extern from "stdio.h":
-    # FILE * fopen ( const char * filename, const char * mode )
-    FILE *fopen(const char *, const char *)
-    # int fclose ( FILE * stream )
-    int fclose(FILE *)
-    # ssize_t getline(char **lineptr, size_t *n, FILE *stream);
-    ssize_t getline(char **, size_t *, FILE *)
+from libc.stdio cimport FILE, fopen, fclose, getline
+from libc.stdlib cimport malloc, free
+
+# https://stackoverflow.com/a/54081075/4767645
+cdef extern from "Python.h":
+    char* PyUnicode_AsUTF8(object unicode)
+
+cdef char ** to_cstring_array(list_str):
+    cdef char **ret = <char **>malloc(len(list_str) * sizeof(char *))
+    for i in range(len(list_str)):
+        ret[i] = PyUnicode_AsUTF8(list_str[i])
+    return ret
+
 
 def read_file(filename):
     """ Fast Cython file reader
@@ -443,50 +469,86 @@ def read_file(filename):
     return (b"", 0)
 
 #
-cdef _classify_reads(str filename, unsigned int k, file_format="fastq"):
+cdef _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] weights, const char** outputs,
+                     unsigned int modulo=4, unsigned int dev=12):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
+        
+        For whole file reading:
+        in C: https://stackoverflow.com/questions/2029103/correct-way-to-read-a-text-file-into-a-buffer-in-c
+        in cython: https://stackoverflow.com/questions/44721835/cython-read-binary-file-into-string-and-return
     """
-    filename_byte_string = filename.encode("UTF-8")
-    cdef char* fname = filename_byte_string
-
-    cdef FILE* cfile
-    cfile = fopen(fname, "rb")
-    if cfile == NULL:
-        raise FileNotFoundError(2, "No such file or directory: '%s'" % filename)
+    _init_variables(k)
 
     cdef:
-        char * line = NULL
-        size_t seed = 0
-        ssize_t length
+        char * line_0 = NULL
+        char * line_1 = NULL
+        char * line_2 = NULL
+        char * line_3 = NULL
+        size_t buffer_size_0 = 0
+        size_t buffer_size_1 = 0
+        size_t buffer_size_2 = 0
+        size_t buffer_size_3 = 0
+        ssize_t length_line
+        ssize_t length_sequence
         float [:] counts
-        list list_counts = []
-        unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
-        unsigned long long line_nb = 0
-        # todo: add variables to hold the whole read (id, seq, +, quality)
+        unsigned long long number_of_reads = 0
+        unsigned int cluster
 
+    cdef FILE* cfile
+    cfile = fopen(fastq_file, "rb")
+
+    if verbosity <= INFO: logger.info("File opened, Cython initialized, counting k-mers and spliting fastq file")
     while True:
-        length = getline(&line, &seed, cfile)
-        if length == -1: break
-        if line_nb % modulo == 1:
-            # Count all kmers
-            counts = _kmer_counter(line, k_value=k, length=length)
-            # counts = kmer_counter(line, k, dictionary=False, combine=True, length=length)
-            list_counts.append(counts)
-            # todo: scale / normalize
+        # Read line 4 by 4 if fastq, otherwise 2 by 2. Save all
+        length_line = getline(&line_0, &buffer_size_0, cfile)
+        if length_line < 0: break
+        length_sequence = getline(&line_1, &buffer_size_1, cfile)
+        if length_line < 0: break
+        if modulo == 4:
+            length_line = getline(&line_2, &buffer_size_2, cfile)
+            if length_line < 0: break
+            length_line = getline(&line_3, &buffer_size_3, cfile)
+            if length_line < 0: break
 
-            # todo: find cluster
+        # Count k-mers
+        counts = _kmer_counter(line_1, k_value=k, length=length_sequence - 1)
+        _combine_counts_forward_w_rc(counts)
+        # scale
+        _scale_counts(counts, k, length_sequence - 1)
+        # find cluster
+        cluster = _find_cluster(counts, weights)
+        # todo: copy read to bin
 
-            # todo: copy read to bin
 
-        line_nb += 1
+        number_of_reads += 1
+        if number_of_reads > dev:
+            break
 
     fclose(cfile)
-    return list_counts
+    return number_of_reads
 
-def classify_reads(filename, k, file_format="fastq"):
+
+def classify_reads(p_fastq, k, weights, list outputs, file_format="fastq", dev=12):
+    """ Interface for Cython's function.
+        Read fastq file, count k-mers for each read, find its cluster, copy to read to its bin
+    """
     # todo: use ramfs to preload the file ()
-    return _classify_reads(filename, k=k, file_format=file_format)
+    # todo: pre process python variables
+
+    # ouputs to char array
+    cdef char* filename
+    cdef char** p_output_parts = to_cstring_array(outputs)
+    cdef unsigned long long number_of_reads
+
+    filename = PyUnicode_AsUTF8(p_fastq)
+
+    cdef float [:,::1] kmeans_weights = weights
+    cdef unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
+
+    number_of_reads = _classify_reads(filename, k=k, weights=kmeans_weights, outputs=p_output_parts, modulo=modulo, dev=dev)
+    free(p_output_parts)
+    return number_of_reads
 
 
 
