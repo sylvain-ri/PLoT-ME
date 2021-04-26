@@ -202,32 +202,32 @@ def scale_counts(counts, k, length):
     """ Scale the counts by their length, in place """
     return _scale_counts(counts, k, length)
 
-cdef unsigned int _find_cluster(float[:] counts, float[:,::1] weights):
-    """ Compute the distance to each centroid, given the weights for each centroid, for all dimensions 
+cdef unsigned int _find_cluster(float[:] counts, float[:,::1] centers):
+    """ Compute the distance to each centroid, given the centers for each centroid, for all dimensions 
         Return the cluster number (unsigned int)
     """
-    cdef unsigned int cluster_nb = weights.shape[0]
+    cdef unsigned int cluster_nb = centers.shape[0]
     cdef float [:] distances = template_distances    # copy template with zeros, faster than initializing each time
-    cdef float shortest_distance
+    cdef float tmp_distance
     cdef unsigned int cluster_choice
     cdef unsigned int i, j
 
     # Compute the distance to each centroid
     for i in range(cluster_nb):
-        for j in range(weights[0].shape[0]):
-            distances[i] += counts[j] * weights[i][j]
+        for j in range(centers[0].shape[0]):
+            tmp_distance = counts[j] - centers[i][j]
+            distances[i] += tmp_distance * tmp_distance
 
     # todo: move this inside the previous loop
     # Find the cluster with the minimum distance
-    shortest_distance = distances[0]
     cluster_choice = 0
     for i in range(1, cluster_nb):
-        if shortest_distance > distances[i]:
+        if distances[cluster_choice] > distances[i]:
             cluster_choice = i
     return cluster_choice
 
-cdef unsigned int find_cluster(counts, weights):
-    return _find_cluster(counts, weights)
+cdef unsigned int find_cluster(counts, centroid_centers):
+    return _find_cluster(counts, centroid_centers)
 
 
 cdef _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3):
@@ -481,8 +481,8 @@ def read_file(filename):
     return (b"", 0)
 
 #
-cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] weights, const char** outputs,
-                     unsigned int modulo=4, unsigned int dev=12):
+cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] centroid_centers,
+                                        const char** outputs, unsigned int modulo=4, unsigned int dev=12):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
         
@@ -529,7 +529,7 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         # scale
         _scale_counts(counts, k, length_sequence - 1)
         # find cluster
-        cluster = _find_cluster(counts, weights)
+        cluster = _find_cluster(counts, centroid_centers)
         # todo: copy read to bin
         _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
 
@@ -542,7 +542,7 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
     return number_of_reads
 
 
-def classify_reads(p_fastq, k, weights, list outputs, file_format="fastq", dev=12):
+def classify_reads(p_fastq, k, centroids, list outputs, file_format="fastq", dev=12):
     """ Interface for Cython's function.
         Read fastq file, count k-mers for each read, find its cluster, copy to read to its bin
     """
@@ -556,10 +556,10 @@ def classify_reads(p_fastq, k, weights, list outputs, file_format="fastq", dev=1
 
     filename = PyUnicode_AsUTF8(p_fastq)
 
-    cdef float [:,::1] kmeans_weights = weights
+    cdef float [:,::1] kmeans_centroids = centroids
     cdef unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
 
-    number_of_reads = _classify_reads(filename, k=k, weights=kmeans_weights, outputs=p_output_parts, modulo=modulo, dev=dev)
+    number_of_reads = _classify_reads(filename, k=k, centroid_centers=kmeans_centroids, outputs=p_output_parts, modulo=modulo, dev=dev)
     free(p_output_parts)
     return number_of_reads
 
