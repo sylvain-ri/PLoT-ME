@@ -111,7 +111,7 @@ cdef inline unsigned int nucl_val(char c) nogil:
     else:
         return ADDR_ERROR
 
-cdef _combinations(int k, str combi=nucleotides):
+cdef list _combinations(int k, str combi=nucleotides):
     """ Return combinations from the char in instances. Using for finding possible k-mers, for a given n/k """
     if k == 1:
         return combi
@@ -122,7 +122,7 @@ def combinations(k, combi=nucleotides):
     return _combinations(k, combi)
 
 cdef conversion_table_rc = str.maketrans("ACGT", "TGCA")
-cdef _reverse_complement_string(str seq):
+cdef str _reverse_complement_string(str seq):
     """ Return reverse complement string """
     return seq.translate(conversion_table_rc)[::-1]
 
@@ -199,10 +199,13 @@ cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length):
         counts[i] = counts[i] * factor
 
 def scale_counts(counts, k, length):
+    """ Scale the counts by their length, in place """
     return _scale_counts(counts, k, length)
 
 cdef unsigned int _find_cluster(float[:] counts, float[:,::1] weights):
-    """ Compute the distance to each centroid, given the weights for each centroid, for all dimensions """
+    """ Compute the distance to each centroid, given the weights for each centroid, for all dimensions 
+        Return the cluster number (unsigned int)
+    """
     cdef unsigned int cluster_nb = weights.shape[0]
     cdef float [:] distances = template_distances    # copy template with zeros, faster than initializing each time
     cdef float shortest_distance
@@ -214,6 +217,7 @@ cdef unsigned int _find_cluster(float[:] counts, float[:,::1] weights):
         for j in range(weights[0].shape[0]):
             distances[i] += counts[j] * weights[i][j]
 
+    # todo: move this inside the previous loop
     # Find the cluster with the minimum distance
     shortest_distance = distances[0]
     cluster_choice = 0
@@ -222,9 +226,17 @@ cdef unsigned int _find_cluster(float[:] counts, float[:,::1] weights):
             cluster_choice = i
     return cluster_choice
 
+cdef unsigned int find_cluster(counts, weights):
+    return _find_cluster(counts, weights)
+
+
+cdef _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3):
+
+    return NotImplementedError
+
 
  # ###################    INITIALIZATION OF VARIABLES    ########################
-cdef _init_variables(unsigned int k):
+cdef void _init_variables(unsigned int k):
     """ Initialize k and indexes for fast processing """
     # Build the mapping to convert fast
     if verbosity <= INFO: logger.info("Initializing Indexes for k-mer counting ")
@@ -304,7 +316,7 @@ def init_variables(k):
 def init_binner():
     # todo: load the model
     # todo: save weights in an array
-    raise NotImplemented
+    raise NotImplementedError
 
 # ##########################           MAIN  FUNCTIONS         ##########################
 
@@ -469,7 +481,7 @@ def read_file(filename):
     return (b"", 0)
 
 #
-cdef _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] weights, const char** outputs,
+cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] weights, const char** outputs,
                      unsigned int modulo=4, unsigned int dev=12):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
@@ -519,12 +531,13 @@ cdef _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] weight
         # find cluster
         cluster = _find_cluster(counts, weights)
         # todo: copy read to bin
-
+        _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
 
         number_of_reads += 1
         if number_of_reads > dev:
             break
 
+    free(outputs)
     fclose(cfile)
     return number_of_reads
 
