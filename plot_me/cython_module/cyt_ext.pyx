@@ -111,7 +111,7 @@ cdef inline unsigned int nucl_val(char c) nogil:
     else:
         return ADDR_ERROR
 
-cdef list _combinations(int k, str combi=nucleotides):
+cdef _combinations(int k, str combi=nucleotides):
     """ Return combinations from the char in instances. Using for finding possible k-mers, for a given n/k """
     if k == 1:
         return combi
@@ -192,8 +192,8 @@ cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length):
         unsigned int i
         float divisor, factor
 
-    divisor = (<unsigned int>length) - k + 1
-    factor  = 4**k / divisor
+    divisor = <float>length - <float>k + 1.
+    factor  = 4.**k / divisor
 
     for i in range(0, counts.shape[0]):
         counts[i] = counts[i] * factor
@@ -202,7 +202,7 @@ def scale_counts(counts, k, length):
     """ Scale the counts by their length, in place """
     return _scale_counts(counts, k, length)
 
-cdef unsigned int _find_cluster(float[:] counts, float[:,::1] centers):
+cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     """ Compute the distance to each centroid, given the centers for each centroid, for all dimensions 
         Return the cluster number (unsigned int)
     """
@@ -226,11 +226,11 @@ cdef unsigned int _find_cluster(float[:] counts, float[:,::1] centers):
             cluster_choice = i
     return cluster_choice
 
-cdef unsigned int find_cluster(counts, centroid_centers):
+def find_cluster(counts, centroid_centers):
     return _find_cluster(counts, centroid_centers)
 
 
-cdef _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3):
+cdef _copy_read_to_bin(char** outputs, unsigned int cluster, char* line_0, char* line_1, char* line_2, char* line_3):
 
     return NotImplementedError
 
