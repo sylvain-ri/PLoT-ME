@@ -26,6 +26,7 @@ import logging
 cimport cython     # For @cython.boundscheck(False)
 import numpy as np
 cimport numpy as np
+from libc.stdlib cimport malloc, free
 
 # todo: try with cpython.array : https://cython.readthedocs.io/en/latest/src/tutorial/array.html#array-array
 # from cpython cimport array
@@ -158,24 +159,24 @@ def codon_addr(codon):
 #@cython.boundscheck(False)  # Deactivate bounds checking
 #@cython.wraparound(False)
 cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
-    """ Combine the forward and reverse complement in the k-mer profile  """
+    """ Return the combined forward and reverse complement from the k-mer profile  """
     if counts.shape[0] != 4 ** k_val:
         LookupError(f"k (={k_val}) hasn't been initialized properly, combining forward and RC can't be made ")
     cdef:
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
-         int i
-    if verbosity <= DEBUG: logger.debug(f"Combining forward and reverse complement: {counts.base}")
+         unsigned int i
+    if verbosity <= DEBUG: logger.debug(f"Combining forward and reverse complement. count[0]={counts[0]}")
     if verbosity <= DEBUG_MORE:
         logger.log(DEBUG_MORE, f"ar_codons_forward_addr={ar_codons_forward_addr.base}, ar_codons_rev_comp_addr={ar_codons_rev_comp_addr.base}")
 
-    # todo: use prange ?
+    # todo: use prange ? then `i` must be signed
 #    for i in prange(dim_combined_codons, nogil=True):
     for i in range(dim_combined_codons):
         if ar_codons_forward_addr[i] == ar_codons_rev_comp_addr[i]:
             res[i] = counts[ar_codons_forward_addr[i]]
         else:
             res[i] = counts[ar_codons_forward_addr[i]] + counts[ar_codons_rev_comp_addr[i]]
-    if verbosity <= DEBUG: logger.debug(f"Combining forward and reverse complement: {res.base}")
+    if verbosity <= DEBUG: logger.debug(f"Combined forward and reverse complement={res.base}")
     return res
 
 
@@ -211,10 +212,11 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     cdef float tmp_distance
     cdef unsigned int cluster_choice = 0
     cdef unsigned int i, j
+    if verbosity <= DEBUG: logger.debug(f"Find_clusters: Centroids of shape={centers.shape[0]},{centers.shape[1]}, counts of shape={counts.shape[0]}")
 
     # Compute the distance to each centroid
     for i in range(cluster_nb):
-        for j in range(centers[0].shape[0]):
+        for j in range(centers.shape[1]):
             tmp_distance = counts[j] - centers[i][j]
             distances[i] += tmp_distance * tmp_distance
 
@@ -403,7 +405,7 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True, ssize_t length=-1
         dict dict_kmer_counts
         unsigned int i
         str key
-        char* seq
+        char* seq             # Do NOT free it. Get munmap_chunk(): invalid pointer | Fatal Python error: Aborted | Aborted (core dumped)
 
     if length == -1:
         length = len(sequence)
@@ -438,14 +440,13 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True, ssize_t length=-1
 # Related to the file reader. Can be replaced by from libc.stdio cimport fopen, fclose, getline ; +10% time
 # from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
 from libc.stdio cimport FILE, fopen, fclose, getline
-from libc.stdlib cimport malloc, free
 
 # https://stackoverflow.com/a/54081075/4767645
 cdef extern from "Python.h":
-    char* PyUnicode_AsUTF8(object unicode)
+    const char* PyUnicode_AsUTF8(object unicode)
 
-cdef char ** to_cstring_array(list_str):
-    cdef char **ret = <char **>malloc(len(list_str) * sizeof(char *))
+cdef const char** to_cstring_array(list_str):
+    cdef const char** ret = <const char**>malloc(len(list_str) * sizeof(char *))
     for i in range(len(list_str)):
         ret[i] = PyUnicode_AsUTF8(list_str[i])
     return ret
@@ -477,6 +478,7 @@ def read_file(filename):
     fclose(cfile)
     return (b"", 0)
 
+
 #
 cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] centroid_centers,
                                         const char** outputs, unsigned int modulo=4, unsigned int dev=12):
@@ -488,26 +490,31 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         in cython: https://stackoverflow.com/questions/44721835/cython-read-binary-file-into-string-and-return
     """
     _init_variables(k)
+    if dim_combined_codons != centroid_centers.shape[1]:
+        logger.error(f"The number of dimension, based on the provided k={k_val}, should be {dim_combined_codons}. "
+                     f"Nevertheless the centroids have a shape of ({centroid_centers.shape[0]},{centroid_centers.shape[1]}).")
 
     cdef:
-        char * line_0 = NULL
-        char * line_1 = NULL
-        char * line_2 = NULL
-        char * line_3 = NULL
+        char * line_0        = NULL
+        char * line_1        = NULL
+        char * line_2        = NULL
+        char * line_3        = NULL
         size_t buffer_size_0 = 0
         size_t buffer_size_1 = 0
         size_t buffer_size_2 = 0
         size_t buffer_size_3 = 0
         ssize_t length_line
         ssize_t length_sequence
-        float [:] counts
+        float [:] counts     # = np.empty(4**k, dtype=np.float32)
+        float [:] combined   # = np.empty(dim_combined_codons, dtype=np.float32)
         unsigned long long number_of_reads = 0
         unsigned int cluster
+    results = []
 
     cdef FILE* cfile
     cfile = fopen(fastq_file, "rb")
 
-    if verbosity <= INFO: logger.info("File opened, Cython initialized, counting k-mers and spliting fastq file")
+    if verbosity <= INFO: logger.info("File opened, Cython initialized, counting k-mers and splitting fastq file")
     while True:
         # Read line 4 by 4 if fastq, otherwise 2 by 2. Save all
         length_line = getline(&line_0, &buffer_size_0, cfile)
@@ -521,20 +528,28 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
             if length_line < 0: break
 
         # Count k-mers
+        if verbosity <= DEBUG: logger.debug(f"Lines read, sequence len={length_sequence-1}, counting k-mers now")
         counts = _kmer_counter(line_1, k_value=k, length=length_sequence - 1)
-        _combine_counts_forward_w_rc(counts)
+        combined = _combine_counts_forward_w_rc(counts)
+        if verbosity <= DEBUG: logger.debug(f"combined counts, shape={combined.shape[0]}, counts[0]={combined[0]}, scaling now")
         # scale
-        _scale_counts(counts, k, length_sequence - 1)
+        _scale_counts(combined, k, length_sequence - 1)
+        if verbosity <= DEBUG: logger.debug(f"scaled value={combined[0]}")
         # find cluster
-        cluster = _find_cluster(counts, centroid_centers)
+        cluster = _find_cluster(combined, centroid_centers)
+        if verbosity <= DEBUG: logger.debug(f"assigned to cluster={cluster}")
+        results.append(cluster)
         # todo: copy read to bin
-        _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
+        # _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
 
         number_of_reads += 1
         if number_of_reads > dev:
             break
 
-    free(outputs)
+    free(line_0)
+    free(line_1)
+    free(line_2)
+    free(line_3)
     fclose(cfile)
     return number_of_reads
 
@@ -547,16 +562,21 @@ def classify_reads(p_fastq, k, centroids, list outputs, file_format="fastq", dev
     # todo: pre process python variables
 
     # ouputs to char array
-    cdef char* filename
-    cdef char** p_output_parts = to_cstring_array(outputs)
+    cdef const char* filename
+    cdef const char** p_output_parts = to_cstring_array(outputs)
     cdef unsigned long long number_of_reads
 
     filename = PyUnicode_AsUTF8(p_fastq)
-
     cdef float [:,::1] kmeans_centroids = centroids
     cdef unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
 
-    number_of_reads = _classify_reads(filename, k=k, centroid_centers=kmeans_centroids, outputs=p_output_parts, modulo=modulo, dev=dev)
+    number_of_reads = _classify_reads(filename, k=k, centroid_centers=kmeans_centroids, outputs=p_output_parts,
+                                      modulo=modulo, dev=dev)
+    # Free memory
+    # crashes if trying to free the char** or PyUnicode_AsUTF8()
+    # PyMem_Free(filename)
+    # for i in range(len(outputs)):
+    #     PyMem_Free(p_output_parts[i])
     free(p_output_parts)
     return number_of_reads
 
@@ -579,6 +599,7 @@ cdef _process_file(str filename, unsigned int k=4, file_format="fastq"):
         if line_nb % modulo == 1:
             kmer_counts.append(_kmer_counter(line, k_value=k, length=length))
         line_nb+= 1
+    free(line)
     return kmer_counts
 
 def process_file(filename, k, file_format="fastq"):
@@ -603,4 +624,5 @@ def python_preprocess(filename, k, file_format="fastq"):
                 if verbosity <= DEBUG: logger.info(f"counts length={len(line)}, counts={counts}")
                 list_counts.append(counts)
             line_nb += 1
+    free(line)
     return list_counts
