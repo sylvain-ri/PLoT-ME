@@ -8,7 +8,7 @@ Testing both plot_me.bio and plot_me.cython_module.cyt_ext
 """
 from plot_me import bio
 from plot_me.cython_module import cyt_ext
-from plot_me.tools import init_logger
+from plot_me.tools import init_logger, scale_df_by_length
 
 import logging
 import numpy as np
@@ -224,31 +224,41 @@ def test_cyt_count_and_combine_seq_arrays(k, seq, counts):
     np.testing.assert_array_equal(counts, cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=False, combine=True))
 
 
+avg = 4.**2/(11.-2.+1.)
 scaling_counts = [
     (2, 11,
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
-     np.array([0,  0,  0,  0,        10    ,  0,  0,  0,  0,  0], dtype=np.float32),
-     np.array([0,  0,  0,  0, 4**2/(10-2+1),  0,  0,  0,  0,  0], dtype=np.float32), ),  # 1.777777778
+     np.array([  1,  1,  1,  1,  1,  1,  1,  1,  1,  1], dtype=np.float32),
+     np.array([avg,avg,avg,avg,avg,avg,avg,avg,avg,avg], dtype=np.float32), ),
+    (2, 11,
+     #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
+     np.array([0,  0,  0,  0,        10.            ,  0,  0,  0,  0,  0], dtype=np.float32),
+     np.array([0,  0,  0,  0, 10 * 4.**2/(11.-2.+1.),  0,  0,  0,  0,  0], dtype=np.float32), ),
     (2, 30,
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
      np.array([2,  2,  3,  1,  4,  5,  2,  1,  3,  6], dtype=np.float32),
-     np.array([0.068965517, 0.068965517, 0.103448276, 0.034482759, 0.137931034, 0.172413793, 0.068965517, 0.034482759, 0.103448276, 0.206896552], dtype=np.float32), ),
+     np.array([1.103448276, 1.103448276, 1.655172414, 0.551724138, 2.206896552, 2.75862069, 1.103448276, 0.551724138, 1.655172414, 3.310344828], dtype=np.float32), ),
     (2, 102,
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
      np.array([2,  8,  3,  7, 10,  1,  9, 20, 40,  1], dtype=np.float32),
-     np.array([0.316831683, 1.267326733, 0.475247525, 1.425742574, 1.584158416, 0.158415842, 1.425742574, 3.168316832, 6.336633663, 0.158415842], dtype=np.float32), ),
-    (3, 102,
+     np.array([0.316831683, 1.267326733, 0.475247525, 1.108910891, 1.584158416, 0.158415842, 1.425742574, 3.168316832, 6.336633663, 0.158415842], dtype=np.float32), ),
+    (3, 25,
      #
      #        AAA,AAC,AAG,        AAT,ACA,ACC,ACG,ACT,AGA,        AGC,AGG,ATA,ATC,ATG,CAA,CAC,CAG,CCA,CCC,        CCG,CGA,CGC,CTA,CTC,GAA,        GAC,GCA,GCC,GGA,        GTA,TAA,TCA
-     np.array([ 0,  0,  0,         10,  0,  0,  0,  0,  0,          4,  0,  0,  0,  0,  0,  0,  0,  0,  0,          7,  0,  0,  0,  0,  0,          2,  0,  0,  0,          1,  0,  0], dtype=np.float32),
-     np.array([ 0,  0,  0,0.434782609,  0,  0,  0,  0,  0,0.173913043,  0,  0,  0,  0,  0,  0,  0,  0,  0,0.304347826,  0,  0,  0,  0,  0,0.086956522,  0,  0,  0,0.043478261,  0,  0], dtype=np.float32), ),
+     np.array([ 0, 0, 0,          10, 0, 0, 0, 0, 0,           4, 0, 0, 0, 0, 0, 0, 0, 0, 0,           7, 0, 0, 0, 0, 0,           2, 0, 0, 0,           1, 0, 0], dtype=np.float32),
+     np.array([ 0, 0, 0, 27.82608696, 0, 0, 0, 0, 0, 11.13043478, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.47826087, 0, 0, 0, 0, 0, 5.565217391, 0, 0, 0, 2.782608696, 0, 0], dtype=np.float32), ),
 ]
 
 @pytest.mark.parametrize("k, length, counts_unscaled, scaled", scaling_counts)
 def test_cyt_scale_counts(k, length, counts_unscaled, scaled):
     cyt_ext.init_variables(k)
     cyt_ext.scale_counts(counts_unscaled, k, length)  # Scaling in place
-    np.testing.assert_array_almost_equal(scaled, counts_unscaled)
+    np.testing.assert_array_almost_equal(scaled, counts_unscaled, decimal=3)
+
+@pytest.mark.parametrize("k, length, counts_unscaled, scaled", scaling_counts)
+def test_tools_scale_df_by_length(k, length, counts_unscaled, scaled):
+    after_scaling = scale_df_by_length(counts_unscaled, kmer_cols=None, k=k, w=length, single_row=True)  # Scaling in place
+    np.testing.assert_array_almost_equal(scaled, after_scaling, decimal=3)
 
 
 cluster_for_kmer_profile = [
