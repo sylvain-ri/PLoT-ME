@@ -206,8 +206,8 @@ class ArgumentParserWithDefaults(argparse.ArgumentParser):
 def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
     # todo: should scale by the actual number of columns (palindromes and reverse complemented k-mers)
-    divider = w - k + 1
-    ratio = 4**k / divider if divider > 1 else 4**k  # avoid divide by 0
+    divider = w - k + 1.
+    ratio = 4.**k / divider if divider > 1 else 4.**k  # avoid divide by 0
     ratio = np.float32(ratio)
     if single_row:
         return data * ratio
