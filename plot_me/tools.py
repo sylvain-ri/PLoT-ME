@@ -209,6 +209,7 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
     divider = w - k + 1.
     ratio = 4.**k / divider if divider > 1 else 4.**k  # avoid divide by 0
     ratio = np.float32(ratio)
+    logger.debug(f"scaling with ratio={ratio}, from k={k}, w={w}, divider={divider}")
     if single_row:
         return data * ratio
     else:
