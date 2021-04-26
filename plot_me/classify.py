@@ -207,8 +207,11 @@ class ReadToBin(SeqRecord.SeqRecord):
         cls.FILEBASE = file_base
         if not path_model == "full":
             cls.KMER = kmers_dic(K)
-            with open(path_model, 'rb') as f:
-                cls.MODEL = pickle.load(f)
+            if cython_is_there:
+                cls.MODEL = np.load(path_model.replace("model", "cluster_centers").replace(".pkl", ".npy"))
+            else:
+                with open(path_model, 'rb') as f:
+                    cls.MODEL = pickle.load(f)
 
     @classmethod
     def bin_reads(cls):
