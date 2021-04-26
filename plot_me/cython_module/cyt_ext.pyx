@@ -209,7 +209,7 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     cdef unsigned int cluster_nb = centers.shape[0]
     cdef float [:] distances = template_distances    # copy template with zeros, faster than initializing each time
     cdef float tmp_distance
-    cdef unsigned int cluster_choice
+    cdef unsigned int cluster_choice = 0
     cdef unsigned int i, j
 
     # Compute the distance to each centroid
@@ -218,11 +218,8 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
             tmp_distance = counts[j] - centers[i][j]
             distances[i] += tmp_distance * tmp_distance
 
-    # todo: move this inside the previous loop
-    # Find the cluster with the minimum distance
-    cluster_choice = 0
-    for i in range(1, cluster_nb):
-        if distances[cluster_choice] > distances[i]:
+        # Find the cluster with the minimum distance
+        if i != 0 and distances[cluster_choice] > distances[i]:
             cluster_choice = i
     return cluster_choice
 
