@@ -375,11 +375,11 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
     with open(path_model, 'wb') as f:
         pickle.dump(ml_model, f)
     logger.info(f"{model_name} model saved for k={k} s={w} at {path_model}")
-    p_weights = path_model.replace("model", "weights").replace(".pkl", ".npy")
-    np.save(p_weights, ml_model.cluster_centers_)
-    np.savetxt(p_weights.replace(".npy", ".tsv"), ml_model.cluster_centers_, delimiter="\t", newline="\n",
-               header="Weights for PLoT-ME model. Load with numpy.loadtxt(). Full precision in the .npy file with numpy.load()", )
-    logger.info(f"Also saved in numpy and .tsv format ({p_weights}), now predicting bins for each segment...")
+    p_cluster_centers = path_model.replace("model", "cluster_centers").replace(".pkl", ".npy")
+    np.save(p_cluster_centers, ml_model.cluster_centers_)
+    np.savetxt(p_cluster_centers.replace(".npy", ".tsv"), ml_model.cluster_centers_, delimiter="\t", newline="\n",
+               header="cluster centers for PLoT-ME binner. Load with numpy.loadtxt(). Full precision in the .npy file with numpy.load()", )
+    logger.info(f"Also saved in numpy and .tsv format ({p_cluster_centers}), now predicting bins for each segment...")
 
     # ## 3 ##
     predicted = ml_model.predict(df[cols_kmers])
