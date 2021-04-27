@@ -297,4 +297,7 @@ def test_cyt_find_cluster(k, cluster, counts, centroids):
     assert cluster == cyt_ext.find_cluster(counts, centroids)  # Scaling in place
 
 
+def test_Binner():
+    # todo: should check that the cyt version finds the same bin as the sklearn KMeans
+    return NotImplementedError
 
