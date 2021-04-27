@@ -22,24 +22,40 @@ TODO
 
 import logging
 
+
 # Lib for Cython
 cimport cython     # For @cython.boundscheck(False)
 import numpy as np
 cimport numpy as np
 from libc.stdlib cimport malloc, free
-
+from cython.parallel import prange
 # todo: try with cpython.array : https://cython.readthedocs.io/en/latest/src/tutorial/array.html#array-array
 # from cpython cimport array
 # import array
-from cython.parallel import prange
+
+# ######################################      FILE PROCESSING      ########################################
+# Related to the file reader. Can be replaced by from libc.stdio cimport fopen, fclose, getline ; +10% time
+# from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
+from libc.stdio cimport FILE, fopen, fclose, getline, fwrite, fputs, fputc, fprintf
+
+# https://stackoverflow.com/a/54081075/4767645
+cdef extern from "Python.h":
+    const char* PyUnicode_AsUTF8(object unicode)
+
+cdef const char** to_cstring_array(list_str):
+    cdef const char** ret = <const char**>malloc(len(list_str) * sizeof(char *))
+    for i in range(len(list_str)):
+        ret[i] = PyUnicode_AsUTF8(list_str[i])
+    return ret
+
+logger = logging.getLogger(__name__)
+
 
 DEF ADDR_ERROR  = 8192  # Value above the possible address of the codon: if k=5, max addr is 4**(5+1)
 DEF WARNING     = 30
 DEF INFO        = 20
 DEF DEBUG       = 10
 DEF DEBUG_MORE  =  5
-
-logger = logging.getLogger(__name__)
 
 
 # ##########################    CONSTANTS AND VARIABLES FOR FUNCTIONS   ##########################
@@ -230,8 +246,21 @@ def find_cluster(counts, centroid_centers):
 
 
 cdef _copy_read_to_bin(char** outputs, unsigned int cluster, char* line_0, char* line_1, char* line_2, char* line_3):
+    """" Write the 4 lines of a read to its designated cluster. """
 
-    return NotImplementedError
+    cdef FILE* file_write_ptr
+    file_write_ptr = fopen(outputs[cluster], "ab")
+    if file_write_ptr == NULL:
+        raise FileNotFoundError(2, "No such file or directory: '%s'" % outputs[2])
+
+    # fprintf(file_write_ptr, "%d", cluster)
+    fputs(line_0, file_write_ptr)
+    fputs(line_1, file_write_ptr)
+    fputs(line_2, file_write_ptr)
+    fputs(line_3, file_write_ptr)
+
+    fclose(file_write_ptr)
+    return
 
 
  # ###################    INITIALIZATION OF VARIABLES    ########################
@@ -437,21 +466,6 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True, ssize_t length=-1
 
 
 # ######################################      FILE PROCESSING      ########################################
-# Related to the file reader. Can be replaced by from libc.stdio cimport fopen, fclose, getline ; +10% time
-# from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
-from libc.stdio cimport FILE, fopen, fclose, getline
-
-# https://stackoverflow.com/a/54081075/4767645
-cdef extern from "Python.h":
-    const char* PyUnicode_AsUTF8(object unicode)
-
-cdef const char** to_cstring_array(list_str):
-    cdef const char** ret = <const char**>malloc(len(list_str) * sizeof(char *))
-    for i in range(len(list_str)):
-        ret[i] = PyUnicode_AsUTF8(list_str[i])
-    return ret
-
-
 def read_file(filename):
     """ Fast Cython file reader
         return each line as char array and its length
@@ -529,18 +543,18 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
 
         # Count k-mers
         if verbosity <= DEBUG_MORE: logger.debug(f"Lines read, sequence len={length_sequence-1}, counting k-mers now")
-        counts = _kmer_counter(line_1, k_value=k, length=length_sequence - 1)
+        counts = _kmer_counter(line_1, k_value=k, length=length_sequence - 1)     # because getline() keeps \n
         combined = _combine_counts_forward_w_rc(counts)
         if verbosity <= DEBUG_MORE: logger.debug(f"combined counts, shape={combined.shape[0]}, counts[0]={combined[0]}, scaling now")
         # scale
-        _scale_counts(combined, k, length_sequence - 1)
+        _scale_counts(combined, k, length_sequence - 1)                           # because getline() keeps \n
         if verbosity <= DEBUG_MORE: logger.debug(f"scaled value={combined[0]}")
         # find cluster
         cluster = _find_cluster(combined, centroid_centers)
         if verbosity <= DEBUG_MORE: logger.debug(f"assigned to cluster={cluster}")
         results.append(cluster)
         # todo: copy read to bin
-        # _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
+        _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
 
         number_of_reads += 1
         if number_of_reads > dev:
