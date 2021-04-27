@@ -165,7 +165,7 @@ cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
     cdef:
          float [:] res = np.empty(dim_combined_codons, dtype=np.float32)
          unsigned int i
-    if verbosity <= DEBUG: logger.debug(f"Combining forward and reverse complement. count[0]={counts[0]}")
+    if verbosity <= DEBUG_MORE: logger.debug(f"Combining forward and reverse complement. count[0]={counts[0]}")
     if verbosity <= DEBUG_MORE:
         logger.log(DEBUG_MORE, f"ar_codons_forward_addr={ar_codons_forward_addr.base}, ar_codons_rev_comp_addr={ar_codons_rev_comp_addr.base}")
 
@@ -176,7 +176,7 @@ cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
             res[i] = counts[ar_codons_forward_addr[i]]
         else:
             res[i] = counts[ar_codons_forward_addr[i]] + counts[ar_codons_rev_comp_addr[i]]
-    if verbosity <= DEBUG: logger.debug(f"Combined forward and reverse complement={res.base}")
+    if verbosity <= DEBUG_MORE: logger.debug(f"Combined forward and reverse complement={res.base}")
     return res
 
 
@@ -212,7 +212,7 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     cdef float tmp_distance
     cdef unsigned int cluster_choice = 0
     cdef unsigned int i, j
-    if verbosity <= DEBUG: logger.debug(f"Find_clusters: Centroids of shape={centers.shape[0]},{centers.shape[1]}, counts of shape={counts.shape[0]}")
+    if verbosity <= DEBUG_MORE: logger.debug(f"Find_clusters: Centroids of shape={centers.shape[0]},{centers.shape[1]}, counts of shape={counts.shape[0]}")
 
     # Compute the distance to each centroid
     for i in range(cluster_nb):
@@ -421,7 +421,7 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True, ssize_t length=-1
             kmer_counts = _kmer_counter(seq, k_value=k, length=length)
             dict_kmer_counts = d_template_counts_all.copy()
 
-        if verbosity <= DEBUG:
+        if verbosity <= DEBUG_MORE:
             dict_kmers_keys = list(dict_kmer_counts.keys())
             logger.debug(f"MemoryView (len={kmer_counts.shape}, first 10={kmer_counts[0]}) "
                          f"to Dict (template keys={dict_kmers_keys[:5]}")
@@ -528,16 +528,16 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
             if length_line < 0: break
 
         # Count k-mers
-        if verbosity <= DEBUG: logger.debug(f"Lines read, sequence len={length_sequence-1}, counting k-mers now")
+        if verbosity <= DEBUG_MORE: logger.debug(f"Lines read, sequence len={length_sequence-1}, counting k-mers now")
         counts = _kmer_counter(line_1, k_value=k, length=length_sequence - 1)
         combined = _combine_counts_forward_w_rc(counts)
-        if verbosity <= DEBUG: logger.debug(f"combined counts, shape={combined.shape[0]}, counts[0]={combined[0]}, scaling now")
+        if verbosity <= DEBUG_MORE: logger.debug(f"combined counts, shape={combined.shape[0]}, counts[0]={combined[0]}, scaling now")
         # scale
         _scale_counts(combined, k, length_sequence - 1)
-        if verbosity <= DEBUG: logger.debug(f"scaled value={combined[0]}")
+        if verbosity <= DEBUG_MORE: logger.debug(f"scaled value={combined[0]}")
         # find cluster
         cluster = _find_cluster(combined, centroid_centers)
-        if verbosity <= DEBUG: logger.debug(f"assigned to cluster={cluster}")
+        if verbosity <= DEBUG_MORE: logger.debug(f"assigned to cluster={cluster}")
         results.append(cluster)
         # todo: copy read to bin
         # _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
