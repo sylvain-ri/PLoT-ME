@@ -108,6 +108,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     MODEL = None
     PARAM = ""
     outputs = {}
+    outputs_list = []
     total_reads = 0
     file_has_been_binned = False
     NUMBER_BINNED = 0
@@ -167,6 +168,10 @@ class ReadToBin(SeqRecord.SeqRecord):
             SeqIO.write(self, f, bin_classify.format)
 
     @classmethod
+    def cls_path_out(cls, cluster=None):
+        return f"{cls.FASTQ_BIN_FOLDER}/{cls.FILEBASE}.bin-{cluster}.fastq"
+
+    @classmethod
     def set_fastq_model_and_param(cls, path_fastq, path_model, param, force_binning):
         assert osp.isfile(path_fastq), FileNotFoundError(f"{path_fastq} cannot be found")
         # todo: load the parameter file from parse_DB.py instead of parsing string.... parameters_RefSeq_binning.txt
@@ -209,6 +214,11 @@ class ReadToBin(SeqRecord.SeqRecord):
             cls.KMER = kmers_dic(K)
             if cython_is_there:
                 cls.MODEL = np.load(path_model.replace("model", "cluster_centers").replace(".pkl", ".npy"))
+                cluster_nb = cls.MODEL.shape[0]
+                for i in range(cluster_nb):
+                    path_cluster_i = cls.cls_path_out(i)
+                    cls.outputs_list.append(path_cluster_i)
+                    cls.outputs[i] = path_cluster_i
             else:
                 with open(path_model, 'rb') as f:
                     cls.MODEL = pickle.load(f)
@@ -218,7 +228,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         """ Bin all reads from provided file """
         # Skip binning if already done. Count total number of lines in each binned fastq
         if cls.file_has_been_binned:
-            cls.logger.info(f"Fastq has already been binned, skipping reads binning: {cls.FASTQ_PATH}")
+            cls.logger.warning(f"Fastq has already been binned, skipping reads binning: {cls.FASTQ_PATH}")
             return
 
         cls.logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
@@ -227,18 +237,21 @@ class ReadToBin(SeqRecord.SeqRecord):
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
-        # TODO Cyt: use Cython file reader, k-mer counter and binner, fallback on Python otherwise
-        counter = 0
-        for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=cls.total_reads,
-                           desc="binning and copying reads to bins", leave=True, dynamic_ncols=True):
-            counter += 1
-            custom_read = ReadToBin(record)
-            # custom_read.kmer_count
-            custom_read.scale()
-            custom_read.find_bin()
-            custom_read.to_fastq()
-        cls.logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
-        cls.NUMBER_BINNED = counter
+        if cython_is_there:
+            cyt_ext.classify_reads(cls.FASTQ_PATH, K, cls.MODEL, cls.outputs_list, file_format="fastq", dev=10**9)
+
+        else:
+            counter = 0
+            for record in tqdm(SeqIO.parse(cls.FASTQ_PATH, bin_classify.format), total=cls.total_reads,
+                               desc="binning and copying reads to bins", leave=True, dynamic_ncols=True):
+                counter += 1
+                custom_read = ReadToBin(record)
+                # custom_read.kmer_count
+                custom_read.scale()
+                custom_read.find_bin()
+                custom_read.to_fastq()
+            cls.logger.info(f"{counter} reads binned into bins: [" + ", ".join(map(str, sorted(cls.outputs.keys()))) + "]")
+            cls.NUMBER_BINNED = counter
         return cls.outputs
 
     @classmethod
