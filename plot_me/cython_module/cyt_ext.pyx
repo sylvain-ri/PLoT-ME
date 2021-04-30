@@ -631,6 +631,8 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
     free(line_2)
     free(line_3)
     fclose(cfile)
+    clock_gettime(CLOCK_REALTIME, &ts)
+    time_precise = ts.tv_sec + (ts.tv_nsec / 1000000000.)
     print_progress(number_of_reads, <float>file_bytes_read / <float>file_size_bytes)  # to print the 100%
     printf("\nNumber of reads pre-classified: %d, in %.2f seconds. \n", number_of_reads, time_precise-time_start)
     if verbosity <= INFO:
