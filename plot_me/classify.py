@@ -184,22 +184,23 @@ class ReadToBin(SeqRecord.SeqRecord):
         # Compute expected length
         cls.DIM_COMBINED = n_dim_rc_combined(K)
 
-        cls.total_reads = reads_in_file(cls.FASTQ_PATH)
+        if cython_is_there is False: cls.total_reads = reads_in_file(cls.FASTQ_PATH)
 
         # skip if reads already binned
         if osp.isdir(cls.FASTQ_BIN_FOLDER):
-            total_binned_reads = 0
-            if not force_binning:
-                # Compute total reads count if it hasn't been forced
-                for path in Path(cls.FASTQ_BIN_FOLDER).rglob("*bin-*.fastq"):
-                    str_path = path.as_posix()
-                    total_binned_reads += reads_in_file(str_path)
-                    _, key, _ = re.split('.bin-|.fastq', str_path)
-                    cls.outputs[int(key)] = str_path
-                cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, "
-                                 f"compared to the {cls.total_reads} in the original fastq file.")
+            if cython_is_there is False:
+                total_binned_reads = 0
+                if not force_binning:
+                    # Compute total reads count if it hasn't been forced
+                    for path in Path(cls.FASTQ_BIN_FOLDER).rglob("*bin-*.fastq"):
+                        str_path = path.as_posix()
+                        total_binned_reads += reads_in_file(str_path)
+                        _, key, _ = re.split('.bin-|.fastq', str_path)
+                        cls.outputs[int(key)] = str_path
+                    cls.logger.debug(f"A folder has been detected, and holds in total {total_binned_reads} reads, "
+                                     f"compared to the {cls.total_reads} in the original fastq file.")
 
-            if force_binning or cls.total_reads != total_binned_reads:
+            if force_binning or cython_is_there or cls.total_reads != total_binned_reads:
                 last_modif = dt.fromtimestamp(osp.getmtime(cls.FASTQ_BIN_FOLDER))
                 save_folder = f"{cls.FASTQ_BIN_FOLDER}_{last_modif:%Y-%m-%d_%H-%M}"
                 cls.logger.warning(f"Folder existing, renaming to avoid losing files: {save_folder}")
@@ -233,7 +234,6 @@ class ReadToBin(SeqRecord.SeqRecord):
 
         cls.logger.info(f"Binning the reads (count kmers, scale, find_bin, copy to file.bin-<cluster>.fastq")
         # todo: try to parallelize it, careful of file writing concurrency.
-        #  Dask ? process to load and count kmers, single one for appending read to fastq ?
         # with Pool(cls.CORES) as pool:
         #     results = list(tqdm(pool.imap(pll_binning, SeqIO.parse(cls.FASTQ_PATH, "fasta"))))
         # counter = len(results)
