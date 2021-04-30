@@ -534,7 +534,6 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         in C: https://stackoverflow.com/questions/2029103/correct-way-to-read-a-text-file-into-a-buffer-in-c
         in cython: https://stackoverflow.com/questions/44721835/cython-read-binary-file-into-string-and-return
     """
-    print_progress(0, 0.)
     _init_variables(k)
     if dim_combined_codons != centroid_centers.shape[1]:
         logger.error(f"The number of dimension, based on the provided k={k_val}, should be {dim_combined_codons}. "
@@ -580,6 +579,7 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
 
     # Main loop
     if verbosity <= INFO: logger.info("File opened, Cython initialized, counting k-mers and splitting fastq file")
+    print_progress(0, 0.)
     while True:
         # Read line 4 by 4 if fastq, otherwise 2 by 2. Save all
         length_line = getline(&line_0, &buffer_size_0, cfile)
