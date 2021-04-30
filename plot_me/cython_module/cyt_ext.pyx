@@ -21,13 +21,14 @@ TODO
 """
 
 import logging
-
+from os.path import getsize
 
 # Lib for Cython
 cimport cython     # For @cython.boundscheck(False)
 import numpy as np
 cimport numpy as np
 from libc.stdlib cimport malloc, free
+from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
 from cython.parallel import prange
 # todo: try with cpython.array : https://cython.readthedocs.io/en/latest/src/tutorial/array.html#array-array
 # from cpython cimport array
@@ -36,7 +37,9 @@ from cython.parallel import prange
 # ######################################      FILE PROCESSING      ########################################
 # Related to the file reader. Can be replaced by from libc.stdio cimport fopen, fclose, getline ; +10% time
 # from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
-from libc.stdio cimport FILE, fopen, fclose, getline, fwrite, fputs, fputc, fprintf
+from libc.stdio cimport FILE, fopen, fclose, ftell, fseek, SEEK_END, SEEK_SET   # Files
+from libc.stdio cimport getline, fputs                                          # read / write lines
+from libc.stdio cimport printf, fflush, stdout                                  # Console printing
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +77,11 @@ def get_verbosity():
 def set_verbosity(v):
     global verbosity
     verbosity = v
+    logger.setLevel(v)
+    for handler in logger.handlers:
+        handler.setLevel(v)
+    logger.info(f"Logging level changed to {v}")
+
 def get_k_val():
     return k_val
 def get_dim_combined_codons():
@@ -113,6 +121,26 @@ cdef const char** to_cstring_array(list_str):
     for i in range(len(list_str)):
         ret[i] = PyUnicode_AsUTF8(list_str[i])
     return ret
+
+
+cdef char* progressbar_empty  = PyUnicode_AsUTF8("")
+cdef char* progressbar_string = PyUnicode_AsUTF8("...LoLoMeME:.LOng.reads.LOw.MEmory.MEtagenomics.(PLoT-ME)...")
+DEF  progressbar_length        = 60
+
+cdef void print_progress(unsigned long long reads, float ratio):
+    """ progress bar in Cython 
+        https://stackoverflow.com/questions/14539867/how-to-display-a-progress-indicator-in-pure-c-c-cout-printf/36315819#36315819
+    """
+    cdef:
+        int percentage  = <int>(ratio * 100.)
+        int nb_chars_done = <int>(ratio * progressbar_length)
+        int remaining_chars = progressbar_length - nb_chars_done
+
+    # printf("  ratio=%f.2 | percentage=%d | nb_chars_done=%d | remaining_chars=%d \n", ratio, percentage, nb_chars_done, remaining_chars)
+    # https://stackoverflow.com/questions/7899119/what-does-s-mean-in-printf
+    printf("\rPre-classifying: %6d reads (%3d%%) [%.*s%*s]", reads, percentage, nb_chars_done, progressbar_string, remaining_chars, progressbar_empty)
+    fflush(stdout)
+    return
 
 
 # ##########################               BIO               ##########################
@@ -498,7 +526,7 @@ def read_file(filename):
 
 #
 cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] centroid_centers,
-                                        const char** outputs, unsigned int modulo=4, unsigned int dev=12):
+                                        const char** outputs, unsigned int modulo=4, unsigned long long dev=10, unsigned long long file_size_from_python=-1):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
         
@@ -525,24 +553,48 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         float [:] counts     # = np.empty(4**k, dtype=np.float32)
         float [:] combined   # = np.empty(dim_combined_codons, dtype=np.float32)
         unsigned long long number_of_reads = 0
+        unsigned long long file_bytes_read = 0
+        unsigned long long file_size_bytes = 0
         unsigned int cluster
-    results = []
+        timespec ts
+        double time_precise
+        double time_start
+        double time_last
 
+    # https://stackoverflow.com/questions/42304195/how-to-measure-time-up-to-millisecond-in-cython/43009871
+    clock_gettime(CLOCK_REALTIME, &ts)
+    time_start = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+    time_last = time_start
+
+    # Open file, check number of bytes
     cdef FILE* cfile
     cfile = fopen(fastq_file, "rb")
+    if file_size_from_python == -1:
+        fseek(cfile, 0, SEEK_END)
+        file_size_bytes = <unsigned long long>ftell(cfile)
+        fseek(cfile, 0, SEEK_SET)
+    else:
+        file_size_bytes = file_size_from_python
 
+    # Main loop
     if verbosity <= INFO: logger.info("File opened, Cython initialized, counting k-mers and splitting fastq file")
     while True:
         # Read line 4 by 4 if fastq, otherwise 2 by 2. Save all
         length_line = getline(&line_0, &buffer_size_0, cfile)
         if length_line < 0: break
+        file_bytes_read += length_line
+
         length_sequence = getline(&line_1, &buffer_size_1, cfile)
-        if length_line < 0: break
+        if length_sequence < 0: break
+        file_bytes_read += length_sequence
+
         if modulo == 4:
             length_line = getline(&line_2, &buffer_size_2, cfile)
             if length_line < 0: break
+            file_bytes_read += length_line
             length_line = getline(&line_3, &buffer_size_3, cfile)
             if length_line < 0: break
+            file_bytes_read += length_line
 
         # Count k-mers
         if verbosity <= DEBUG_MORE: logger.debug(f"Lines read, sequence len={length_sequence-1}, counting k-mers now")
@@ -555,9 +607,16 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         # find cluster
         cluster = _find_cluster(combined, centroid_centers)
         if verbosity <= DEBUG_MORE: logger.debug(f"assigned to cluster={cluster}")
-        results.append(cluster)
-        # todo: copy read to bin
+        # copy reads to bins
         _copy_read_to_bin(outputs, cluster, line_0, line_1, line_2, line_3)
+
+        # Update progress bar
+        if verbosity <= INFO:
+            clock_gettime(CLOCK_REALTIME, &ts)
+            time_precise = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+            if time_precise >= time_last + 0.04:
+                time_last = time_precise
+                print_progress(number_of_reads, <float>file_bytes_read / file_size_bytes)
 
         number_of_reads += 1
         if number_of_reads > dev:
@@ -568,27 +627,29 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
     free(line_2)
     free(line_3)
     fclose(cfile)
+    print_progress(number_of_reads, <float>file_bytes_read / <float>file_size_bytes)  # to print the 100%
+    printf("\nNumber of reads pre-classified: %d, in %.2f seconds. \n", number_of_reads, time_precise-time_start)
+    if verbosity <= INFO: logger.info(f"Number of reads: {number_of_reads}, bytes counted={file_bytes_read}, file size={file_size_bytes}")
     return number_of_reads
 
 
-def classify_reads(p_fastq, k, centroids, list outputs, file_format="fastq", dev=12):
+def classify_reads(p_fastq, k, centroids, list outputs, file_format="fastq", dev=10):
     """ Interface for Cython's function.
         Read fastq file, count k-mers for each read, find its cluster, copy to read to its bin
     """
     # todo: use ramfs to preload the file ()
-    # todo: pre process python variables
 
     # ouputs to char array
-    cdef const char* filename
+    cdef const char* filename = PyUnicode_AsUTF8(p_fastq)
     cdef const char** p_output_parts = to_cstring_array(outputs)
     cdef unsigned long long number_of_reads
 
-    filename = PyUnicode_AsUTF8(p_fastq)
     cdef float [:,::1] kmeans_centroids = centroids
     cdef unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
+    cdef unsigned long long file_size = getsize(p_fastq)
 
     number_of_reads = _classify_reads(filename, k=k, centroid_centers=kmeans_centroids, outputs=p_output_parts,
-                                      modulo=modulo, dev=dev)
+                                      modulo=modulo, dev=dev, file_size_from_python=file_size)
     # Free memory
     # crashes if trying to free the char** or PyUnicode_AsUTF8()
     # PyMem_Free(filename)
