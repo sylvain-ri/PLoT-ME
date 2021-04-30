@@ -258,18 +258,18 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     cdef float [:] distances = template_distances    # copy template with zeros, faster than initializing each time
     cdef float tmp_distance
     cdef unsigned int cluster_choice = 0
-    cdef unsigned int i, j
+    cdef unsigned int cluster_i, dimension
     if verbosity <= DEBUG_MORE: logger.debug(f"Find_clusters: Centroids of shape={centers.shape[0]},{centers.shape[1]}, counts of shape={counts.shape[0]}")
 
     # Compute the distance to each centroid
-    for i in range(cluster_nb):
-        for j in range(centers.shape[1]):
-            tmp_distance = counts[j] - centers[i][j]
-            distances[i] += tmp_distance * tmp_distance
+    for cluster_i in range(cluster_nb):
+        for dimension in range(centers.shape[1]):
+            tmp_distance = counts[dimension] - centers[cluster_i][dimension]
+            distances[cluster_i] += tmp_distance * tmp_distance
 
         # Find the cluster with the minimum distance
-        if i != 0 and distances[cluster_choice] > distances[i]:
-            cluster_choice = i
+        if cluster_i != 0 and distances[cluster_choice] > distances[cluster_i]:
+            cluster_choice = cluster_i
     return cluster_choice
 
 def find_cluster(counts, centroid_centers):
