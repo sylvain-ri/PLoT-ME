@@ -127,7 +127,7 @@ cdef char* progressbar_empty  = PyUnicode_AsUTF8("")
 cdef char* progressbar_string = PyUnicode_AsUTF8("...LoLoMeME:.LOng.reads.LOw.MEmory.MEtagenomics.(PLoT-ME)...")
 DEF  progressbar_length        = 60
 
-cdef void print_progress(unsigned long long reads, float ratio):
+cdef void print_progress(long long reads, float ratio):
     """ progress bar in Cython 
         https://stackoverflow.com/questions/14539867/how-to-display-a-progress-indicator-in-pure-c-c-cout-printf/36315819#36315819
     """
@@ -138,7 +138,7 @@ cdef void print_progress(unsigned long long reads, float ratio):
 
     # printf("  ratio=%f.2 | percentage=%d | nb_chars_done=%d | remaining_chars=%d \n", ratio, percentage, nb_chars_done, remaining_chars)
     # https://stackoverflow.com/questions/7899119/what-does-s-mean-in-printf
-    printf("\rPre-classifying: %6d reads (%3d%%) [%.*s%*s]", reads, percentage, nb_chars_done, progressbar_string, remaining_chars, progressbar_empty)
+    printf("\rPre-classifying: %6ll reads (%3d%%) [%.*s%*s]", reads, percentage, nb_chars_done, progressbar_string, remaining_chars, progressbar_empty)
     fflush(stdout)
     return
 
@@ -402,7 +402,7 @@ cdef float [:] _kmer_counter(const char *stream, unsigned int k_value=4, ssize_t
         unsigned int modulo_addr = 4 ** (k_value - 1)
         unsigned int last_failed = 0
         unsigned int fails = 0
-        unsigned long long counter = 0
+        long long counter = 0
 
     if length >= 0:
         stream_len = length
@@ -525,8 +525,8 @@ def read_file(filename):
 
 
 #
-cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] centroid_centers,
-                                        const char** outputs, unsigned int modulo=4, unsigned long long dev=10, unsigned long long file_size_from_python=-1):
+cdef long long _classify_reads(char* fastq_file, unsigned int k, const float[:,::1] centroid_centers,
+                                        const char** outputs, unsigned int modulo=4, long long dev=10, long long file_size_from_python=-1):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
         
@@ -553,9 +553,9 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         ssize_t length_sequence
         float [:] counts     # = np.empty(4**k, dtype=np.float32)
         float [:] combined   # = np.empty(dim_combined_codons, dtype=np.float32)
-        unsigned long long number_of_reads = 0
-        unsigned long long file_bytes_read = 0
-        unsigned long long file_size_bytes = 0
+        long long number_of_reads = 0
+        long long file_bytes_read = 0
+        long long file_size_bytes = 0
         unsigned int cluster
         timespec ts
         double time_precise
@@ -573,7 +573,7 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
     cfile = fopen(fastq_file, "rb")
     if file_size_from_python == -1:
         fseek(cfile, 0, SEEK_END)
-        file_size_bytes = <unsigned long long>ftell(cfile)
+        file_size_bytes = <long long>ftell(cfile)
         fseek(cfile, 0, SEEK_SET)
     else:
         file_size_bytes = file_size_from_python
@@ -631,8 +631,10 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
     free(line_2)
     free(line_3)
     fclose(cfile)
+    clock_gettime(CLOCK_REALTIME, &ts)
+    time_precise = ts.tv_sec + (ts.tv_nsec / 1000000000.)
     print_progress(number_of_reads, <float>file_bytes_read / <float>file_size_bytes)  # to print the 100%
-    printf("\nNumber of reads pre-classified: %d, in %.2f seconds. \n", number_of_reads, time_precise-time_start)
+    printf("\nNumber of reads pre-classified: %ll, in %.2f seconds. \n", number_of_reads, time_precise-time_start)
     if verbosity <= INFO:
         logger.info(f"Number of reads: {number_of_reads}, bytes counted={file_bytes_read}, file size={file_size_bytes}")
         logger.info(f"reads per cluster: {clusters_dict}")
@@ -648,11 +650,11 @@ def classify_reads(p_fastq, k, centroids, list outputs, file_format="fastq", dev
     # ouputs to char array
     cdef const char* filename = PyUnicode_AsUTF8(p_fastq)
     cdef const char** p_output_parts = to_cstring_array(outputs)
-    cdef unsigned long long number_of_reads
+    cdef long long number_of_reads
 
     cdef float [:,::1] kmeans_centroids = centroids
     cdef unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
-    cdef unsigned long long file_size = getsize(p_fastq)
+    cdef long long file_size = getsize(p_fastq)
 
     number_of_reads = _classify_reads(filename, k=k, centroid_centers=kmeans_centroids, outputs=p_output_parts,
                                       modulo=modulo, dev=dev, file_size_from_python=file_size)
