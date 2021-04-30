@@ -534,6 +534,7 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         in C: https://stackoverflow.com/questions/2029103/correct-way-to-read-a-text-file-into-a-buffer-in-c
         in cython: https://stackoverflow.com/questions/44721835/cython-read-binary-file-into-string-and-return
     """
+    print_progress(0, 0.)
     _init_variables(k)
     if dim_combined_codons != centroid_centers.shape[1]:
         logger.error(f"The number of dimension, based on the provided k={k_val}, should be {dim_combined_codons}. "
@@ -560,6 +561,7 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
         double time_precise
         double time_start
         double time_last
+        clusters_dict = {i:0 for i in range(centroid_centers.shape[0])}
 
     # https://stackoverflow.com/questions/42304195/how-to-measure-time-up-to-millisecond-in-cython/43009871
     clock_gettime(CLOCK_REALTIME, &ts)
@@ -612,6 +614,8 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
 
         # Update progress bar
         if verbosity <= INFO:
+            clusters_dict[cluster] += 1
+
             clock_gettime(CLOCK_REALTIME, &ts)
             time_precise = ts.tv_sec + (ts.tv_nsec / 1000000000.)
             if time_precise >= time_last + 0.04:
@@ -629,7 +633,9 @@ cdef unsigned long long _classify_reads(char* fastq_file, unsigned int k, const 
     fclose(cfile)
     print_progress(number_of_reads, <float>file_bytes_read / <float>file_size_bytes)  # to print the 100%
     printf("\nNumber of reads pre-classified: %d, in %.2f seconds. \n", number_of_reads, time_precise-time_start)
-    if verbosity <= INFO: logger.info(f"Number of reads: {number_of_reads}, bytes counted={file_bytes_read}, file size={file_size_bytes}")
+    if verbosity <= INFO:
+        logger.info(f"Number of reads: {number_of_reads}, bytes counted={file_bytes_read}, file size={file_size_bytes}")
+        logger.info(f"reads per cluster: {clusters_dict}")
     return number_of_reads
 
 
