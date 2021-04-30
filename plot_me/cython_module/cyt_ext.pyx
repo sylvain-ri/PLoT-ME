@@ -38,16 +38,6 @@ from cython.parallel import prange
 # from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
 from libc.stdio cimport FILE, fopen, fclose, getline, fwrite, fputs, fputc, fprintf
 
-# https://stackoverflow.com/a/54081075/4767645
-cdef extern from "Python.h":
-    const char* PyUnicode_AsUTF8(object unicode)
-
-cdef const char** to_cstring_array(list_str):
-    cdef const char** ret = <const char**>malloc(len(list_str) * sizeof(char *))
-    for i in range(len(list_str)):
-        ret[i] = PyUnicode_AsUTF8(list_str[i])
-    return ret
-
 logger = logging.getLogger(__name__)
 
 
@@ -113,6 +103,19 @@ def get_template_kmer_counts():
 # ##########################             FUNCTIONS             ##########################
 
 # ##########################             UTILITIES             ##########################
+
+# https://stackoverflow.com/a/54081075/4767645
+cdef extern from "Python.h":
+    const char* PyUnicode_AsUTF8(object unicode)
+
+cdef const char** to_cstring_array(list_str):
+    cdef const char** ret = <const char**>malloc(len(list_str) * sizeof(char *))
+    for i in range(len(list_str)):
+        ret[i] = PyUnicode_AsUTF8(list_str[i])
+    return ret
+
+
+# ##########################               BIO               ##########################
 
 @cython.profile(False)       # Allows profiling the function
 cdef inline unsigned int nucl_val(char c) nogil:
