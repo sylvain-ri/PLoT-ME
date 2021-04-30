@@ -38,7 +38,7 @@ def init_logger(logger_name='reads_binning', verbose=False):
     #     return loggers.get(logger_name)
     # else:
     # create formatter for the handlers
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s.%(funcName)s() --- %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)-8s - %(name)s.%(funcName)s --- %(message)s')
     # create file handler which logs even debug messages
     fh = logging.FileHandler(LOGS)
     fh.setLevel(logging.DEBUG)
