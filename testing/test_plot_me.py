@@ -12,6 +12,7 @@ from plot_me.tools import init_logger, scale_df_by_length
 
 import logging
 import numpy as np
+from sklearn.cluster import MiniBatchKMeans
 import pytest
 
 
@@ -290,6 +291,12 @@ cluster_for_kmer_profile = [
                [3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9,3.9, ],
                [ -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, ]], dtype=np.float32), ),
 ]
+
+@pytest.mark.parametrize("k, cluster, counts, centroids", cluster_for_kmer_profile)
+def test_sklearn_find_cluster(k, cluster, counts, centroids):
+    model = MiniBatchKMeans()
+    model.cluster_centers_ = centroids
+    assert cluster == model.predict(counts.reshape(-1, counts.shape[0]))[0]  # Scaling in place
 
 @pytest.mark.parametrize("k, cluster, counts, centroids", cluster_for_kmer_profile)
 def test_cyt_find_cluster(k, cluster, counts, centroids):
