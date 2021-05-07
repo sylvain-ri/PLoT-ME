@@ -253,7 +253,7 @@ scaling_counts = [
 @pytest.mark.parametrize("k, length, counts_unscaled, scaled", scaling_counts)
 def test_tools_scale_df_by_length(k, length, counts_unscaled, scaled):
     # Testing plot_me.tools FIRST because Cython modifies the arrays INPLACE
-    after_scaling = scale_df_by_length(counts_unscaled, kmer_cols=None, k=k, w=length, single_row=True)  # Scaling in place
+    after_scaling = scale_df_by_length(counts_unscaled, kmer_cols=counts_unscaled, k=k, w=length, single_row=True)  # Scaling in place
     np.testing.assert_array_almost_equal(scaled, after_scaling, decimal=3)
 
 @pytest.mark.parametrize("k, length, counts_unscaled, scaled", scaling_counts)
