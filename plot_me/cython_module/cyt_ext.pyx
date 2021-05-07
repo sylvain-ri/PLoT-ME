@@ -232,16 +232,17 @@ def combine_counts_forward_w_rc(counts):
     return _combine_counts_forward_w_rc(counts).base
 
 
-cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length):
-    """ Scale the counts by their length, in place """
-    # todo: should scale by the actual number of columns (palindromes and reverse complemented k-mers)
-    #       then do it in parse_DB tools.scale_df_by_length() as well
+cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length, unsigned int dimensions=-1):
+    """ Scale the counts by their length, in place. Assume the number of dimension being dim_combined_codons """
     cdef:
         unsigned int i
         float divisor, factor
 
+    if dimensions == -1:
+        dimensions = dim_combined_codons
+
     divisor = <float>length - <float>k + 1.
-    factor  = 4.**k / divisor
+    factor  = <float>dimensions / divisor
 
     for i in range(0, counts.shape[0]):
         counts[i] = counts[i] * factor
@@ -249,6 +250,7 @@ cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length):
 def scale_counts(counts, k, length):
     """ Scale the counts by their length, in place """
     return _scale_counts(counts, k, length)
+
 
 cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     """ Compute the distance to each centroid, given the centers for each centroid, for all dimensions 

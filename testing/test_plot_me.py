@@ -225,7 +225,7 @@ def test_cyt_count_and_combine_seq_arrays(k, seq, counts):
     np.testing.assert_array_equal(counts, cyt_ext.kmer_counter(str.encode(seq), k=k, dictionary=False, combine=True))
 
 
-avg = 4.**2/(11.-2.+1.)
+avg = 10./(11.-2.+1.)
 scaling_counts = [
     (2, 11,
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
@@ -233,21 +233,21 @@ scaling_counts = [
      np.array([avg,avg,avg,avg,avg,avg,avg,avg,avg,avg], dtype=np.float32), ),
     (2, 11,
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
-     np.array([0,  0,  0,  0,        10.            ,  0,  0,  0,  0,  0], dtype=np.float32),
-     np.array([0,  0,  0,  0, 10 * 4.**2/(11.-2.+1.),  0,  0,  0,  0,  0], dtype=np.float32), ),
+     np.array([0,  0,  0,  0,      10.            ,  0,  0,  0,  0,  0], dtype=np.float32),
+     np.array([0,  0,  0,  0, 10 * 10./(11.-2.+1.),  0,  0,  0,  0,  0], dtype=np.float32), ),
     (2, 30,
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
      np.array([2,  2,  3,  1,  4,  5,  2,  1,  3,  6], dtype=np.float32),
-     np.array([1.103448276, 1.103448276, 1.655172414, 0.551724138, 2.206896552, 2.75862069, 1.103448276, 0.551724138, 1.655172414, 3.310344828], dtype=np.float32), ),
+     np.array([0.689655172, 0.689655172, 1.034482759, 0.344827586, 1.379310345, 1.724137931, 0.689655172, 0.344827586, 1.034482759, 2.068965517], dtype=np.float32), ),
     (2, 102,
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
      np.array([2,  8,  3,  7, 10,  1,  9, 20, 40,  1], dtype=np.float32),
-     np.array([0.316831683, 1.267326733, 0.475247525, 1.108910891, 1.584158416, 0.158415842, 1.425742574, 3.168316832, 6.336633663, 0.158415842], dtype=np.float32), ),
+     np.array([0.198019802, 0.792079208, 0.297029703, 0.693069307, 0.99009901, 0.099009901, 0.891089109, 1.98019802, 3.96039604, 0.099009901], dtype=np.float32), ),
     (3, 25,
      #
      #        AAA,AAC,AAG,        AAT,ACA,ACC,ACG,ACT,AGA,        AGC,AGG,ATA,ATC,ATG,CAA,CAC,CAG,CCA,CCC,        CCG,CGA,CGC,CTA,CTC,GAA,        GAC,GCA,GCC,GGA,        GTA,TAA,TCA
      np.array([ 0, 0, 0,          10, 0, 0, 0, 0, 0,           4, 0, 0, 0, 0, 0, 0, 0, 0, 0,           7, 0, 0, 0, 0, 0,           2, 0, 0, 0,           1, 0, 0], dtype=np.float32),
-     np.array([ 0, 0, 0, 27.82608696, 0, 0, 0, 0, 0, 11.13043478, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.47826087, 0, 0, 0, 0, 0, 5.565217391, 0, 0, 0, 2.782608696, 0, 0], dtype=np.float32), ),
+     np.array([ 0, 0, 0, 13.33333333, 0, 0, 0, 0, 0, 5.333333333, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.333333333, 0, 0, 0, 0, 0, 2.666666667, 0, 0, 0, 1.333333333, 0, 0], dtype=np.float32), ),
 ]
 
 @pytest.mark.parametrize("k, length, counts_unscaled, scaled", scaling_counts)
@@ -265,13 +265,13 @@ def test_cyt_scale_counts(k, length, counts_unscaled, scaled):
 
 
 cluster_for_kmer_profile = [
-    (2, 8,
-     np.array([1.777777778,  1.777777778,  1.777777778,  1.777777778,  1.777777778,  1.777777778,  1.777777778,  1.777777778,  1.777777778,  1.777777778, ], dtype=np.float32),
-     np.array([[  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, ],
-               [  3,  3,  3,  3,  3,  3,  3,  3,  3,  3, ],
+    (2, 4,
+     np.array([1.02, 1.02, 1.02, 1.02, 1.02, 0.98, 0.98, 0.98, 0.98, 0.98, ], dtype=np.float32),
+     np.array([[  3,  3,  3,  3,  3,  3,  3,  3,  3,  3, ],
                [ -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, ],
                [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, ],
                [3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5, ],
+               [  1.03,  1.03,  1.03,  1.03,  1.03,  0.97,  0.97,  0.97,  0.97,  0.97, ],
                [  9,  9,  9,  9,  9,  9,  9,  9,  9,  9, ],
                [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, ],
                [  4,  4,  4,  4,  4,  4,  4,  4,  4,  4, ],

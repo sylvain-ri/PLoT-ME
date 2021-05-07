@@ -207,7 +207,7 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
     """ Divide the kmer counts by the length of the segments, and multiply by the number kmer choices"""
     # todo: should scale by the actual number of columns (palindromes and reverse complemented k-mers)
     divider = w - k + 1.
-    ratio = 4.**k / divider if divider > 1 else 4.**k  # avoid divide by 0
+    ratio = len(kmer_cols) / divider if divider > 1 else len(kmer_cols)  # avoid divide by 0
     ratio = np.float32(ratio)
     logger.debug(f"scaling with ratio={ratio}, from k={k}, w={w}, divider={divider}")
     if single_row:
