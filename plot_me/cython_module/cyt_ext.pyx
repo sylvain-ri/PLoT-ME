@@ -232,13 +232,13 @@ def combine_counts_forward_w_rc(counts):
     return _combine_counts_forward_w_rc(counts).base
 
 
-cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length, unsigned int dimensions=-1):
+cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length, unsigned int dimensions=0):
     """ Scale the counts by their length, in place. Assume the number of dimension being dim_combined_codons """
     cdef:
         unsigned int i
         float divisor, factor
 
-    if dimensions == -1:
+    if dimensions == 0:
         dimensions = dim_combined_codons
 
     divisor = <float>(length - k + 1)
