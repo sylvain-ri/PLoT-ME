@@ -32,8 +32,8 @@ from Cython.Build import cythonize
 from Cython.Distutils import build_ext
 import numpy as np
 
-# from plot_me import
 
+__version__  = "0.9.2"
 REQUIREMENTS = "requirements.txt"
 
 
@@ -62,7 +62,7 @@ cython_module = cythonize([Extension("plot_me.cython_module.cyt_ext", ['plot_me/
 
 setup(
     name="PLoT-ME",
-    version="0.9.1",
+    version=__version__,
     author="Sylvain Riondet",
     author_email="sylvainrionder@gmail.com",
     description="Pre-classification of Long-reads for Memory Efficient Taxonomic assignment",
