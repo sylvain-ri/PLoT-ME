@@ -241,15 +241,16 @@ cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length, unsigne
     if dimensions == -1:
         dimensions = dim_combined_codons
 
-    divisor = <float>length - <float>k + 1.
-    factor  = <float>dimensions / divisor
+    divisor = <float>(length - k + 1)
+    factor  = (<float>dimensions) / divisor
 
     for i in range(0, counts.shape[0]):
         counts[i] = counts[i] * factor
 
 def scale_counts(counts, k, length):
     """ Scale the counts by their length, in place """
-    return _scale_counts(counts, k, length)
+    cdef ssize_t ssize_len = <ssize_t>length
+    return _scale_counts(counts, k, ssize_len)
 
 
 cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
