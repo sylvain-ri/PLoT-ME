@@ -243,7 +243,7 @@ scaling_counts = [
      #        AA, AC, AG, AT, CA, CC, CG, GA, GC, TA
      np.array([2,  8,  3,  7, 10,  1,  9, 20, 40,  1], dtype=np.float32),
      np.array([0.198019802, 0.792079208, 0.297029703, 0.693069307, 0.99009901, 0.099009901, 0.891089109, 1.98019802, 3.96039604, 0.099009901], dtype=np.float32), ),
-    (3, 25,
+    (3, 26,
      #
      #        AAA,AAC,AAG,        AAT,ACA,ACC,ACG,ACT,AGA,        AGC,AGG,ATA,ATC,ATG,CAA,CAC,CAG,CCA,CCC,        CCG,CGA,CGC,CTA,CTC,GAA,        GAC,GCA,GCC,GGA,        GTA,TAA,TCA
      np.array([ 0, 0, 0,          10, 0, 0, 0, 0, 0,           4, 0, 0, 0, 0, 0, 0, 0, 0, 0,           7, 0, 0, 0, 0, 0,           2, 0, 0, 0,           1, 0, 0], dtype=np.float32),
