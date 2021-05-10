@@ -39,10 +39,12 @@ Tested with [NCBI RefSeq](https://www.ncbi.nlm.nih.gov/refseq/) ([ftp server](ft
 Package | Version
  --- | --- 
 biopython   | \>= 1.72
+Cython      | \>= 0.29
 ete3        | \>= 3.1.1
 numpy       | \>= 1.17.3
 pandas      | \>= 0.23
 scikit-learn| \>= 0.18
+setuptools  | \>= 42.0
 tqdm        | \>= 4.24.0
 
 
@@ -62,7 +64,7 @@ For the full help: `plot-me.preprocess -h`  <br>
 Typical usage:  <br>
 `plot-me.preprocess <path/NCBI/refseq> <folder/for/clusters> <path/taxonomy> 
  -k 4 -w 10000 -n 10 -o <OmitFoldersContainingString>` <br>
-#### Pre-classification + classification
+#### Pre-classification (PLoT-ME) + classification (Kraken2)
 For the full help: `plot-me.classify -h`  <br>
 Typical usage:  <br>
 `plot-me.classify <folder/with/clusters> <folder/reports> 
@@ -101,7 +103,7 @@ Typical usage:  <br>
 |   \-- mock_community_1 (one report per cluster)
 \-- taxonomy
 ```
-This `<*>` can be generated with: <br>
+This `<*>` will be generated with: <br>
 `plot-me.preprocess /mnt/data/NCBI/refseq /mnt/data/PLoT-ME /mnt/data/taxonomy -k 3 -w 10000 -n 10
  -o plant vertebrate` <br>
 And can be used with: <br>
@@ -138,7 +140,6 @@ _July 2020:_
 #### Future work
 - `classify` Cleaning of pre-classification tmp files
 - `classify` Multi cores
-- `classify`/`pre-process` Speed up kmer counting
 - `pre-process` Even sized bins
 - `pre-process` Overlapping clusters or tricks for higher accuracy
 
@@ -149,4 +150,5 @@ _July 2020:_
 **Supervisors:** Niranjan Nagarajan & Martin Henz <br>
 
 ## Thanks
-Thanks for your support and supervision all along my PhD and this project: Martin Henz, Chenhao Li, Rafael Peres, D. Bertrand and the whole [MTMS lab](https://csb5.github.io/)
+Thanks for your support and supervision all along my PhD and this project: 
+Niranjan Nagarajan, Martin Henz, Nok (Suphavilai Chayaporn), Chenhao Li, Rafael Peres, D. Bertrand and the whole [MTMS lab](https://csb5.github.io/)
