@@ -344,7 +344,7 @@ def clustering_segments(path_kmer_counts, output_pred, path_model, n_clusters, m
         df.description = df.description.astype('category')
         df.to_pickle(path_pkl_kmer_counts)
 
-    cols_kmers = df.columns[-nb_col:]
+    cols_kmers = codons_without_rev_comp(k)
     cols_spe = df.columns[:-nb_col]
     logger.debug(f"cols_kmers={cols_kmers[:5]} {cols_kmers[-5:]}")
 
@@ -515,7 +515,7 @@ def add_library(path_refseq_binned, path_bins_hash, n_clusters, classifier):
 
             # If library has already been done, skip it
             if osp.isdir(path_new_lib):
-                logger.debug(f"Library {bin_id} already existing. Delete folder if reinstall needed: {path_new_lib}")
+                logger.info(f"Library {bin_id} already existing. Delete folder if reinstall needed: {path_new_lib}")
             # If done with other parameters, k25, can reuse it
             elif len(existing_lib) > 0:
                 os.symlink(existing_lib[0], path_new_lib)
@@ -558,7 +558,7 @@ def build_indexes(path_taxonomy, path_classifier, n_clusters, p):
             path_kraken2 = osp.join(path_classifier, bin_id)
             path_kraken2_hash = osp.join(path_kraken2, "hash.k2d")
             if osp.isfile(path_kraken2_hash) and not any([fname.endswith('.tmp') for fname in os.listdir(path_kraken2)]):
-                logger.debug(f"Hash table already created, skipping bin {cluster}")
+                logger.info(f"Hash table already created, skipping bin {cluster}")
                 continue
 
             # add link to taxonomy
