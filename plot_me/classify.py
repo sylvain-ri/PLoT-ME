@@ -101,6 +101,7 @@ class Binner:
 class ReadToBin(SeqRecord.SeqRecord):
     """ General Read. Wrapping SeqIO.Record """
     logger = logging.getLogger(__name__)
+    k    = None
     KMER = {}  # kmers_dic(K)
     FASTQ_PATH = None
     FASTQ_BIN_FOLDER = None
@@ -421,9 +422,10 @@ class MockCommunity:
 
 def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=False, threads=cpu_count(),
                  f_record="~/logs/classify_records.csv", clf_settings="", drop_bin_threshold=DROP_BIN_THRESHOLD,
-                 skip_clas=False, force_binning=False, no_cython=False):
+                 skip_clas=False, force_binning=False, no_cython=False, verbosity=logging.INFO):
     """ Should load a file, do all the processing """
-    _ = init_logger(__package__)  # initialize the global logger
+    global logger
+    logger = init_logger(__package__)  # initialize the global logger
     logger.info("\n*********************************************************************************************************")
     logger.info("**** Starting script **** \n ")
     global THREADS
@@ -443,7 +445,6 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     logger.info("let's classify reads!")
 
     # Find the model
-    global K, BIN_NB, DROP_BIN_THRESHOLD
     if full_DB:
         path_model = "full"
         K          = 0
@@ -465,14 +466,17 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
         # Parse the model name to find parameters:
         basename = path_model.split("/model.")[1]
         clusterer, bin_nb, k, w, omitted, _ = re.split('_b|_k|_s|_o|.pkl', basename)
+        global K
         K      = int(k)
+        global BIN_NB
         BIN_NB = int(bin_nb)
+        global DROP_BIN_THRESHOLD
         DROP_BIN_THRESHOLD = drop_bin_threshold if drop_bin_threshold != -1 else 1. / BIN_NB
         path_to_hash = osp.join(path_database, classifier, clf_settings)
         logger.debug(f"path_to_hash: {path_to_hash}")
         logger.debug(f"Found parameters: clusterer={clusterer}, bin number={BIN_NB}, k={K}, w={w}, omitted={omitted}")
         if cython_is_there:
-            cyt_ext.set_verbosity(logging.INFO)
+            cyt_ext.set_verbosity(verbosity)
             cyt_ext.init_variables(K)
 
     # Set the folder with hash tables
@@ -596,6 +600,8 @@ def arg_parser():
                                                      'this flag is activated',
                                                 action='store_true')
     parser.add_argument('--no_cython',          help='Disable Cython', action='store_true')
+    parser.add_argument('-v', '--verbosity',    help='verbosity (default=%(default)d)',
+                                                default=logging.INFO, type=int, metavar='')
 
     args = parser.parse_args()
     logger.debug(f"Script {__file__} called with {args}")
@@ -605,7 +611,8 @@ def arg_parser():
     bin_classify(args.input_fastq, args.path_reports, args.path_plot_me,
                  classifier=args.classifier[0], full_DB=args.full_index, threads=args.threads, f_record=args.record,
                  drop_bin_threshold=args.drop_bin_threshold, skip_clas=args.skip_classification,
-                 clf_settings=args.classifier[1], force_binning=args.force_binning, no_cython=args.no_cython)
+                 clf_settings=args.classifier[1], force_binning=args.force_binning, no_cython=args.no_cython,
+                 verbosity=args.verbosity)
 
 
 if __name__ == '__main__':
