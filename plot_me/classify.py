@@ -150,7 +150,7 @@ class ReadToBin(SeqRecord.SeqRecord):
         else:
             self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=np.float32)\
                                              .reshape(-1, self.DIM_COMBINED),
-                                             None, k=K, w=len(self.seq), single_row=True)  # Put into 2D one row
+                                             self.KMER.keys(), k=K, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
