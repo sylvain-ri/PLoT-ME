@@ -47,7 +47,7 @@ def n_dim_rc_combined(k):
 
 
 def codons_without_rev_comp(k):
-    """ Forward codons only, without those which have been reverse complemented """
+    """ List of forward k-mers only, for a given k, without those which have been reverse complemented """
     l_codons_all = combinations(k)
     l_forward_only = []
     for cod in l_codons_all:
