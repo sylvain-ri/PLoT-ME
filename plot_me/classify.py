@@ -447,7 +447,9 @@ def bin_classify(list_fastq, path_report, path_database, classifier, full_DB=Fal
     # Find the model
     if full_DB:
         path_model = "full"
+        global K
         K          = 0
+        global BIN_NB
         BIN_NB     = 1
         # clusterer, bin_nb, k, w, omitted = (None, 1, None, None, None)
         path_to_hash = path_database
