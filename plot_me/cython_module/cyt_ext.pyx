@@ -467,6 +467,8 @@ def kmer_counter(sequence, k=4, dictionary=True, combine=True, ssize_t length=-1
 
     if length == -1:
         length = len(sequence)
+        if sequence[length-1] == "\n":
+            length -= 1
     if isinstance(sequence, str):
         sequence = str.encode(sequence)
     seq = <char*>sequence
@@ -547,7 +549,7 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
         size_t buffer_size_2 = 0
         size_t buffer_size_3 = 0
         ssize_t length_line
-        ssize_t length_sequence
+        ssize_t length_read
         float [:] counts     # = np.empty(4**k, dtype=np.float32)
         float [:] combined   # = np.empty(dim_combined_codons, dtype=np.float32)
         long long number_of_reads = 0
@@ -580,13 +582,18 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
     print_progress(0, 0.)
     while True:
         # Read line 4 by 4 if fastq, otherwise 2 by 2. Save all
+        # Always check if a line is empty `if length < 0`, in case a file doesn't end properly
+        # Keep count of the file length by adding the length of each line
         length_line = getline(&line_0, &buffer_size_0, cfile)
         if length_line < 0: break
         file_bytes_read += length_line
 
-        length_sequence = getline(&line_1, &buffer_size_1, cfile)
-        if length_sequence < 0: break
-        file_bytes_read += length_sequence
+        length_line = getline(&line_1, &buffer_size_1, cfile)
+        if length_line < 0: break
+        file_bytes_read += length_line
+        length_read = length_line
+        if line_1[length_read-1] == "\n" or line_1[length_read-1] == 10:
+            length_read -= 1
 
         if modulo == 4:
             length_line = getline(&line_2, &buffer_size_2, cfile)
@@ -597,12 +604,12 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
             file_bytes_read += length_line
 
         # Count k-mers
-        if verbosity <= DEBUG_MORE: logger.debug(f"Lines read, sequence len={length_sequence-1}, counting k-mers now")
-        counts = _kmer_counter(line_1, k_value=k, length=length_sequence - 1)     # because getline() keeps \n
+        if verbosity <= DEBUG_MORE: logger.debug(f"Lines read, sequence len={length_read}, counting k-mers now")
+        counts = _kmer_counter(line_1, k_value=k, length=length_read)
         combined = _combine_counts_forward_w_rc(counts)
         if verbosity <= DEBUG_MORE: logger.debug(f"combined counts, shape={combined.shape[0]}, counts[0]={combined[0]}, scaling now")
         # scale
-        _scale_counts(combined, k, length_sequence - 1)                           # because getline() keeps \n
+        _scale_counts(combined, k, length_read)
         if verbosity <= DEBUG_MORE: logger.debug(f"scaled value={combined[0]}")
         # find cluster
         cluster = _find_cluster(combined, centroid_centers)
