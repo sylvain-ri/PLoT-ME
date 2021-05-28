@@ -62,7 +62,6 @@ cdef:
     unsigned int [:] ar_codons_forward_addr
     unsigned int [:] ar_codons_rev_comp_addr
     float [:]        template_kmer_counts
-    float [:]        template_distances
 
 # ##########################              GETTERS / SETTERS              ##########################
 # Getters in Python only. Setter for Verbosity
@@ -253,8 +252,9 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
         Return the cluster number (unsigned int)
     """
     cdef unsigned int cluster_nb = centers.shape[0]
-    cdef float [:] distances = template_distances    # copy template with zeros, faster than initializing each time
-    cdef float tmp_distance
+    cdef float l1
+    cdef float distance
+    cdef float shortest_distance
     cdef unsigned int cluster_choice = 0
     cdef unsigned int cluster_i, dimension
     if verbosity <= DEBUG_MORE: logger.debug(f"Find_clusters: Centroids of shape={centers.shape[0]},{centers.shape[1]}, counts of shape={counts.shape[0]}")
@@ -262,12 +262,16 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     # Compute the distance to each centroid
     for cluster_i in range(cluster_nb):
         # todo: use prange ? then `dimension` must be signed
+        distance = 0.
         for dimension in range(centers.shape[1]):
-            tmp_distance = counts[dimension] - centers[cluster_i][dimension]
-            distances[cluster_i] += tmp_distance * tmp_distance
+            l1 = counts[dimension] - centers[cluster_i][dimension]
+            distance += l1 * l1
 
         # Find the cluster with the minimum distance
-        if cluster_i != 0 and distances[cluster_choice] > distances[cluster_i]:
+        if cluster_i == 0:
+            shortest_distance = distance
+        elif distance < shortest_distance:
+            shortest_distance = distance
             cluster_choice = cluster_i
     return cluster_choice
 
@@ -348,8 +352,6 @@ cdef void _init_variables(unsigned int k):
     k_val = k
     global template_kmer_counts
     template_kmer_counts = np.zeros(4**k, dtype=np.float32)
-    global template_distances
-    template_distances = np.zeros(dim_combined_codons, dtype=np.float32)
     global l_codons_all
     l_codons_all = codons_all
     global l_codons_combined
