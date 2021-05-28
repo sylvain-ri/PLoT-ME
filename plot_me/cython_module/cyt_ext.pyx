@@ -22,7 +22,7 @@ import numpy as np
 cimport numpy as np
 from libc.stdlib cimport malloc, free
 from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
-# from cython.parallel import prange
+from cython.parallel import prange
 # todo: try with cpython.array : https://cython.readthedocs.io/en/latest/src/tutorial/array.html#array-array
 # from cpython cimport array
 # import array
@@ -251,19 +251,21 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
     """ Compute the distance to each centroid, given the centers for each centroid, for all dimensions 
         Return the cluster number (unsigned int)
     """
-    cdef unsigned int cluster_nb = centers.shape[0]
-    cdef float l1
-    cdef float distance
-    cdef float shortest_distance
-    cdef unsigned int cluster_choice = 0
-    cdef unsigned int cluster_i, dimension
+    cdef:
+        unsigned int cluster_nb = centers.shape[0]
+        float l1
+        float distance
+        float shortest_distance
+        unsigned int cluster_choice = 0
+        unsigned int cluster_i
+        int dimension
+
     if verbosity <= DEBUG_MORE: logger.debug(f"Find_clusters: Centroids of shape={centers.shape[0]},{centers.shape[1]}, counts of shape={counts.shape[0]}")
 
     # Compute the distance to each centroid
     for cluster_i in range(cluster_nb):
-        # todo: use prange ? then `dimension` must be signed
         distance = 0.
-        for dimension in range(centers.shape[1]):
+        for dimension in prange(centers.shape[1], nogil=True):
             l1 = counts[dimension] - centers[cluster_i][dimension]
             distance += l1 * l1
 
