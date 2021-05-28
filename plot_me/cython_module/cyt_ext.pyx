@@ -635,7 +635,8 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
     printf("\nNumber of reads pre-classified: %lld, in %.2f seconds. \n", number_of_reads, time_precise-time_start)
     if verbosity <= INFO:
         logger.info(f"Number of reads: {number_of_reads}, bytes counted={file_bytes_read}, file size={file_size_bytes}")
-        logger.info(f"reads per cluster: {clusters_counts}")
+        f_str = ", ".join((f"{i}={clusters_counts[i]}" for i in range(clusters_counts.shape[0])))
+        logger.info(f"reads per cluster: {f_str}")
     return number_of_reads
 
 
