@@ -222,6 +222,22 @@ def scale_df_by_length(data, kmer_cols, k, w, single_row=False, ):
         logger.debug(f"{data.iloc[:5,:20]}")
 
 
+def find_cluster(vector, centers):
+    """ Python implementation to find lcuster number. For unittest against the cython implementation """
+    closest_distance = 999999999
+    chosen_cluster = 0
+    for i in range(centers.shape[0]):
+        l1 = vector - centers[i]
+        distance = (l1*l1).sum()
+
+        if i == 0:
+            closest_distance = distance
+        if distance < closest_distance:
+            closest_distance = distance
+            chosen_cluster = i
+    return chosen_cluster
+
+
 class ScanFolder:
     """ Set class attributes, root & target folder, extensions to find and create
         tqdm scan the folder and create abs, rel, target path
