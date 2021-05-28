@@ -22,7 +22,6 @@ import numpy as np
 cimport numpy as np
 from libc.stdlib cimport malloc, free
 from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
-from cython.parallel import prange
 # todo: try with cpython.array : https://cython.readthedocs.io/en/latest/src/tutorial/array.html#array-array
 # from cpython cimport array
 # import array
@@ -209,8 +208,6 @@ cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
     if verbosity <= DEBUG_MORE:
         logger.log(DEBUG_MORE, f"ar_codons_forward_addr={ar_codons_forward_addr.base}, ar_codons_rev_comp_addr={ar_codons_rev_comp_addr.base}")
 
-    # todo: use prange ? then `i` must be signed
-#    for i in prange(dim_combined_codons, nogil=True):
     for i in range(dim_combined_codons):
         if ar_codons_forward_addr[i] == ar_codons_rev_comp_addr[i]:
             res[i] = counts[ar_codons_forward_addr[i]]
@@ -237,7 +234,6 @@ cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length, unsigne
     divisor = <float>(length - k + 1)
     factor  = (<float>dimensions) / divisor
 
-    # todo: use prange ? then `i` must be signed
     for i in range(0, counts.shape[0]):
         counts[i] = counts[i] * factor
 
@@ -257,15 +253,14 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
         float distance
         float shortest_distance
         unsigned int cluster_choice = 0
-        unsigned int cluster_i
-        int dimension
+        unsigned int cluster_i, dimension
 
     if verbosity <= DEBUG_MORE: logger.debug(f"Find_clusters: Centroids of shape={centers.shape[0]},{centers.shape[1]}, counts of shape={counts.shape[0]}")
 
     # Compute the distance to each centroid
     for cluster_i in range(cluster_nb):
         distance = 0.
-        for dimension in prange(centers.shape[1], nogil=True):
+        for dimension in range(centers.shape[1]):
             l1 = counts[dimension] - centers[cluster_i][dimension]
             distance += l1 * l1
 
