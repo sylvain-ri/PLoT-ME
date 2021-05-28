@@ -216,6 +216,7 @@ class ReadToBin(SeqRecord.SeqRecord):
             if cython_is_there:
                 cls.MODEL = np.load(path_model.replace("model", "cluster_centers").replace(".pkl", ".npy"))
                 cluster_nb = cls.MODEL.shape[0]
+                cls.logger.debug(f"Dimensions of the centroids: {cluster_nb}, {cls.MODEL[1]}")
                 for i in range(cluster_nb):
                     path_cluster_i = cls.cls_path_out(i)
                     cls.outputs_list.append(path_cluster_i)
