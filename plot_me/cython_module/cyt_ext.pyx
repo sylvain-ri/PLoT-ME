@@ -243,7 +243,7 @@ def scale_counts(counts, k, length):
     return _scale_counts(counts, k, ssize_len)
 
 
-cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
+cdef unsigned int _find_cluster(float[:] counts, const float[:,:] centers):
     """ Compute the distance to each centroid, given the centers for each centroid, for all dimensions 
         Return the cluster number (unsigned int)
     """
@@ -525,7 +525,7 @@ def read_file(filename):
 
 
 #
-cdef long long _classify_reads(const char* fastq_file, unsigned int k, const float[:,::1] centroid_centers,
+cdef long long _classify_reads(const char* fastq_file, unsigned int k, const float[:,:] centroid_centers,
                                         const char** outputs, unsigned int modulo=4, long long dev=10, long long file_size_from_python=-1):
     """ Fast Cython file reader
         from https://gist.github.com/pydemo/0b85bd5d1c017f6873422e02aeb9618a
@@ -658,7 +658,7 @@ def classify_reads(p_fastq, k, centroids, list outputs, file_format="fastq", dev
     cdef const char** p_output_parts = to_cstring_array(outputs)
     cdef long long number_of_reads
 
-    cdef float [:,::1] kmeans_centroids = centroids
+    cdef float [:,:] kmeans_centroids = centroids
     cdef unsigned int modulo = 4 if file_format.lower() == "fastq" else 2
     cdef long long file_size = getsize(p_fastq)
 
