@@ -130,10 +130,7 @@ class ReadToBin(SeqRecord.SeqRecord):
     def kmer_count(self, ignore_N=True):
         """ common method """
         if self._kmer_count is None:
-            if cython_is_there:
-                self._kmer_count = cyt_ext.kmer_counter(str(self.seq), k=self.k, dictionary=True, combine=True, length=len(self.seq))
-            else:
-                self._kmer_count = combine_counts_forward_w_rc(seq_count_kmer(self.seq, self.KMER.copy(), self.k, ignore_N=ignore_N), k=self.k)
+            self._kmer_count = combine_counts_forward_w_rc(seq_count_kmer(self.seq, self.KMER.copy(), self.k, ignore_N=ignore_N), k=self.k)
         return self._kmer_count
 
     @property
@@ -142,14 +139,9 @@ class ReadToBin(SeqRecord.SeqRecord):
 
     def scale(self):
         self.logger.log(5, "scaling the read by it's length and k-mer")
-        if cython_is_there:
-            counts = cyt_ext.kmer_counter(str(self.seq), k=self.k, dictionary=False, combine=True, length=len(self.seq))
-            cyt_ext.scale_counts(counts, self.k, len(self.seq))
-            self.scaled = counts.reshape(-1, self.DIM_COMBINED)
-        else:
-            self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=np.float32)\
-                                             .reshape(-1, self.DIM_COMBINED),
-                                             self.KMER.keys(), k=self.k, w=len(self.seq), single_row=True)  # Put into 2D one row
+        self.scaled = scale_df_by_length(np.fromiter(self.kmer_count.values(), dtype=np.float32)\
+                                         .reshape(-1, self.DIM_COMBINED),
+                                         self.KMER.keys(), k=self.k, w=len(self.seq), single_row=True)  # Put into 2D one row
         return self.scaled
 
     def find_bin(self):
