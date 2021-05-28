@@ -3,22 +3,15 @@
 # cython: language_level=3, infer_types=True, boundscheck=True, profile=False, wraparound=False, cdivision=True
 # distutils: language=c, define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 # unused args: DISABLED_cdivision=True, DISABLED_define_macros=CYTHON_TRACE_NOGIL=1,
-# todo: set to False the cython flags, one by one
-# todo: use a class
-#       https://cython.readthedocs.io/en/latest/src/userguide/extension_types.html
-#       https://cython.readthedocs.io/en/latest/src/tutorial/cdef_classes.html
 """
 !!!! MUST run this init before using any methods !!!!
 python3 -m build
 python3 setup.py build_ext --inplace
 python3 -m pip install -e .
-
-TODO
- * count k-mers in fastq
- * make the binning
- * vectorize the distance calculation
- * save into fastq file
 """
+# todo: set to False the cython flags, one by one
+# todo: vectorize the distance calculation
+# todo: prange _classify_reads(), and with gil for read writing
 
 import logging
 from os.path import getsize
@@ -29,7 +22,7 @@ import numpy as np
 cimport numpy as np
 from libc.stdlib cimport malloc, free
 from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
-from cython.parallel import prange
+# from cython.parallel import prange
 # todo: try with cpython.array : https://cython.readthedocs.io/en/latest/src/tutorial/array.html#array-array
 # from cpython cimport array
 # import array
@@ -49,6 +42,7 @@ DEF WARNING     = 30
 DEF INFO        = 20
 DEF DEBUG       = 10
 DEF DEBUG_MORE  =  5
+DEF BAR_UPDATE_DELAY = 1. / 25.  # time between updates of the progress bar: 1 / frequency
 
 
 # ##########################    CONSTANTS AND VARIABLES FOR FUNCTIONS   ##########################
@@ -117,6 +111,7 @@ cdef extern from "Python.h":
     const char* PyUnicode_AsUTF8(object unicode)
 
 cdef const char** to_cstring_array(list_str):
+    """ convert a list of Python strings into C char ** (array of char arrays) """
     cdef const char** ret = <const char**>malloc(len(list_str) * sizeof(char *))
     for i in range(len(list_str)):
         ret[i] = PyUnicode_AsUTF8(list_str[i])
@@ -124,8 +119,8 @@ cdef const char** to_cstring_array(list_str):
 
 
 cdef const char* progressbar_empty  = PyUnicode_AsUTF8("")
-cdef const char* progressbar_string = PyUnicode_AsUTF8("...LoLoMeME:.LOng.reads.LOw.MEmory.MEtagenomics.(PLoT-ME)...")
-DEF  progressbar_length        = 60
+cdef const char* progressbar_string = PyUnicode_AsUTF8("...PLoT-ME.or.LoLoMeMe=LOng.reads.LOw.MEmory.Metagenomics...")
+DEF  progressbar_length             = 60
 
 cdef void print_progress(long long reads, float ratio):
     """ progress bar in Cython 
@@ -147,7 +142,7 @@ cdef void print_progress(long long reads, float ratio):
 
 @cython.profile(False)       # Allows profiling the function
 cdef inline unsigned int nucl_val(char c) nogil:
-    """ Map of letters To Value (for addressing the k-mer array """
+    """ Map of letters To Value (for addressing the k-mer array) """
     if c == b"A" or c == b"a":
         return 0
     elif c == b"C" or c == b"c":
@@ -178,17 +173,18 @@ def reverse_complement_string(seq):
     return _reverse_complement_string(seq)
 
 cdef unsigned int _n_dim_rc_combined(unsigned int k):
-    """ Return the number of dimensions, for a given k, for the unique k-mer counts (forward - reverse complement) 
+    """ Return the number of dimensions, for a given k, of the unique k-mer (forward minus reverse complements) 
         https://stackoverflow.com/questions/40952719/algorithm-to-collapse-forward-and-reverse-complement-of-a-dna-sequence-in-python
     """
     return 2**k + (4**k - 2**k)//2 if k % 2 == 0 else 4**k // 2
 
 def n_dim_rc_combined(k):
+    """ Return the number of dimensions, for a given k, of the unique k-mer (forward minus reverse complements)  """
     return _n_dim_rc_combined(k)
 
 
 cdef unsigned int _codon_addr(str codon):
-    """ Take a codon as char array / str and return the address, given its nucleotides """
+    """ Take a k-mer as char array / str and return the address, given its nucleotides """
     cdef:
         unsigned int length = len(codon)
         unsigned int i
@@ -203,8 +199,6 @@ def codon_addr(codon):
     return _codon_addr(codon)
 
 
-#@cython.boundscheck(False)  # Deactivate bounds checking
-#@cython.wraparound(False)
 cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
     """ Return the combined forward and reverse complement from the k-mer profile  """
     if counts.shape[0] != 4 ** k_val:
@@ -228,7 +222,7 @@ cdef float[:] _combine_counts_forward_w_rc(float[:] counts):
 
 
 def combine_counts_forward_w_rc(counts):
-    """ Python API for cython method. combine forward and reverse complement on an array"""
+    """ Python API for cython method. combine forward and reverse complement in an array"""
     return _combine_counts_forward_w_rc(counts).base
 
 
@@ -244,6 +238,7 @@ cdef void _scale_counts(float[:] counts, unsigned int k, ssize_t length, unsigne
     divisor = <float>(length - k + 1)
     factor  = (<float>dimensions) / divisor
 
+    # todo: use prange ? then `i` must be signed
     for i in range(0, counts.shape[0]):
         counts[i] = counts[i] * factor
 
@@ -266,6 +261,7 @@ cdef unsigned int _find_cluster(float[:] counts, const float[:,::1] centers):
 
     # Compute the distance to each centroid
     for cluster_i in range(cluster_nb):
+        # todo: use prange ? then `dimension` must be signed
         for dimension in range(centers.shape[1]):
             tmp_distance = counts[dimension] - centers[cluster_i][dimension]
             distances[cluster_i] += tmp_distance * tmp_distance
@@ -563,7 +559,7 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
         double time_precise
         double time_start
         double time_last
-        clusters_dict = {i:0 for i in range(centroid_centers.shape[0])}
+        long long [:] clusters_counts = np.zeros(centroid_centers.shape[0], dtype=np.longlong)
 
     # https://stackoverflow.com/questions/42304195/how-to-measure-time-up-to-millisecond-in-cython/43009871
     clock_gettime(CLOCK_REALTIME, &ts)
@@ -617,11 +613,11 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
 
         # Update progress bar
         if verbosity <= INFO:
-            clusters_dict[cluster] += 1
+            clusters_counts[cluster] += 1
 
             clock_gettime(CLOCK_REALTIME, &ts)
             time_precise = ts.tv_sec + (ts.tv_nsec / 1000000000.)
-            if time_precise >= time_last + 0.04:
+            if time_precise >= time_last + BAR_UPDATE_DELAY:
                 time_last = time_precise
                 print_progress(number_of_reads, <float>file_bytes_read / file_size_bytes)
 
@@ -640,7 +636,7 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
     printf("\nNumber of reads pre-classified: %lld, in %.2f seconds. \n", number_of_reads, time_precise-time_start)
     if verbosity <= INFO:
         logger.info(f"Number of reads: {number_of_reads}, bytes counted={file_bytes_read}, file size={file_size_bytes}")
-        logger.info(f"reads per cluster: {clusters_dict}")
+        logger.info(f"reads per cluster: {clusters_counts}")
     return number_of_reads
 
 
