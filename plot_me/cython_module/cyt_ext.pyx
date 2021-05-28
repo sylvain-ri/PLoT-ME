@@ -592,7 +592,7 @@ cdef long long _classify_reads(const char* fastq_file, unsigned int k, const flo
         if length_line < 0: break
         file_bytes_read += length_line
         length_read = length_line
-        if line_1[length_read-1] == "\n" or line_1[length_read-1] == 10:
+        while line_1[length_read-1] == 10 or line_1[length_read-1] == 13:  #  10 == b"\n"  linefeed and carriage return
             length_read -= 1
 
         if modulo == 4:
